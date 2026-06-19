@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: copyquick
+    runtime: node
+    repo: https://github.com/danimi4336-spec/CopyQuick
+    plan: free
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: STRIPE_KEY
+        sync: false
+      - key: STRIPE_PRO_PRICE
+        value: price_1Tk32kDYjZIa0wMA00QC6C7e
+      - key: STRIPE_UNLIMITED_PRICE
+        value: price_1Tk32kDYjZIa0wMAKZ19U8e2
+    buildCommand: npm install
+    startCommand: node server.js
