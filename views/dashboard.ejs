@@ -1,0 +1,160 @@
+<div class="container dashboard">
+    <header class="dashboard-header">
+        <div>
+            <h1>Welcome, <%= user.name %>!</h1>
+            <p class="text-secondary">Ready to generate some high-converting copy?</p>
+        </div>
+        <div class="user-stats">
+            <span class="badge">Plan: <%= user.plan_tier %></span>
+            <span class="usage">Generations: <strong><%= user.generations_used %></strong> / <%= user.monthly_limit %></span>
+        </div>
+    </header>
+
+    <% if (typeof error !== 'undefined') { %>
+        <div class="alert alert-error"><%- error %></div>
+    <% } %>
+
+    <div class="dashboard-grid">
+        <section class="generator-tool">
+            <div class="card p-4">
+                <h2 class="h3 mb-4">Generate New Copy</h2>
+                <form action="/dashboard/generate" method="POST">
+                    <div class="form-group">
+                        <label for="productDescription">What are you selling? (Product description)</label>
+                        <textarea id="productDescription" name="productDescription" rows="4" placeholder="Describe your product or service in detail..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="targetAudience">Target Audience</label>
+                            <input type="text" id="targetAudience" name="targetAudience" placeholder="e.g. Busy moms, Tech founders" value="<%= typeof input !== 'undefined' ? input.targetAudience : '' %>" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="contentType">Content Type</label>
+                            <select id="contentType" name="contentType">
+                                <% Object.keys(contentTypes).forEach(type => { %>
+                                    <option value="<%= type %>" <%= (typeof input !== 'undefined' && input.contentType === type) ? 'selected' : '' %>><%= contentTypes[type] %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="tone">Tone</label>
+                            <select id="tone" name="tone">
+                                <% Object.keys(tones).forEach(t => { %>
+                                    <option value="<%= t %>" <%= (typeof input !== 'undefined' && input.tone === t) ? 'selected' : '' %>><%= tones[t] %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-block">Generate Copy</button>
+                </form>
+            </div>
+
+            <% if (results) { %>
+                <div class="results-container mt-5">
+                    <h2 class="h3 mb-4">Your Results</h2>
+                    <div class="results-grid">
+                        <% results.forEach((result, index) => { %>
+                            <div class="result-card">
+                                <div class="result-header">
+                                    <span class="result-tag"><%= result.tone %></span>
+                                    <button class="copy-btn" onclick="copyToClipboard('copy-text-<%= index %>', this)">
+                                        Copy
+                                    </button>
+                                </div>
+                                <p class="result-text" id="copy-text-<%= index %>"><%= result.text %></p>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+            <% } %>
+        </section>
+
+        <section class="recent-generations">
+            <h2 class="h3 mb-4">Recent History</h2>
+            <% if (history && history.length > 0) { %>
+                <div class="history-table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Input Preview</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% history.forEach(item => { %>
+                                <tr>
+                                    <td><span class="badge-sm"><%= contentTypes[item.content_type] %></span></td>
+                                    <td class="history-preview"><%= item.input_text.substring(0, 40) %>...</td>
+                                    <td class="history-date"><%= new Date(item.created_at).toLocaleDateString() %></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <div class="empty-state">
+                    <p>No generations yet. Start by filling out the form!</p>
+                </div>
+            <% } %>
+        </section>
+    </div>
+</div>
+
+<script>
+function copyToClipboard(elementId, btn) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.remove('copied');
+        }, 2000);
+    });
+}
+</script>
+
+<style>
+    .card { background: var(--white); border: 1px solid var(--border); border-radius: 0.75rem; }
+    .p-4 { padding: 1.5rem; }
+    .mb-4 { margin-bottom: 1rem; }
+    .mt-5 { margin-top: 2rem; }
+    .h3 { font-size: 1.25rem; font-weight: 700; }
+    .text-secondary { color: var(--secondary); font-size: 0.9rem; }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    
+    textarea, select, input { 
+        width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; 
+        font-family: inherit; font-size: 0.95rem; margin-top: 0.25rem;
+    }
+    textarea:focus, select:focus, input:focus { outline: none; border-color: var(--primary); }
+
+    .results-grid { display: grid; gap: 1rem; }
+    .result-card { 
+        background: #f8fafc; border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.25rem;
+        position: relative; transition: all 0.2s;
+    }
+    .result-card:hover { border-color: var(--primary); background: var(--white); }
+    .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .result-tag { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 0.2rem 0.5rem; border-radius: 0.25rem; }
+    .copy-btn { background: none; border: 1px solid var(--border); padding: 0.25rem 0.75rem; border-radius: 0.4rem; font-size: 0.8rem; cursor: pointer; font-weight: 600; }
+    .copy-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
+    .copy-btn.copied { background: var(--success); color: white; border-color: var(--success); }
+    .result-text { font-size: 1.05rem; white-space: pre-wrap; color: var(--dark); }
+
+    .history-table-container { background: white; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
+    .history-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .history-table th { background: #f8fafc; padding: 0.75rem 1rem; font-size: 0.8rem; text-transform: uppercase; color: var(--secondary); border-bottom: 1px solid var(--border); }
+    .history-table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .badge-sm { font-size: 0.65rem; background: #eef2ff; color: var(--primary); padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-weight: 600; white-space: nowrap; }
+    .history-preview { color: var(--secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-date { color: var(--secondary); white-space: nowrap; }
+    .empty-state { text-align: center; padding: 2rem; border: 2px dashed var(--border); border-radius: 0.5rem; color: var(--secondary); }
+</style>

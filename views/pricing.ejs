@@ -1,0 +1,67 @@
+<div class="container pricing">
+    <div class="section-title">
+        <h1>Choose Your Plan</h1>
+        <p class="tagline">Supercharge your marketing with more generations and advanced features.</p>
+    </div>
+
+    <div class="pricing-grid">
+        <!-- Free Tier -->
+        <div class="pricing-card">
+            <h3>Free</h3>
+            <div class="price"><span>$</span>0<span>/mo</span></div>
+            <ul class="price-features">
+                <li>10 generations / mo</li>
+                <li>Basic templates</li>
+                <li>Email support</li>
+            </ul>
+            <% if (user && user.plan_tier === 'free') { %>
+                <button class="btn btn-outline btn-block" disabled>Current Plan</button>
+            <% } else if (!user) { %>
+                <a href="/signup" class="btn btn-outline btn-block">Sign Up</a>
+            <% } else { %>
+                <button class="btn btn-outline btn-block" disabled>Downgrade (Contact Support)</button>
+            <% } %>
+        </div>
+
+        <!-- Pro Tier -->
+        <div class="pricing-card highlighted">
+            <span class="badge">Most Popular</span>
+            <h3>Pro</h3>
+            <div class="price"><span>$</span>9<span>/mo</span></div>
+            <ul class="price-features">
+                <li>200 generations / mo</li>
+                <li>All templates</li>
+                <li>Tone customization</li>
+                <li>Priority support</li>
+            </ul>
+            <% if (user && user.plan_tier === 'pro') { %>
+                <button class="btn btn-primary btn-block" disabled>Current Plan</button>
+            <% } else { %>
+                <form action="/subscribe" method="POST">
+                    <input type="hidden" name="price" value="pro">
+                    <button type="submit" class="btn btn-primary btn-block">Upgrade to Pro</button>
+                </form>
+            <% } %>
+        </div>
+
+        <!-- Unlimited Tier -->
+        <div class="pricing-card">
+            <h3>Unlimited</h3>
+            <div class="price"><span>$</span>29<span>/mo</span></div>
+            <ul class="price-features">
+                <li>Unlimited generations</li>
+                <li>Team sharing</li>
+                <li>API access</li>
+                <li>24/7 Priority support</li>
+            </ul>
+            <% if (user && user.plan_tier === 'unlimited') { %>
+                <button class="btn btn-primary btn-block" disabled>Current Plan</button>
+            <% } else { %>
+                <form action="/subscribe" method="POST">
+                    <input type="hidden" name="price" value="unlimited">
+                    <button type="submit" class="btn btn-primary btn-block">Go Unlimited</button>
+                </form>
+            <% } %>
+        </div>
+    </div>
+</div>

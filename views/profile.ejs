@@ -1,0 +1,60 @@
+<div class="container dashboard">
+    <header class="dashboard-header">
+        <h1>My Profile</h1>
+        <a href="/dashboard" class="btn btn-outline">Back to Dashboard</a>
+    </header>
+
+    <div class="auth-card" style="max-width: 600px; margin: 0 auto;">
+        <h2 class="h3 mb-4">Account Information</h2>
+        
+        <div class="profile-info">
+            <div class="info-group">
+                <label>Name</label>
+                <p><%= user.name %></p>
+            </div>
+            
+            <div class="info-group">
+                <label>Email Address</label>
+                <p><%= user.email %></p>
+            </div>
+            
+            <div class="info-group">
+                <label>Current Plan</label>
+                <div class="plan-status">
+                    <span class="badge"><%= user.plan_tier %></span>
+                    <% if (user.plan_tier === 'free') { %>
+                        <a href="/pricing" class="btn btn-primary btn-sm ml-3">Upgrade Now</a>
+                    <% } else { %>
+                        <form action="/manage" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-outline btn-sm ml-3">Manage Subscription</button>
+                        </form>
+                    <% } %>
+                </div>
+            </div>
+            
+            <div class="info-group">
+                <label>Usage This Month</label>
+                <p><%= user.generations_used %> / <%= user.monthly_limit %> generations</p>
+                <div class="progress-bar">
+                    <div class="progress" style="width: <%= (user.generations_used / user.monthly_limit) * 100 %>%"></div>
+                </div>
+            </div>
+            
+            <div class="info-group" style="margin-top: 2rem;">
+                <label>Member Since</label>
+                <p><%= new Date(user.created_at).toLocaleDateString() %></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-info { display: grid; gap: 1.5rem; }
+    .info-group label { display: block; font-size: 0.85rem; color: var(--secondary); font-weight: 600; margin-bottom: 0.25rem; }
+    .info-group p { font-size: 1.1rem; font-weight: 500; }
+    .plan-status { display: flex; align-items: center; }
+    .ml-3 { margin-left: 1rem; }
+    .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+    .progress-bar { width: 100%; height: 0.5rem; background: #e2e8f0; border-radius: 1rem; margin-top: 0.5rem; overflow: hidden; }
+    .progress { height: 100%; background: var(--primary); border-radius: 1rem; }
+</style>
