@@ -13,7 +13,7 @@ function requireAuth(req, res, next) {
 
 // Signup
 router.get('/signup', (req, res) => {
-  res.render('signup', { title: 'Sign Up - CopyQuick', error: null });
+  res.render('signup', { title: 'Sign Up - CopyQuick', error: null, currentPage: 'signup' });
 });
 
 router.post('/signup', async (req, res) => {
@@ -29,13 +29,13 @@ router.post('/signup', async (req, res) => {
     res.redirect('/dashboard');
   } catch (err) {
     console.error(err);
-    res.render('signup', { title: 'Sign Up - CopyQuick', error: 'Email already exists or invalid data.' });
+    res.render('signup', { title: 'Sign Up - CopyQuick', error: 'Email already exists or invalid data.', currentPage: 'signup' });
   }
 });
 
 // Login
 router.get('/login', (req, res) => {
-  res.render('login', { title: 'Login - CopyQuick', error: null });
+  res.render('login', { title: 'Login - CopyQuick', error: null, currentPage: 'login' });
 });
 
 router.post('/login', async (req, res) => {
@@ -48,11 +48,11 @@ router.post('/login', async (req, res) => {
       req.session.userId = user.id;
       res.redirect('/dashboard');
     } else {
-      res.render('login', { title: 'Login - CopyQuick', error: 'Invalid email or password.' });
+      res.render('login', { title: 'Login - CopyQuick', error: 'Invalid email or password.', currentPage: 'login' });
     }
   } catch (err) {
     console.error(err);
-    res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.' });
+    res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
   }
 });
 

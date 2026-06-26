@@ -20,7 +20,8 @@ router.get('/dashboard', requireAuth, (req, res) => {
     contentTypes: getContentTypes(),
     tones: getTones(),
     history: history,
-    results: null
+    results: null,
+    currentPage: 'dashboard'
   });
 });
 
@@ -87,7 +88,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 });
 
 router.get('/profile', requireAuth, (req, res) => {
-  res.render('profile', { title: 'My Profile - CopyQuick' });
+  res.render('profile', { title: 'My Profile - CopyQuick', currentPage: 'profile' });
 });
 
 module.exports = router;

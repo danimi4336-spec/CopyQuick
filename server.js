@@ -70,7 +70,7 @@ app.use('/', dashboardRoutes);
 app.use('/', pricingRoutes);
 
 app.get('/', (req, res) => {
-  res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy' });
+  res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy', currentPage: 'home' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {

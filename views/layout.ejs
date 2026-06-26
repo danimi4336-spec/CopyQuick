@@ -7,41 +7,102 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✍️</text></svg>">
 </head>
 <body>
     <nav class="navbar">
         <div class="container">
             <a href="/" class="logo">CopyQuick</a>
-            <button class="hamburger" id="hamburger" aria-label="Menu">
+            <button class="hamburger" id="hamburger" aria-label="Open menu">
                 <span></span>
                 <span></span>
                 <span></span>
             </button>
+            <button class="mobile-menu-close" id="menuClose" aria-label="Close menu">✕</button>
             <ul class="nav-links" id="navLinks">
-                <li><a href="/#features">Features</a></li>
-                <li><a href="/#pricing">Pricing</a></li>
+                <li><a href="/#features" class="<% if (currentPage === 'features') { %>active<% } %>">Features</a></li>
+                <li><a href="/#pricing" class="<% if (currentPage === 'pricing') { %>active<% } %>">Pricing</a></li>
                 <% if (locals.user) { %>
-                    <li><a href="/dashboard">Dashboard</a></li>
-                    <li><a href="/profile">Profile</a></li>
+                    <li><a href="/dashboard" class="<% if (currentPage === 'dashboard') { %>active<% } %>">Dashboard</a></li>
+                    <li><a href="/profile" class="<% if (currentPage === 'profile') { %>active<% } %>">Profile</a></li>
                     <li>
                         <form action="/logout" method="POST" style="display: inline;">
-                            <button type="submit" class="btn-link">Logout</button>
+                            <button type="submit" class="btn-link" style="width:100%;text-align:center;padding:1rem 0;font-size:1.125rem;font-weight:600;">Logout</button>
                         </form>
                     </li>
                 <% } else { %>
-                    <li><a href="/login">Login</a></li>
+                    <li><a href="/login" class="<% if (currentPage === 'login') { %>active<% } %>">Login</a></li>
                     <li><a href="/signup" class="btn btn-primary">Get Started</a></li>
+                    <li class="mobile-get-started-divider" style="display:none;">
+                        <a href="/signup" class="mobile-menu-cta-btn">Get Started Free →</a>
+                    </li>
                 <% } %>
             </ul>
-            <a href="/signup" class="btn btn-primary mobile-cta">Get Started</a>
+            <% if (!locals.user) { %>
+                <a href="/signup" class="btn btn-primary mobile-cta">Get Started</a>
+            <% } %>
         </div>
     </nav>
+
     <script>
-        document.getElementById('hamburger').addEventListener('click', function() {
-            this.classList.toggle('active');
-            document.getElementById('navLinks').classList.toggle('open');
-        });
+        (function() {
+            const hamburger = document.getElementById('hamburger');
+            const menuClose = document.getElementById('menuClose');
+            const navLinks = document.getElementById('navLinks');
+
+            function openMenu() {
+                hamburger.classList.add('active');
+                navLinks.classList.remove('closing');
+                navLinks.classList.add('open');
+                if (menuClose) menuClose.classList.add('visible');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeMenu() {
+                navLinks.classList.remove('open');
+                navLinks.classList.add('closing');
+                hamburger.classList.remove('active');
+                if (menuClose) menuClose.classList.remove('visible');
+                document.body.style.overflow = '';
+                setTimeout(function() {
+                    navLinks.classList.remove('closing');
+                }, 200);
+            }
+
+            if (hamburger) {
+                hamburger.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    if (navLinks.classList.contains('open')) {
+                        closeMenu();
+                    } else {
+                        openMenu();
+                    }
+                });
+            }
+
+            if (menuClose) {
+                menuClose.addEventListener('click', closeMenu);
+            }
+
+            // Close menu when a link is clicked
+            if (navLinks) {
+                navLinks.querySelectorAll('a').forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        if (navLinks.classList.contains('open')) {
+                            closeMenu();
+                        }
+                    });
+                });
+            }
+
+            // Close menu on Escape key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && navLinks && navLinks.classList.contains('open')) {
+                    closeMenu();
+                }
+            });
+        })();
     </script>
 
     <main>
@@ -50,12 +111,44 @@
 
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2026 CopyQuick. All rights reserved.</p>
-            <ul class="footer-links">
-                <li><a href="#">Privacy</a></li>
-                <li><a href="#">Terms</a></li>
-                <li><a href="mailto:support@copyquick.com">Contact</a></li>
-            </ul>
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <h3>CopyQuick</h3>
+                    <p>AI-powered marketing copy in seconds. Generate high-converting content for your business instantly.</p>
+                </div>
+                <div class="footer-col">
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="/#features">Features</a></li>
+                        <li><a href="/#pricing">Pricing</a></li>
+                        <li><a href="/signup">Get Started</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Company</h4>
+                    <ul>
+                        <li><a href="#">About</a></li>
+                        <li><a href="mailto:support@copyquick.com">Contact</a></li>
+                        <li><a href="#">Blog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms of Service</a></li>
+                        <li><a href="#">Cookie Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 CopyQuick. All rights reserved.</p>
+                <div class="footer-social">
+                    <a href="#" aria-label="Twitter">𝕏</a>
+                    <a href="#" aria-label="LinkedIn">in</a>
+                    <a href="#" aria-label="GitHub">⌂</a>
+                </div>
+            </div>
         </div>
     </footer>
 </body>
