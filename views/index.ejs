@@ -6,43 +6,15 @@
             <a href="/signup" class="btn btn-primary btn-lg">Start Generating for Free</a>
         </div>
 
-        <div class="live-demo">
-            <div class="demo-input">
-                <span>✍️ Describe your product:</span>
-                <span>Organic Turmeric Supplement</span>
+        <div class="live-demo" id="liveDemo">
+            <div class="demo-editor">
+                <span class="prompt-label">✍️ My product:</span>
+                <input type="text" class="demo-input-field" id="demoInput" value="Wireless Noise-Cancelling Headphones" placeholder="Describe your product..." autocomplete="off">
+                <button class="demo-run-btn" id="demoRunBtn">Generate →</button>
             </div>
-            <div class="demo-arrow">⬇</div>
-            <div class="demo-results">
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Product Description — <strong>Natural turmeric capsules for daily wellness</strong></span>
-                    <span class="label">30 words</span>
-                </div>
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Amazon Bullet Points — <strong>Boosts immunity ✦ Reduces inflammation ✦ 100% organic</strong></span>
-                    <span class="label">5 points</span>
-                </div>
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Facebook Ad — <strong>Feel the difference naturally. 🌿 Try our turmeric today.</strong></span>
-                    <span class="label">45 words</span>
-                </div>
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Instagram Caption — <strong>Your daily dose of golden wellness. ✨ #turmeric #wellness</strong></span>
-                    <span class="label">Hashtags included</span>
-                </div>
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Google Ad Headline — <strong>Best Organic Turmeric | 30-Day Money-Back</strong></span>
-                    <span class="label">2 headlines</span>
-                </div>
-                <div class="demo-result-item">
-                    <span class="check">✓</span>
-                    <span>Email Campaign — <strong>Subject: Your journey to natural wellness starts here</strong></span>
-                    <span class="label">3 variations</span>
-                </div>
+            <div class="demo-arrow" id="demoArrow">⬇</div>
+            <div class="demo-results" id="demoResults">
+                <!-- Results appear here -->
             </div>
         </div>
     </div>
@@ -176,6 +148,107 @@
 
 <script>
 (function() {
+    // Interactive Demo
+    var demoInput = document.getElementById('demoInput');
+    var demoRunBtn = document.getElementById('demoRunBtn');
+    var demoResults = document.getElementById('demoResults');
+    var demoArrow = document.getElementById('demoArrow');
+
+    var samples = {
+        "Wireless Noise-Cancelling Headphones": [
+            { cat: "Product Description", text: "Premium wireless headphones with active noise cancellation up to 40dB. 30-hour battery life." },
+            { cat: "Amazon Listing", text: "✓ ANC up to 40dB ✓ 30hr playtime ✓ Ultra-comfort fit ✓ USB-C fast charging" },
+            { cat: "Facebook Ad", text: "Escape the noise. 🎧 Immerse yourself in crystal-clear sound anywhere." },
+            { cat: "Google Ads", text: "Best Noise-Cancelling Headphones | 30-Day Trial | Free Shipping" },
+            { cat: "Instagram Caption", text: "Your focus, amplified. 🔇✨ #NoiseCancelling #WirelessAudio #FocusMode" },
+            { cat: "Email Campaign", text: "Subject: Finally, peace and quiet in a noisy world" }
+        ],
+        "Organic Turmeric Supplement": [
+            { cat: "Product Description", text: "Natural turmeric capsules for daily wellness. Reduces inflammation, boosts immunity." },
+            { cat: "Amazon Listing", text: "✓ 100% Organic ✓ 95% Curcumin ✓ 120 Capsules ✓ Third-party tested" },
+            { cat: "Facebook Ad", text: "Feel the difference naturally. 🌿 Try our organic turmeric today." },
+            { cat: "Google Ads", text: "Best Organic Turmeric | 30-Day Money-Back | Free Shipping" },
+            { cat: "Instagram Caption", text: "Your daily dose of golden wellness. ✨ #turmeric #wellness #organic" },
+            { cat: "Email Campaign", text: "Subject: Your journey to natural wellness starts here" }
+        ]
+    };
+
+    function generateDemoResults(product) {
+        var results;
+        if (samples[product]) {
+            results = samples[product];
+        } else {
+            // Generic fallback
+            results = [
+                { cat: "Product Description", text: "Premium " + product + " designed for modern needs. Quality you can trust." },
+                { cat: "Amazon Listing", text: "✓ Premium quality ✓ Satisfaction guaranteed ✓ Fast shipping ✓ Great value" },
+                { cat: "Facebook Ad", text: "Discover " + product + " — designed for people who demand the best." },
+                { cat: "Google Ads", text: product + " | Shop Now | Free Returns" },
+                { cat: "Instagram Caption", text: "Meet your new favorite " + product.toLowerCase() + ". ✨" },
+                { cat: "Email Campaign", text: "Subject: Introducing " + product + " — you'll love it" }
+            ];
+        }
+        return results;
+    }
+
+    function animateDemo(product) {
+        demoResults.innerHTML = '';
+        demoArrow.style.opacity = '1';
+        
+        var items = generateDemoResults(product);
+
+        // Show typing indicator first
+        var typingEl = document.createElement('div');
+        typingEl.className = 'demo-typing';
+        typingEl.innerHTML = '<span class="demo-pulse"></span> Generating content for <strong>' + product + '</strong><span class="typing-dots"><span></span><span></span><span></span></span>';
+        demoResults.appendChild(typingEl);
+
+        var delay = 0;
+        items.forEach(function(item, i) {
+            delay = 500 + i * 450;
+            setTimeout(function() {
+                // Remove typing indicator after first item appears
+                if (i === 0 && typingEl.parentNode) {
+                    typingEl.parentNode.removeChild(typingEl);
+                }
+
+                var el = document.createElement('div');
+                el.className = 'demo-result-item visible';
+                el.innerHTML = '<span class="check">✓</span>' +
+                    '<div class="copy-preview"><span class="category">' + item.cat + '</span><span>' + item.text + '</span></div>' +
+                    '<button class="demo-copy-btn" onclick="navigator.clipboard.writeText(\'' + item.text.replace(/'/g, "\\'") + '\');this.textContent=\'Copied!\';setTimeout(function(){this.textContent=\'Copy\'}.bind(this),1500)">Copy</button>';
+                demoResults.appendChild(el);
+
+                // After all items, hide arrow
+                if (i === items.length - 1) {
+                    setTimeout(function() {
+                        demoArrow.style.opacity = '0.3';
+                    }, 400);
+                }
+            }, delay);
+        });
+    }
+
+    // Run demo on click
+    demoRunBtn.addEventListener('click', function() {
+        var val = demoInput.value.trim() || "Wireless Noise-Cancelling Headphones";
+        demoInput.value = val;
+        animateDemo(val);
+    });
+
+    // Run demo on Enter
+    demoInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            demoRunBtn.click();
+        }
+    });
+
+    // Auto-run on page load
+    setTimeout(function() {
+        animateDemo("Wireless Noise-Cancelling Headphones");
+    }, 600);
+
     // Scroll animation observer
     var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
@@ -185,7 +258,6 @@
         });
     }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
 
-    // Observe all fade-in elements
     document.querySelectorAll('.fade-in').forEach(function(el) {
         observer.observe(el);
     });
