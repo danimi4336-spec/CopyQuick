@@ -10,28 +10,33 @@
         <div class="contact-grid">
             <div class="contact-form-wrapper fade-in">
                 <h2>Send us a Message</h2>
-                <form class="contact-form" action="/contact" method="POST" onsubmit="handleContactSubmit(event)">
-                    <div class="form-group">
-                        <label for="name">Name</label>
-                        <input type="text" id="name" name="name" placeholder="Your name" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" placeholder="you@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="subject">Subject</label>
-                        <input type="text" id="subject" name="subject" placeholder="What's this about?" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" rows="6" placeholder="Tell us more..." required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block btn-lg">Send Message</button>
-                </form>
-                <div class="form-success" id="formSuccess" style="display:none;">
-                    <div class="alert alert-success">Thanks for reaching out! We'll get back to you within 24 hours.</div>
-                </div>
+
+                <% if (locals.sent) { %>
+                    <div class="alert alert-success">Message sent successfully! We'll get back to you within 24 hours.</div>
+                <% } else { %>
+                    <% if (locals.error) { %>
+                        <div class="alert alert-error"><%= error %></div>
+                    <% } %>
+                    <form class="contact-form" action="/contact" method="POST">
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" id="name" name="name" placeholder="Your name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <input type="text" id="subject" name="subject" placeholder="What's this about?" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message</label>
+                            <textarea id="message" name="message" rows="6" placeholder="Tell us more..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block btn-lg">Send Message</button>
+                    </form>
+                <% } %>
             </div>
             <div class="contact-info-wrapper fade-in">
                 <div class="contact-info-card">
@@ -57,12 +62,6 @@
 </section>
 
 <script>
-function handleContactSubmit(e) {
-    e.preventDefault();
-    document.querySelector('.contact-form').style.display = 'none';
-    document.getElementById('formSuccess').style.display = 'block';
-}
-
 (function() {
     var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {

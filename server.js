@@ -12,6 +12,7 @@ const { router: authRoutes, requireAuth } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const pricingRoutes = require('./routes/pricing');
 const webhookRoutes = require('./routes/webhook');
+const { sendContactEmail } = require('./lib/email');
 
 // Initialize database
 initDb();
@@ -78,7 +79,29 @@ app.get('/about', (req, res) => {
 });
 
 app.get('/contact', (req, res) => {
-  res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact' });
+  res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, error: null });
+});
+
+app.post('/contact', async (req, res) => {
+  const { name, email, subject, message } = req.body;
+
+  if (!name || !email || !subject || !message) {
+    return res.render('contact', { 
+      title: 'Contact - CopyQuick', currentPage: 'contact', sent: false,
+      error: 'Please fill in all fields.' 
+    });
+  }
+
+  try {
+    await sendContactEmail({ name, email, subject, message });
+    res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: true, error: null });
+  } catch (err) {
+    console.error('Contact form error:', err);
+    res.render('contact', { 
+      title: 'Contact - CopyQuick', currentPage: 'contact', sent: false,
+      error: 'Sorry, your message could not be sent. Please try again later.' 
+    });
+  }
 });
 
 app.get('/blog', (req, res) => {
