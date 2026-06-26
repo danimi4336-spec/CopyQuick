@@ -13,7 +13,12 @@
     <nav class="navbar">
         <div class="container">
             <a href="/" class="logo">CopyQuick</a>
-            <ul class="nav-links">
+            <button class="hamburger" id="hamburger" aria-label="Menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-links" id="navLinks">
                 <li><a href="/#features">Features</a></li>
                 <li><a href="/#pricing">Pricing</a></li>
                 <% if (locals.user) { %>
@@ -29,8 +34,15 @@
                     <li><a href="/signup" class="btn btn-primary">Get Started</a></li>
                 <% } %>
             </ul>
+            <a href="/signup" class="btn btn-primary mobile-cta">Get Started</a>
         </div>
     </nav>
+    <script>
+        document.getElementById('hamburger').addEventListener('click', function() {
+            this.classList.toggle('active');
+            document.getElementById('navLinks').classList.toggle('open');
+        });
+    </script>
 
     <main>
         <%- body %>
