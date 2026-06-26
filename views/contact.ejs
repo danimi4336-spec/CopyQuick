@@ -1,0 +1,78 @@
+<section class="page-hero">
+    <div class="container">
+        <h1>Get in Touch</h1>
+        <p class="tagline">Have a question, suggestion, or just want to say hello? We'd love to hear from you.</p>
+    </div>
+</section>
+
+<section class="contact-section">
+    <div class="container">
+        <div class="contact-grid">
+            <div class="contact-form-wrapper fade-in">
+                <h2>Send us a Message</h2>
+                <form class="contact-form" action="/contact" method="POST" onsubmit="handleContactSubmit(event)">
+                    <div class="form-group">
+                        <label for="name">Name</label>
+                        <input type="text" id="name" name="name" placeholder="Your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subject">Subject</label>
+                        <input type="text" id="subject" name="subject" placeholder="What's this about?" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" rows="6" placeholder="Tell us more..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg">Send Message</button>
+                </form>
+                <div class="form-success" id="formSuccess" style="display:none;">
+                    <div class="alert alert-success">Thanks for reaching out! We'll get back to you within 24 hours.</div>
+                </div>
+            </div>
+            <div class="contact-info-wrapper fade-in">
+                <div class="contact-info-card">
+                    <h3>Support</h3>
+                    <p class="contact-detail"><strong>Email:</strong> <a href="mailto:support@copyquick.co">support@copyquick.co</a></p>
+                    <p class="contact-response">We typically respond within <strong>24 hours</strong> during business days.</p>
+                </div>
+                <div class="contact-info-card">
+                    <h3>Feature Requests</h3>
+                    <p>Have an idea for a new content type, template, or integration? We're building CopyQuick in public and would love your input.</p>
+                    <p>Send your feature request to <a href="mailto:support@copyquick.co">support@copyquick.co</a> with the subject line <strong>"Feature Request"</strong>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-bottom">
+    <div class="container">
+        <h2 class="fade-in">Ready to create better copy in seconds?</h2>
+        <a href="/signup" class="btn btn-primary btn-lg fade-in">Start Generating for Free</a>
+    </div>
+</section>
+
+<script>
+function handleContactSubmit(e) {
+    e.preventDefault();
+    document.querySelector('.contact-form').style.display = 'none';
+    document.getElementById('formSuccess').style.display = 'block';
+}
+
+(function() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+    document.querySelectorAll('.fade-in').forEach(function(el) {
+        observer.observe(el);
+    });
+})();
+</script>

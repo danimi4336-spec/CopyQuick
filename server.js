@@ -73,6 +73,18 @@ app.get('/', (req, res) => {
   res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy', currentPage: 'home' });
 });
 
+app.get('/about', (req, res) => {
+  res.render('about', { title: 'About - CopyQuick', currentPage: 'about' });
+});
+
+app.get('/contact', (req, res) => {
+  res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact' });
+});
+
+app.get('/blog', (req, res) => {
+  res.render('blog', { title: 'Blog - CopyQuick', currentPage: 'blog' });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });
