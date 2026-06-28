@@ -25,27 +25,27 @@
         <h2 class="section-title fade-in">Everything you need to sell more</h2>
         <p class="section-subtitle fade-in">From social posts to email campaigns — get the right words for every channel.</p>
         <div class="feature-grid">
-            <div class="feature-card fade-in">
-                <div class="feature-icon">✉️</div>
-                <h3>Email Subject Lines</h3>
-                <p>Open rates matter. Get subject lines that actually get clicked.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">📱</div>
-                <h3>Social Posts</h3>
-                <p>Engaging posts for Twitter, LinkedIn, and Instagram in one click.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">📢</div>
-                <h3>Ad Headlines</h3>
-                <p>Stop wasting ad spend. Headlines that capture attention and convert.</p>
-            </div>
-            <div class="feature-card fade-in">
-                <div class="feature-icon">🎯</div>
-                <h3>Power CTAs</h3>
-                <p>The perfect call-to-action for every occasion.</p>
-            </div>
+    <% 
+        var icons2 = { subject_line: '✉️', social_post: '📱', ad_headline: '📢', product_description: '🛒', cta: '🎯', email_campaign: '📧', blog_intro: '📝', sales_message: '💬' };
+        var descs2 = { 
+            subject_line: 'Open rates matter. Get subject lines that actually get clicked.',
+            social_post: 'Engaging posts for Twitter, LinkedIn, and Instagram in one click.',
+            ad_headline: 'Stop wasting ad spend. Headlines that capture attention and convert.',
+            product_description: 'Amazon listings, Shopify products, and ecommerce descriptions.',
+            cta: 'The perfect call-to-action for every occasion.',
+            email_campaign: 'Full email sequences — welcome flows, promotions, and follow-ups.',
+            blog_intro: 'Strong openings that hook readers and keep them scrolling.',
+            sales_message: 'Direct messages, cold emails, and outreach copy that gets replies.'
+        };
+        Object.keys(contentTypes).forEach(function(key) { 
+    %>
+        <div class="feature-card fade-in">
+            <div class="feature-icon"><%= icons2[key] || '📄' %></div>
+            <h3><%= contentTypes[key] %></h3>
+            <p><%= descs2[key] || 'AI-powered copy for your marketing needs.' %></p>
         </div>
+    <% }); %>
+</div>
     </div>
 </section>
 

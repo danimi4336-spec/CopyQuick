@@ -61,10 +61,14 @@
                         <div class="form-group">
                             <label for="contentType">Content Type</label>
                             <select id="contentType" name="contentType">
-                                <option value="subject_line" <%= (typeof input !== 'undefined' && input.contentType === 'subject_line') ? 'selected' : '' %>>Email Subject Line</option>
-                                <option value="social_post" <%= (typeof input !== 'undefined' && input.contentType === 'social_post') ? 'selected' : '' %>>Social Post</option>
-                                <option value="ad_headline" <%= (typeof input !== 'undefined' && input.contentType === 'ad_headline') ? 'selected' : '' %>>Ad Headline</option>
-                                <option value="cta" <%= (typeof input !== 'undefined' && input.contentType === 'cta') ? 'selected' : '' %>>Call to Action</option>
+                                <option value="subject_line" <%= (typeof input !== 'undefined' && input.contentType === 'subject_line') ? 'selected' : '' %>>Email Subject Lines</option>
+                                <option value="social_post" <%= (typeof input !== 'undefined' && input.contentType === 'social_post') ? 'selected' : '' %>>Social Media Posts</option>
+                                <option value="ad_headline" <%= (typeof input !== 'undefined' && input.contentType === 'ad_headline') ? 'selected' : '' %>>Ad Headlines & Copy</option>
+                                <option value="product_description" <%= (typeof input !== 'undefined' && input.contentType === 'product_description') ? 'selected' : '' %>>Product Descriptions</option>
+                                <option value="cta" <%= (typeof input !== 'undefined' && input.contentType === 'cta') ? 'selected' : '' %>>Call-to-Actions</option>
+                                <option value="email_campaign" <%= (typeof input !== 'undefined' && input.contentType === 'email_campaign') ? 'selected' : '' %>>Email Campaigns</option>
+                                <option value="blog_intro" <%= (typeof input !== 'undefined' && input.contentType === 'blog_intro') ? 'selected' : '' %>>Blog Post Introductions</option>
+                                <option value="sales_message" <%= (typeof input !== 'undefined' && input.contentType === 'sales_message') ? 'selected' : '' %>>Sales Messages</option>
                             </select>
                         </div>
                     </div>

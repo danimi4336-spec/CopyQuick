@@ -42,47 +42,27 @@
         <h2 class="section-title fade-in">Marketing Content You Can Create</h2>
         <p class="section-subtitle fade-in">CopyQuick generates copy for every channel your business needs.</p>
         <div class="content-types-grid">
-            <div class="content-type-card fade-in">
-                <span class="type-icon">✉️</span>
-                <h3>Email Subject Lines</h3>
-                <p>High open-rate subject lines for campaigns, newsletters, and promotions.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">📱</span>
-                <h3>Social Media Posts</h3>
-                <p>Engaging posts for Twitter, LinkedIn, Instagram, and Facebook.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">📢</span>
-                <h3>Ad Headlines & Copy</h3>
-                <p>Facebook Ads, Google Ads, LinkedIn Sponsored — headlines that convert.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">🛒</span>
-                <h3>Product Descriptions</h3>
-                <p>Amazon listings, Shopify products, and ecommerce descriptions.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">🎯</span>
-                <h3>Call-to-Actions</h3>
-                <p>CTAs that drive clicks and conversions, tailored to your audience.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">📧</span>
-                <h3>Email Campaigns</h3>
-                <p>Full email sequences — welcome flows, promotions, and follow-ups.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">📝</span>
-                <h3>Blog Post Introductions</h3>
-                <p>Strong openings that hook readers and keep them scrolling.</p>
-            </div>
-            <div class="content-type-card fade-in">
-                <span class="type-icon">💬</span>
-                <h3>Sales Messages</h3>
-                <p>Direct messages, cold emails, and outreach copy that gets replies.</p>
-            </div>
+    <% 
+        const icons = { subject_line: '✉️', social_post: '📱', ad_headline: '📢', product_description: '🛒', cta: '🎯', email_campaign: '📧', blog_intro: '📝', sales_message: '💬' };
+        const descs = { 
+            subject_line: 'High open-rate subject lines for campaigns, newsletters, and promotions.',
+            social_post: 'Engaging posts for Twitter, LinkedIn, Instagram, and Facebook.',
+            ad_headline: 'Facebook Ads, Google Ads, LinkedIn Sponsored — headlines that convert.',
+            product_description: 'Amazon listings, Shopify products, and ecommerce descriptions.',
+            cta: 'CTAs that drive clicks and conversions, tailored to your audience.',
+            email_campaign: 'Full email sequences — welcome flows, promotions, and follow-ups.',
+            blog_intro: 'Strong openings that hook readers and keep them scrolling.',
+            sales_message: 'Direct messages, cold emails, and outreach copy that gets replies.'
+        };
+        Object.keys(contentTypes).forEach(function(key) { 
+    %>
+        <div class="content-type-card fade-in">
+            <span class="type-icon"><%= icons[key] || '📄' %></span>
+            <h3><%= contentTypes[key] %></h3>
+            <p><%= descs[key] || 'AI-powered copy for your marketing needs.' %></p>
         </div>
+    <% }); %>
+</div>
     </div>
 </section>
 

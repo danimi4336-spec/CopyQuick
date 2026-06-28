@@ -13,6 +13,7 @@ const dashboardRoutes = require('./routes/generations');
 const pricingRoutes = require('./routes/pricing');
 const webhookRoutes = require('./routes/webhook');
 const { sendContactFormEmails } = require('./lib/email');
+const { contentTypes } = require('./lib/contentTypes');
 
 // Initialize database
 initDb();
@@ -71,11 +72,11 @@ app.use('/', dashboardRoutes);
 app.use('/', pricingRoutes);
 
 app.get('/', (req, res) => {
-  res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy', currentPage: 'home' });
+  res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy', currentPage: 'home', contentTypes });
 });
 
 app.get('/about', (req, res) => {
-  res.render('about', { title: 'About - CopyQuick', currentPage: 'about' });
+  res.render('about', { title: 'About - CopyQuick', currentPage: 'about', contentTypes });
 });
 
 app.get('/contact', (req, res) => {
