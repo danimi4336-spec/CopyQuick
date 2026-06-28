@@ -73,10 +73,29 @@ router.get('/auth/google', (req, res, next) => {
 });
 
 router.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }),
-  (req, res) => {
-    req.session.userId = req.user.id;
-    res.redirect('/dashboard');
+  (req, res, next) => {
+    passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }, (err, user, info) => {
+      if (err) {
+        console.error('❌ Google OAuth callback error:', err);
+        console.error('❌ Stack:', err.stack);
+        return res.status(500).send('Authentication error. Please try again.');
+      }
+      if (!user) {
+        console.error('❌ Google OAuth callback: no user returned. Info:', JSON.stringify(info));
+        return res.redirect('/login');
+      }
+      console.log('✅ Google OAuth success for user:', user.id, user.email);
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error('❌ Passport login error:', loginErr);
+          console.error('❌ Stack:', loginErr.stack);
+          return res.status(500).send('Session error. Please try again.');
+        }
+        req.session.userId = user.id;
+        console.log('✅ Session set for user:', user.id);
+        return res.redirect('/dashboard');
+      });
+    })(req, res, next);
   }
 );
 
