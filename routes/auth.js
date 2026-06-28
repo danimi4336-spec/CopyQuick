@@ -58,9 +58,12 @@ router.post('/login', async (req, res) => {
 });
 
 // Google OAuth
-router.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+router.get('/auth/google', (req, res, next) => {
+  const redirectURL = `${req.protocol}://${req.get('host')}/auth/google/callback`;
+  console.log(`🔀 Google OAuth redirect: ${redirectURL}`);
+  console.log(`🔀 Request host: ${req.get('host')}, protocol: ${req.protocol}`);
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
 
 router.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }),
