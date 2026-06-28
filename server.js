@@ -12,7 +12,7 @@ const { router: authRoutes, requireAuth } = require('./routes/auth');
 const dashboardRoutes = require('./routes/dashboard');
 const pricingRoutes = require('./routes/pricing');
 const webhookRoutes = require('./routes/webhook');
-const { sendContactEmail } = require('./lib/email');
+const { sendContactFormEmails } = require('./lib/email');
 
 // Initialize database
 initDb();
@@ -84,6 +84,8 @@ app.get('/contact', (req, res) => {
 
 app.post('/contact', async (req, res) => {
   const { name, email, subject, message } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'N/A';
+  const userAgent = req.headers['user-agent'] || 'N/A';
 
   if (!name || !email || !subject || !message) {
     return res.render('contact', { 
@@ -93,7 +95,8 @@ app.post('/contact', async (req, res) => {
   }
 
   try {
-    await sendContactEmail({ name, email, subject, message });
+    const { ticketNumber } = await sendContactFormEmails({ name, email, subject, message, ip, userAgent });
+    console.log(`Contact form processed: ticket ${ticketNumber} from ${email}`);
     res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: true, error: null });
   } catch (err) {
     console.error('Contact form error:', err);

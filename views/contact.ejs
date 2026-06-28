@@ -12,7 +12,11 @@
                 <h2>Send us a Message</h2>
 
                 <% if (locals.sent) { %>
-                    <div class="alert alert-success">Message sent successfully! We'll get back to you within 24 hours.</div>
+                    <div class="alert alert-success" style="text-align:center;padding:2rem;">
+                        <div style="font-size:3rem;margin-bottom:1rem;">✅</div>
+                        <h3 style="margin-bottom:0.5rem;">Message Sent!</h3>
+                        <p style="max-width:none;font-size:1rem;">Thanks for reaching out! We've sent a confirmation to your email. We'll get back to you within 24 business hours.</p>
+                    </div>
                 <% } else { %>
                     <% if (locals.error) { %>
                         <div class="alert alert-error"><%= error %></div>
