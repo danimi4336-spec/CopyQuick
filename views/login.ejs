@@ -7,6 +7,15 @@
             <div class="alert alert-error"><%= error %></div>
         <% } %>
 
+        <a href="/auth/google" class="btn btn-google btn-block">
+            <span class="google-icon">G</span>
+            Continue with Google
+        </a>
+
+        <div class="auth-divider">
+            <span>or continue with email</span>
+        </div>
+
         <form action="/login" method="POST">
             <div class="form-group">
                 <label for="email">Email Address</label>
@@ -24,3 +33,54 @@
         </p>
     </div>
 </div>
+
+<style>
+.btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--white);
+    color: var(--dark);
+    font-weight: 600;
+    font-size: 1rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    margin-bottom: 0.5rem;
+}
+.btn-google:hover {
+    border-color: #4285f4;
+    background: #f8f9ff;
+    box-shadow: var(--shadow-sm);
+}
+.google-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: #4285f4;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.25rem 0;
+    color: var(--secondary);
+    font-size: 0.8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+</style>

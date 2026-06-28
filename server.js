@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const passport = require('./lib/passport');
 const SQLiteStore = require('./lib/sessionStore');
 const path = require('path');
 const app = express();
@@ -40,11 +41,16 @@ app.use(session({
   }
 }));
 
+// Passport initialization
+app.use(passport.initialize());
+app.use(passport.session());
+
 // Provide user to all templates
 app.use((req, res, next) => {
-  if (req.session.userId) {
+  const userId = req.session?.userId || req.session?.passport?.user || req.user?.id;
+  if (userId) {
     const db = getDb();
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+    const user = db.prepare('SELECT id, email, name, plan_tier, avatar_url, generations_used, monthly_limit, created_at FROM users WHERE id = ?').get(userId);
     res.locals.user = user;
   } else {
     res.locals.user = null;

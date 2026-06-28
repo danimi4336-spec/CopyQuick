@@ -10,8 +10,10 @@ function initDb() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
       name TEXT,
+      google_id TEXT UNIQUE,
+      avatar_url TEXT,
       plan_tier TEXT DEFAULT 'free',
       generations_used INTEGER DEFAULT 0,
       monthly_limit INTEGER DEFAULT 10,
@@ -64,6 +66,16 @@ function initDb() {
       db.exec(`ALTER TABLE generations ADD COLUMN ${col}`);
     } catch (e) {
       // Column already exists - ignore
+    }
+  });
+
+  // Add OAuth columns to users table
+  const userCols = ['password_hash TEXT', 'google_id TEXT', 'avatar_url TEXT'];
+  userCols.forEach(col => {
+    try {
+      db.exec(`ALTER TABLE users ADD COLUMN ${col}`);
+    } catch (e) {
+      // Column already exists
     }
   });
 

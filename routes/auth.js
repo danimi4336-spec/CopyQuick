@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
+const passport = require('../lib/passport');
 const { getDb } = require('../db/database');
 
 // Middleware to check if user is logged in
 function requireAuth(req, res, next) {
-  if (req.session && req.session.userId) {
+  if (req.session && (req.session.userId || req.session.passport?.user)) {
     return next();
   }
   res.redirect('/login');
@@ -55,6 +56,19 @@ router.post('/login', async (req, res) => {
     res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
   }
 });
+
+// Google OAuth
+router.get('/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+router.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }),
+  (req, res) => {
+    req.session.userId = req.user.id;
+    res.redirect('/dashboard');
+  }
+);
 
 // Logout
 router.post('/logout', (req, res) => {
