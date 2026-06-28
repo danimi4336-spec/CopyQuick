@@ -1,0 +1,132 @@
+<div class="legal-page">
+    <div class="container">
+        <div class="legal-header fade-in">
+            <h1>Refund Policy</h1>
+            <p class="last-updated">Last Updated: June 19, 2026</p>
+        </div>
+        <div class="legal-layout">
+            <nav class="legal-toc fade-in" aria-label="Table of Contents">
+                <h4>Contents</h4>
+                <ul>
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#cancellation">Cancellation</a></li>
+                    <li><a href="#refunds">Refund Requests</a></li>
+                    <li><a href="#billing-errors">Billing Errors</a></li>
+                    <li><a href="#technical-issues">Technical Issues</a></li>
+                    <li><a href="#contact-before-dispute">Contact Before Dispute</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+            </nav>
+            <div class="legal-content">
+                <section id="overview" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">📋</div>
+                            <h3>Overview</h3>
+                        </div>
+                        <p>We want you to be satisfied with CopyQuick. This Refund Policy outlines our approach to cancellations, refunds, and billing corrections. We believe in fair treatment for our customers and review each request individually.</p>
+                    </div>
+                </section>
+
+                <section id="cancellation" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">⏹️</div>
+                            <h3>Cancellation</h3>
+                        </div>
+                        <p>You may cancel your CopyQuick subscription at any time through your account settings under <strong>Profile → Manage Subscription</strong>.</p>
+                        <ul>
+                            <li>There are <strong>no long-term contracts</strong>. All subscriptions are month-to-month.</li>
+                            <li>Cancellation takes effect at the end of your current billing period.</li>
+                            <li>You will retain access to paid features until the end of the billing cycle.</li>
+                            <li>After cancellation, your account will automatically convert to the Free tier.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="refunds" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">💰</div>
+                            <h3>Refund Requests</h3>
+                        </div>
+                        <p>Refund requests are reviewed on a <strong>case-by-case basis</strong>. We consider factors such as:</p>
+                        <ul>
+                            <li>Length of time since the charge was made.</li>
+                            <li>Usage of the Service during the billing period.</li>
+                            <li>Technical issues experienced that prevented normal use.</li>
+                        </ul>
+                        <p>To request a refund, please contact us at <a href="mailto:support@copyquick.co">support@copyquick.co</a> with your account email and reason for the request.</p>
+                    </div>
+                </section>
+
+                <section id="billing-errors" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">✅</div>
+                            <h3>Billing Errors</h3>
+                        </div>
+                        <p>We take billing accuracy seriously. The following are always corrected promptly:</p>
+                        <ul>
+                            <li><strong>Duplicate charges</strong> — If you were charged twice for the same billing period, the duplicate will be fully refunded.</li>
+                            <li><strong>Incorrect amounts</strong> — If the charged amount does not match your plan's listed price, the difference will be refunded.</li>
+                            <li><strong>Unauthorized charges</strong> — Any charges made after account cancellation will be refunded in full.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="technical-issues" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">🔧</div>
+                            <h3>Technical Issues</h3>
+                        </div>
+                        <p>If CopyQuick experiences a technical issue that significantly impacts your ability to use the Service as intended, please contact our support team. We will review the situation and, if appropriate, issue a prorated or full refund depending on the severity and duration of the issue.</p>
+                        <p>To be eligible for a technical-issue refund review, please provide:</p>
+                        <ul>
+                            <li>A description of the issue experienced.</li>
+                            <li>The date and time the issue occurred.</li>
+                            <li>Any relevant screenshots or error messages (if available).</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section id="contact-before-dispute" class="legal-section fade-in">
+                    <div class="legal-card">
+                        <div class="legal-card-header">
+                            <div class="legal-card-icon">🤝</div>
+                            <h3>Contact Before Dispute</h3>
+                        </div>
+                        <p>We strongly encourage you to <strong>contact us before disputing a charge</strong> with your bank or payment provider. Most billing concerns can be resolved quickly and amicably through direct communication.</p>
+                        <p>Disputing a charge without contacting us first can result in unnecessary fees for both parties and delays in resolution. We're here to help — just reach out.</p>
+                    </div>
+                </section>
+
+                <section id="contact" class="legal-section fade-in">
+                    <div class="legal-contact-box">
+                        <div style="font-size:2rem;margin-bottom:0.75rem;">📬</div>
+                        <h3 style="margin-bottom:0.5rem;">Have a Billing Question?</h3>
+                        <p>We're here to help:</p>
+                        <p><strong>Email:</strong> <a href="mailto:support@copyquick.co">support@copyquick.co</a></p>
+                        <p><strong>Website:</strong> <a href="https://copyquick.co">copyquick.co</a></p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+            }
+        });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.fade-in').forEach(function(el) {
+        observer.observe(el);
+    });
+})();
+</script>

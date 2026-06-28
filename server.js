@@ -111,6 +111,22 @@ app.get('/blog', (req, res) => {
   res.render('blog', { title: 'Blog - CopyQuick', currentPage: 'blog' });
 });
 
+app.get('/privacy', (req, res) => {
+  res.render('privacy', { title: 'Privacy Policy - CopyQuick', currentPage: 'privacy' });
+});
+
+app.get('/terms', (req, res) => {
+  res.render('terms', { title: 'Terms of Service - CopyQuick', currentPage: 'terms' });
+});
+
+app.get('/cookies', (req, res) => {
+  res.render('cookies', { title: 'Cookie Policy - CopyQuick', currentPage: 'cookies' });
+});
+
+app.get('/refunds', (req, res) => {
+  res.render('refunds', { title: 'Refund Policy - CopyQuick', currentPage: 'refunds' });
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });
