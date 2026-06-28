@@ -1,0 +1,135 @@
+<div class="container workspace-page">
+    <header class="workspace-header fade-in">
+        <div>
+            <h1>Generation History</h1>
+            <p class="text-secondary"><%= total %> generation<%= total !== 1 ? 's' : '' %> total</p>
+        </div>
+        <a href="/favorites" class="btn btn-outline">⭐ Favorites</a>
+    </header>
+
+    <!-- Search & Filters -->
+    <div class="workspace-filters fade-in">
+        <form method="GET" action="/history" class="filters-form">
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" name="search" placeholder="Search titles, prompts, tags..." value="<%= search %>" class="search-input">
+            </div>
+            <select name="type" class="filter-select">
+                <option value="">All Types</option>
+                <% Object.keys(contentTypes).forEach(function(t) { %>
+                    <option value="<%= t %>" <%= type === t ? 'selected' : '' %>><%= contentTypes[t] || t.replace(/_/g, ' ') %></option>
+                <% }); %>
+            </select>
+            <select name="sort" class="filter-select">
+                <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest</option>
+                <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
+                <option value="title" <%= sort === 'title' ? 'selected' : '' %>>Title A-Z</option>
+                <option value="words_desc" <%= sort === 'words_desc' ? 'selected' : '' %>>Most Words</option>
+            </select>
+            <select name="favorite" class="filter-select">
+                <option value="">All</option>
+                <option value="1" <%= favorite === '1' ? 'selected' : '' %>>Favorites Only</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Filter</button>
+            <% if (search || type || favorite) { %>
+                <a href="/history" class="btn btn-outline">Clear</a>
+            <% } %>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <% if (generations.length === 0) { %>
+        <div class="empty-state fade-in">
+            <div class="empty-icon">📭</div>
+            <h2>No generations found</h2>
+            <p><%= search ? 'Try different search terms' : 'Generate your first copy to see it here' %></p>
+            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+        </div>
+    <% } else { %>
+        <div class="generations-grid fade-in">
+            <% generations.forEach(function(gen) { %>
+                <div class="gen-card" data-id="<%= gen.id %>">
+                    <div class="gen-card-header">
+                        <span class="gen-type"><%= gen.content_type.replace(/_/g, ' ') %></span>
+                        <% if (gen.favorite) { %><span class="gen-fav">⭐</span><% } %>
+                    </div>
+                    <a href="/generation/<%= gen.id %>" class="gen-card-body">
+                        <h3 class="gen-title"><%= gen.title || gen.input_text.substring(0, 50) %></h3>
+                        <p class="gen-preview"><%= gen.input_text.substring(0, 80) %><%= gen.input_text.length > 80 ? '...' : '' %></p>
+                    </a>
+                    <div class="gen-card-footer">
+                        <div class="gen-meta">
+                            <span><%= gen.tone %></span>
+                            <span>·</span>
+                            <span><%= gen.word_count || 0 %> words</span>
+                            <span>·</span>
+                            <span><%= new Date(gen.created_at).toLocaleDateString() %></span>
+                        </div>
+                        <div class="gen-card-actions">
+                            <button class="gen-action-btn favorite-btn <%= gen.favorite ? 'active' : '' %>" onclick="toggleFavorite(<%= gen.id %>, this)" title="Favorite">⭐</button>
+                            <button class="gen-action-btn" onclick="deleteGen(<%= gen.id %>, this)" title="Delete">🗑️</button>
+                        </div>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+
+        <!-- Pagination -->
+        <% if (totalPages > 1) { %>
+            <div class="pagination fade-in">
+                <% for (var p = 1; p <= totalPages; p++) { %>
+                    <a href="?page=<%= p %><%= search ? '&search=' + search : '' %><%= type ? '&type=' + type : '' %><%= sort !== 'newest' ? '&sort=' + sort : '' %><%= favorite ? '&favorite=' + favorite : '' %>" 
+                       class="page-btn <%= p === page ? 'active' : '' %>"><%= p %></a>
+                <% } %>
+            </div>
+        <% } %>
+    <% } %>
+</div>
+
+<script>
+function toggleFavorite(id, btn) {
+    fetch('/generation/' + id + '/favorite', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.favorite) {
+                btn.classList.add('active');
+                showToast('Added to favorites ⭐');
+            } else {
+                btn.classList.remove('active');
+                showToast('Removed from favorites');
+            }
+        });
+}
+
+function deleteGen(id, btn) {
+    if (!confirm('Move this generation to trash? You can restore it within 30 days.')) return;
+    fetch('/generation/' + id + '/delete', { method: 'POST' })
+        .then(r => r.json())
+        .then(function() {
+            var card = btn.closest('.gen-card');
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(20px)';
+            setTimeout(function() { card.remove(); showToast('Moved to trash'); }, 300);
+        });
+}
+
+function showToast(msg) {
+    var existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.classList.add('show'); }, 10);
+    setTimeout(function() { toast.classList.remove('show'); setTimeout(function() { toast.remove(); }, 300); }, 2500);
+}
+
+(function() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
+})();
+</script>

@@ -1,0 +1,75 @@
+<div class="container workspace-page">
+    <header class="workspace-header fade-in">
+        <div>
+            <h1>⭐ Favorites</h1>
+            <p class="text-secondary"><%= total %> favorite generation<%= total !== 1 ? 's' : '' %></p>
+        </div>
+        <a href="/history" class="btn btn-outline">All History →</a>
+    </header>
+
+    <% if (generations.length === 0) { %>
+        <div class="empty-state fade-in">
+            <div class="empty-icon">⭐</div>
+            <h2>No favorites yet</h2>
+            <p>Star your best generations from the history page</p>
+            <a href="/history" class="btn btn-primary">Browse History</a>
+        </div>
+    <% } else { %>
+        <div class="generations-grid fade-in">
+            <% generations.forEach(function(gen) { %>
+                <div class="gen-card">
+                    <div class="gen-card-header">
+                        <span class="gen-type"><%= gen.content_type.replace(/_/g, ' ') %></span>
+                        <span class="gen-fav">⭐</span>
+                    </div>
+                    <a href="/generation/<%= gen.id %>" class="gen-card-body">
+                        <h3 class="gen-title"><%= gen.title || gen.input_text.substring(0, 50) %></h3>
+                        <p class="gen-preview"><%= gen.input_text.substring(0, 80) %><%= gen.input_text.length > 80 ? '...' : '' %></p>
+                    </a>
+                    <div class="gen-card-footer">
+                        <div class="gen-meta">
+                            <span><%= gen.tone %></span>
+                            <span>·</span>
+                            <span><%= gen.word_count || 0 %> words</span>
+                            <span>·</span>
+                            <span><%= new Date(gen.created_at).toLocaleDateString() %></span>
+                        </div>
+                        <button class="gen-action-btn active" onclick="unfavorite(<%= gen.id %>, this)" title="Remove">💔</button>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    <% } %>
+</div>
+
+<script>
+function unfavorite(id, btn) {
+    fetch('/generation/' + id + '/favorite', { method: 'POST' })
+        .then(r => r.json()).then(function() {
+            var card = btn.closest('.gen-card');
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95)';
+            setTimeout(function() { card.remove(); showToast('Removed from favorites'); }, 300);
+        });
+}
+
+function showToast(msg) {
+    var existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.classList.add('show'); }, 10);
+    setTimeout(function() { toast.classList.remove('show'); setTimeout(function() { toast.remove(); }, 300); }, 2500);
+}
+
+(function() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
+})();
+</script>

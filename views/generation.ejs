@@ -1,0 +1,157 @@
+<div class="container workspace-page">
+    <nav class="breadcrumb fade-in">
+        <a href="/dashboard">Dashboard</a>
+        <span>/</span>
+        <a href="/history">History</a>
+        <span>/</span>
+        <span><%= gen.title || gen.input_text.substring(0, 30) %></span>
+    </nav>
+
+    <div class="gen-detail-layout">
+        <div class="gen-detail-main fade-in">
+            <!-- Title -->
+            <div class="gen-detail-header">
+                <h1 class="gen-detail-title" id="genTitle"><%= gen.title || gen.input_text.substring(0, 50) %></h1>
+                <div class="gen-detail-actions-top">
+                    <button class="icon-btn <%= gen.favorite ? 'active' : '' %>" id="favBtn" onclick="toggleFav()" title="Favorite">⭐</button>
+                    <button class="icon-btn" onclick="deleteGen()" title="Delete">🗑️</button>
+                </div>
+            </div>
+
+            <!-- Prompt -->
+            <div class="detail-card">
+                <h3>Prompt</h3>
+                <p class="detail-prompt"><%= gen.input_text %></p>
+            </div>
+
+            <!-- Results -->
+            <div class="detail-card">
+                <h3>Generated Content</h3>
+                <div class="detail-results">
+                    <% var resultsList = typeof results === 'string' ? JSON.parse(results) : results; %>
+                    <% if (resultsList && resultsList.length) { %>
+                        <% resultsList.forEach(function(r, i) { %>
+                            <div class="detail-result-item">
+                                <div class="result-header">
+                                    <span class="result-tag"><%= r.tone %></span>
+                                    <button class="copy-btn" onclick="copyText('<%= 'result-' + i %>', this)" title="Copy">📋 Copy</button>
+                                </div>
+                                <p class="result-text" id="result-<%= i %>"><%= r.text %></p>
+                            </div>
+                        <% }); %>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="detail-actions-card">
+                <button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button>
+                <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
+                <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
+                <button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button>
+            </div>
+        </div>
+
+        <aside class="gen-detail-sidebar fade-in">
+            <div class="sidebar-card">
+                <h3 class="h4">Metadata</h3>
+                <div class="meta-list">
+                    <div class="meta-row"><span class="meta-label">Type</span><span class="meta-value"><%= gen.content_type.replace(/_/g, ' ') %></span></div>
+                    <div class="meta-row"><span class="meta-label">Tone</span><span class="meta-value"><%= gen.tone %></span></div>
+                    <div class="meta-row"><span class="meta-label">Words</span><span class="meta-value"><%= gen.word_count || 0 %></span></div>
+                    <div class="meta-row"><span class="meta-label">AI Model</span><span class="meta-value"><%= gen.ai_model || 'CopyQuick AI' %></span></div>
+                    <div class="meta-row"><span class="meta-label">Created</span><span class="meta-value"><%= new Date(gen.created_at).toLocaleDateString() %></span></div>
+                    <div class="meta-row"><span class="meta-label">Updated</span><span class="meta-value"><%= new Date(gen.updated_at || gen.created_at).toLocaleDateString() %></span></div>
+                </div>
+            </div>
+
+            <div class="sidebar-card">
+                <h3 class="h4">Tags</h3>
+                <div class="tags-input-wrap">
+                    <input type="text" id="tagInput" placeholder="Add tags..." value="<%= gen.tags || '' %>" onkeydown="handleTagKey(event)">
+                    <button class="btn btn-primary btn-sm" onclick="saveTags()" style="margin-top:0.5rem;width:100%;">Save Tags</button>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<script>
+var genId = <%= gen.id %>;
+
+function toggleFav() {
+    fetch('/generation/' + genId + '/favorite', { method: 'POST' })
+        .then(r => r.json()).then(d => {
+            var btn = document.getElementById('favBtn');
+            btn.classList.toggle('active', d.favorite);
+            showToast(d.favorite ? 'Added to favorites ⭐' : 'Removed from favorites');
+        });
+}
+
+function deleteGen() {
+    if (!confirm('Move to trash? You can restore within 30 days.')) return;
+    fetch('/generation/' + genId + '/delete', { method: 'POST' })
+        .then(r => r.json()).then(function() {
+            showToast('Deleted');
+            setTimeout(function() { window.location.href = '/history'; }, 1000);
+        });
+}
+
+function regenerate() {
+    fetch('/generation/' + genId + '/regenerate', { method: 'POST' })
+        .then(r => r.json()).then(function(d) {
+            if (d.error) { showToast('Error: ' + d.error); return; }
+            showToast('Regenerated!');
+            location.reload();
+        });
+}
+
+function copyText(id, btn) {
+    var text = document.getElementById(id).innerText;
+    navigator.clipboard.writeText(text).then(function() {
+        btn.textContent = '✅ Copied!';
+        setTimeout(function() { btn.innerHTML = '📋 Copy'; }, 2000);
+    });
+}
+
+function copyAll() {
+    var texts = [];
+    document.querySelectorAll('.result-text').forEach(function(el) { texts.push(el.innerText); });
+    navigator.clipboard.writeText(texts.join('\n\n---\n\n')).then(function() {
+        showToast('All copies copied to clipboard 📋');
+    });
+}
+
+function handleTagKey(e) {
+    if (e.key === 'Enter') { e.preventDefault(); saveTags(); }
+}
+
+function saveTags() {
+    var tags = document.getElementById('tagInput').value;
+    fetch('/generation/' + genId + '/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags: tags })
+    }).then(r => r.json()).then(function() { showToast('Tags saved ✅'); });
+}
+
+function showToast(msg) {
+    var existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.classList.add('show'); }, 10);
+    setTimeout(function() { toast.classList.remove('show'); setTimeout(function() { toast.remove(); }, 300); }, 2500);
+}
+
+(function() {
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
+})();
+</script>

@@ -1,0 +1,346 @@
+const express = require('express');
+const router = express.Router();
+const { getDb } = require('../db/database');
+const { requireAuth } = require('./auth');
+const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
+
+// ====== Dashboard ======
+router.get('/dashboard', requireAuth, (req, res) => {
+  const db = getDb();
+  const user = res.locals.user;
+  const userId = user.id;
+
+  const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId).count;
+  const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId).count;
+  const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId).count;
+  const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId);
+
+  // Content type breakdown
+  const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId);
+
+  const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId);
+
+  res.render('dashboard', {
+    title: 'Dashboard - CopyQuick',
+    contentTypes: getContentTypes(),
+    tones: getTones(),
+    history: history,
+    results: null,
+    totalGenerations,
+    favorites,
+    thisMonth,
+    recent,
+    typeBreakdown,
+    currentPage: 'dashboard'
+  });
+});
+
+// ====== Generate Copy ======
+router.post('/dashboard/generate', requireAuth, (req, res) => {
+  const { productDescription, targetAudience, contentType, tone } = req.body;
+  const db = getDb();
+  const user = res.locals.user;
+
+  if (user.generations_used >= user.monthly_limit) {
+    return res.render('dashboard', {
+      title: 'Dashboard - CopyQuick',
+      contentTypes: getContentTypes(),
+      tones: getTones(),
+      history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+      results: null,
+      error: 'Monthly generation limit reached. <a href="/pricing">Upgrade your plan</a> to continue.',
+      totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: [],
+      input: { productDescription, targetAudience, contentType, tone }
+    });
+  }
+
+  try {
+    const results = generateCopy({ productDescription, targetAudience, contentType, tone });
+    const resultsJson = JSON.stringify(results);
+    const wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+    const title = productDescription.length > 60 ? productDescription.substring(0, 60) + '...' : productDescription;
+
+    const stmt = db.prepare(`
+      INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    const result = stmt.run(user.id, title, productDescription, contentType, tone, resultsJson, wordCount);
+    const genId = result.lastInsertRowid;
+
+    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
+
+    const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+    res.locals.user = updatedUser;
+
+    // Get fresh data for sidebar
+    const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
+    const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
+    const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count;
+    const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(user.id);
+    const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(user.id);
+    const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id);
+
+    res.render('dashboard', {
+      title: 'Dashboard - CopyQuick',
+      contentTypes: getContentTypes(),
+      tones: getTones(),
+      history,
+      results,
+      totalGenerations, favorites, thisMonth, recent, typeBreakdown,
+      input: { productDescription, targetAudience, contentType, tone },
+      genId,
+      currentPage: 'dashboard'
+    });
+  } catch (err) {
+    console.error(err);
+    res.render('dashboard', {
+      title: 'Dashboard - CopyQuick',
+      contentTypes: getContentTypes(),
+      tones: getTones(),
+      history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+      results: null,
+      error: 'An error occurred during generation. Please try again.',
+      totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: [],
+      currentPage: 'dashboard'
+    });
+  }
+});
+
+// ====== History ======
+router.get('/history', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const perPage = 20;
+  const offset = (page - 1) * perPage;
+  const search = req.query.search || '';
+  const type = req.query.type || '';
+  const sort = req.query.sort || 'newest';
+  const favorite = req.query.favorite || '';
+  const language = req.query.language || '';
+
+  let where = 'WHERE user_id = ? AND is_deleted = 0';
+  let params = [userId];
+
+  if (search) {
+    where += ` AND (title LIKE ? OR input_text LIKE ? OR tags LIKE ?)`;
+    const s = `%${search}%`;
+    params.push(s, s, s);
+  }
+  if (type) {
+    where += ` AND content_type = ?`;
+    params.push(type);
+  }
+  if (favorite === '1') {
+    where += ` AND favorite = 1`;
+  }
+  if (language) {
+    where += ` AND language = ?`;
+    params.push(language);
+  }
+
+  let orderBy = 'ORDER BY created_at DESC';
+  if (sort === 'oldest') orderBy = 'ORDER BY created_at ASC';
+  if (sort === 'title') orderBy = 'ORDER BY title ASC';
+  if (sort === 'words_desc') orderBy = 'ORDER BY word_count DESC';
+  if (sort === 'words_asc') orderBy = 'ORDER BY word_count ASC';
+
+  const total = db.prepare(`SELECT COUNT(*) as count FROM generations ${where}`).get(...params).count;
+  const totalPages = Math.ceil(total / perPage);
+
+  const generations = db.prepare(`SELECT * FROM generations ${where} ${orderBy} LIMIT ? OFFSET ?`).all(...params, perPage, offset);
+
+  res.render('history', {
+    title: 'History - CopyQuick',
+    generations,
+    page,
+    totalPages,
+    total,
+    search,
+    type,
+    sort,
+    favorite,
+    language,
+    contentTypes: getContentTypes(),
+    tones: getTones(),
+    currentPage: 'history'
+  });
+});
+
+// ====== Favorites ======
+router.get('/favorites', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+
+  const generations = db.prepare('SELECT * FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0 ORDER BY created_at DESC').all(userId);
+
+  res.render('favorites', {
+    title: 'Favorites - CopyQuick',
+    generations,
+    contentTypes: getContentTypes(),
+    total: generations.length,
+    currentPage: 'favorites'
+  });
+});
+
+// ====== Generation Detail ======
+router.get('/generation/:id', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const genId = req.params.id;
+
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
+  if (!gen) return res.status(404).render('error', { title: 'Not Found - CopyQuick', message: 'Generation not found.' });
+
+  const results = JSON.parse(gen.results);
+
+  res.render('generation', {
+    title: `${gen.title || 'Generation'} - CopyQuick`,
+    gen,
+    results,
+    contentTypes: getContentTypes(),
+    currentPage: 'history'
+  });
+});
+
+// ====== Toggle Favorite ======
+router.post('/generation/:id/favorite', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const genId = req.params.id;
+
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(genId, userId);
+  if (!gen) return res.status(404).json({ error: 'Not found' });
+
+  const newVal = gen.favorite ? 0 : 1;
+  db.prepare('UPDATE generations SET favorite = ? WHERE id = ?').run(newVal, genId);
+
+  res.json({ favorite: newVal === 1 });
+});
+
+// ====== Soft Delete ======
+router.post('/generation/:id/delete', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+
+  db.prepare("UPDATE generations SET is_deleted = 1, deleted_at = datetime('now') WHERE id = ? AND user_id = ?").run(req.params.id, userId);
+  res.json({ success: true });
+});
+
+// ====== Restore ======
+router.post('/generation/:id/restore', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+
+  db.prepare('UPDATE generations SET is_deleted = 0, deleted_at = NULL WHERE id = ? AND user_id = ?').run(req.params.id, userId);
+  res.json({ success: true });
+});
+
+// ====== Update Tags ======
+router.post('/generation/:id/tags', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const { tags } = req.body;
+
+  db.prepare('UPDATE generations SET tags = ? WHERE id = ? AND user_id = ?').run(tags || '', req.params.id, userId);
+  res.json({ success: true });
+});
+
+// ====== Update Title ======
+router.post('/generation/:id/title', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const { title } = req.body;
+
+  db.prepare("UPDATE generations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?").run(title || '', req.params.id, userId);
+  res.json({ success: true, title });
+});
+
+// ====== Regenerate ======
+router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const genId = req.params.id;
+
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(genId, userId);
+  if (!gen) return res.status(404).json({ error: 'Not found' });
+
+  const user = res.locals.user;
+  if (user.generations_used >= user.monthly_limit) {
+    return res.status(403).json({ error: 'Monthly limit reached' });
+  }
+
+  try {
+    const newResults = generateCopy({
+      productDescription: gen.input_text,
+      targetAudience: '',
+      contentType: gen.content_type,
+      tone: gen.tone
+    });
+
+    const newJson = JSON.stringify(newResults);
+    const wordCount = newResults.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+
+    db.prepare("UPDATE generations SET results = ?, word_count = ?, updated_at = datetime('now') WHERE id = ?").run(newJson, wordCount, genId);
+    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(userId);
+
+    res.json({ results: newResults });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Generation failed' });
+  }
+});
+
+// ====== Export ======
+router.get('/generation/:id/export', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const format = req.query.format || 'txt';
+
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+  if (!gen) return res.status(404).send('Not found');
+
+  const results = JSON.parse(gen.results);
+  let content = '';
+
+  if (format === 'txt') {
+    content = results.map((r, i) => `--- Variation ${i + 1} (${r.tone}) ---\n${r.text}`).join('\n\n');
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="copyquick-${gen.id}.txt"`);
+  } else if (format === 'md') {
+    content = `# ${gen.title}\n\n**Type:** ${gen.content_type} | **Tone:** ${gen.tone}\n\n**Prompt:** ${gen.input_text}\n\n---\n\n`;
+    content += results.map((r, i) => `### Variation ${i + 1} (${r.tone})\n\n${r.text}\n`).join('\n');
+    res.setHeader('Content-Type', 'text/markdown');
+    res.setHeader('Content-Disposition', `attachment; filename="copyquick-${gen.id}.md"`);
+  } else {
+    return res.status(400).send('Unsupported format');
+  }
+
+  res.send(content);
+});
+
+// ====== API: Search ======
+router.get('/api/search', requireAuth, (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const q = req.query.q || '';
+
+  if (!q || q.length < 2) return res.json([]);
+
+  const gens = db.prepare(`
+    SELECT id, title, input_text, content_type, tags, created_at 
+    FROM generations 
+    WHERE user_id = ? AND is_deleted = 0 
+      AND (title LIKE ? OR input_text LIKE ? OR tags LIKE ?)
+    ORDER BY created_at DESC LIMIT 20
+  `).all(userId, `%${q}%`, `%${q}%`, `%${q}%`);
+
+  res.json(gens);
+});
+
+// ====== Profile ======
+router.get('/profile', requireAuth, (req, res) => {
+  res.render('profile', { title: 'My Profile - CopyQuick', currentPage: 'profile' });
+});
+
+module.exports = router;
