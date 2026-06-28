@@ -16,6 +16,13 @@ const webhookRoutes = require('./routes/webhook');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
 
+// Startup auth config check
+console.log('🔐 Auth Configuration:');
+console.log(`  GOOGLE_CLIENT_ID:     ${process.env.GOOGLE_CLIENT_ID ? '✅ present (' + process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...)' : '❌ MISSING'}`);
+console.log(`  GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? '✅ present (' + process.env.GOOGLE_CLIENT_SECRET.substring(0, 8) + '...)' : '❌ MISSING'}`);
+console.log(`  GOOGLE_CALLBACK_URL:  ${process.env.GOOGLE_CALLBACK_URL ? '✅ ' + process.env.GOOGLE_CALLBACK_URL : '❌ MISSING'}`);
+console.log(`  SESSION_SECRET:       ${process.env.SESSION_SECRET ? '✅ present' : '⚠️ using default'}`);
+
 // Initialize database
 initDb();
 
