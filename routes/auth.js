@@ -59,9 +59,16 @@ router.post('/login', async (req, res) => {
 
 // Google OAuth
 router.get('/auth/google', (req, res, next) => {
-  const redirectURL = `${req.protocol}://${req.get('host')}/auth/google/callback`;
-  console.log(`🔀 Google OAuth redirect: ${redirectURL}`);
-  console.log(`🔀 Request host: ${req.get('host')}, protocol: ${req.protocol}`);
+  const configuredURL = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/auth/google/callback`;
+  console.log(`🔀 Google OAuth initiating...`);
+  console.log(`🔀 Configured callbackURL: "${process.env.GOOGLE_CALLBACK_URL}"`);
+  console.log(`🔀 Request host:           "${req.get('host')}"`);
+  console.log(`🔀 Request protocol:       "${req.protocol}"`);
+  console.log(`🔀 Computed redirect:      "${req.protocol}://${req.get('host')}/auth/google/callback"`);
+  console.log(`🔀 Env var callbackURL:    "${process.env.GOOGLE_CALLBACK_URL}"`);
+  if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
+    console.error(`❌ GOOGLE_CALLBACK_URL does NOT start with https:// — Google will reject this!`);
+  }
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 

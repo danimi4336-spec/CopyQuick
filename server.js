@@ -5,6 +5,7 @@ const passport = require('./lib/passport');
 const SQLiteStore = require('./lib/sessionStore');
 const path = require('path');
 const app = express();
+app.set('trust proxy', 1); // Trust Render's proxy for HTTPS
 const PORT = process.env.PORT || 3000;
 
 const { getDb } = require('./db/database');
