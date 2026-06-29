@@ -1,125 +1,234 @@
-<section class="hero">
+<!-- ====== Hero ====== -->
+<section class="hero hero-modern">
     <div class="container">
-        <h1>Create High-Converting Marketing Content in Seconds</h1>
-        <p class="tagline">Generate product descriptions, Amazon listings, Facebook ads, Google Ads, email campaigns, landing page copy, and social posts using AI in seconds. No more staring at a blank page.</p>
+        <div class="hero-badge">✨ AI-Powered Marketing Platform</div>
+        <h1>From One Idea to a<br>Complete Marketing Campaign</h1>
+        <p class="tagline">Generate emails, ads, landing pages, SEO content, social media posts, product descriptions, video scripts, and complete marketing campaigns — all powered by AI from a single product description.</p>
         <div class="hero-cta">
-            <a href="/signup" class="btn btn-primary btn-lg">Start Generating for Free</a>
+            <a href="/signup" class="btn btn-primary btn-lg hero-btn">🚀 Start Free</a>
+            <a href="#demo-preview" class="btn btn-outline btn-lg hero-btn">▶ Watch Demo</a>
         </div>
+    </div>
+</section>
 
-        <div class="live-demo" id="liveDemo">
-            <div class="demo-editor">
-                <span class="prompt-label">✍️ My product:</span>
-                <input type="text" class="demo-input-field" id="demoInput" value="Wireless Noise-Cancelling Headphones" placeholder="Describe your product..." autocomplete="off">
-                <button class="demo-run-btn" id="demoRunBtn">Generate →</button>
+<!-- ====== Product Cards ====== -->
+<section id="features" class="products-section">
+    <div class="container">
+        <div class="section-label">Choose Your Power Level</div>
+        <h2 class="section-title fade-in">Three Ways to Create</h2>
+        <p class="section-subtitle fade-in">From a single headline to a full campaign launch — pick the tool that fits.</p>
+        <div class="product-grid">
+            <!-- Quick Generate -->
+            <div class="product-card fade-in">
+                <div class="product-icon-wrap">⚡</div>
+                <h3>Quick Generate</h3>
+                <p class="product-sub">Best for single pieces of content</p>
+                <ul class="product-features">
+                    <li>Email Subject Lines</li>
+                    <li>Product Descriptions</li>
+                    <li>Google Ads</li>
+                    <li>Facebook Posts</li>
+                    <li>CTAs</li>
+                    <li>Amazon Listings</li>
+                </ul>
+                <a href="/signup" class="btn btn-outline btn-block">Generate Fast</a>
             </div>
-            <div class="demo-arrow" id="demoArrow">⬇</div>
-            <div class="demo-results" id="demoResults">
-                <!-- Results appear here -->
+
+            <!-- Marketing Bundle -->
+            <div class="product-card fade-in">
+                <div class="product-icon-wrap">📦</div>
+                <h3>Marketing Bundle</h3>
+                <p class="product-sub">Generate multiple coordinated assets</p>
+                <ul class="product-features">
+                    <li>✔ Email Campaign</li>
+                    <li>✔ Google Ads</li>
+                    <li>✔ Social Media</li>
+                    <li>✔ Product Description</li>
+                    <li>✔ SEO</li>
+                    <li>✔ Landing Page</li>
+                </ul>
+                <a href="/signup" class="btn btn-outline btn-block">Build Bundle</a>
+            </div>
+
+            <!-- Campaign Studio -->
+            <div class="product-card product-card-featured fade-in">
+                <div class="featured-badge">⭐ Recommended</div>
+                <div class="product-icon-wrap product-icon-campaign">🚀</div>
+                <h3>Campaign Studio™</h3>
+                <p class="product-sub">Build an entire marketing campaign from one idea</p>
+                <ul class="product-features">
+                    <li>✔ Email Sequence</li>
+                    <li>✔ Facebook Campaign</li>
+                    <li>✔ Instagram Posts</li>
+                    <li>✔ Google Ads</li>
+                    <li>✔ Landing Page</li>
+                    <li>✔ SEO Package</li>
+                    <li>✔ Video Script</li>
+                    <li>✔ Publishing Calendar</li>
+                    <li>✔ Campaign Strategy</li>
+                </ul>
+                <a href="/signup" class="btn btn-primary btn-block">🚀 Launch Campaign</a>
             </div>
         </div>
     </div>
 </section>
 
-<section id="features" class="features">
+<!-- ====== Interactive Preview ====== -->
+<section id="demo-preview" class="preview-section">
     <div class="container">
-        <h2 class="section-title fade-in">Everything you need to sell more</h2>
-        <p class="section-subtitle fade-in">From social posts to email campaigns — get the right words for every channel.</p>
-        <div class="feature-grid">
-    <% 
-        var icons2 = { subject_line: '✉️', social_post: '📱', ad_headline: '📢', product_description: '🛒', cta: '🎯', email_campaign: '📧', blog_intro: '📝', sales_message: '💬' };
-        var descs2 = { 
-            subject_line: 'Open rates matter. Get subject lines that actually get clicked.',
-            social_post: 'Engaging posts for Twitter, LinkedIn, and Instagram in one click.',
-            ad_headline: 'Stop wasting ad spend. Headlines that capture attention and convert.',
-            product_description: 'Amazon listings, Shopify products, and ecommerce descriptions.',
-            cta: 'The perfect call-to-action for every occasion.',
-            email_campaign: 'Full email sequences — welcome flows, promotions, and follow-ups.',
-            blog_intro: 'Strong openings that hook readers and keep them scrolling.',
-            sales_message: 'Direct messages, cold emails, and outreach copy that gets replies.'
-        };
-        Object.keys(contentTypes).forEach(function(key) { 
-    %>
-        <div class="feature-card fade-in">
-            <div class="feature-icon"><%= icons2[key] || '📄' %></div>
-            <h3><%= contentTypes[key] %></h3>
-            <p><%= descs2[key] || 'AI-powered copy for your marketing needs.' %></p>
+        <div class="section-label">See CopyQuick in Action</div>
+        <h2 class="section-title fade-in">From Prompt to Campaign</h2>
+        <p class="section-subtitle fade-in">Describe your product once and watch CopyQuick generate content for every channel.</p>
+        <div class="demo-box fade-in">
+            <div class="demo-box-header">
+                <span class="demo-box-icon">✍️</span>
+                <span class="demo-box-label">Describe your product</span>
+            </div>
+            <div class="demo-box-input">Wireless Noise-Cancelling Headphones</div>
         </div>
-    <% }); %>
-</div>
+
+        <div class="preview-grid">
+            <div class="preview-card fade-in">
+                <div class="preview-card-header">
+                    <span class="preview-icon">⚡</span>
+                    <span>Quick Generate</span>
+                </div>
+                <div class="preview-body">
+                    <div class="preview-content">Subject: <strong>Finally, Peace and Quiet in a Noisy World</strong></div>
+                </div>
+            </div>
+
+            <div class="preview-card fade-in">
+                <div class="preview-card-header">
+                    <span class="preview-icon">📦</span>
+                    <span>Marketing Bundle</span>
+                </div>
+                <div class="preview-body">
+                    <div class="preview-mini">✉️ Email campaign ready</div>
+                    <div class="preview-mini">📘 Facebook post ready</div>
+                    <div class="preview-mini">🔍 Google Ads ready</div>
+                    <div class="preview-mini">🔗 SEO content ready</div>
+                </div>
+            </div>
+
+            <div class="preview-card preview-card-featured fade-in">
+                <div class="preview-card-header">
+                    <span class="preview-icon">🚀</span>
+                    <span>Campaign Studio™</span>
+                    <span class="preview-badge">NEW</span>
+                </div>
+                <div class="preview-body">
+                    <div class="campaign-flow">
+                        <div class="flow-item flow-start">💡 Idea</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item">✉️ Email Campaign</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item">📱 Social Posts</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item">📢 Ads</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item">🌐 Landing Page</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item">🎬 Video Script</div>
+                        <div class="flow-arrow">↓</div>
+                        <div class="flow-item flow-end">🚀 Launch</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
-<section class="how-it-works">
+<!-- ====== Why Businesses Choose CopyQuick ====== -->
+<section class="comparison-section">
     <div class="container">
-        <h2 class="section-title fade-in">How it works</h2>
-        <p class="section-subtitle fade-in">Three simple steps to never write copy from scratch again.</p>
-        <div class="steps">
-            <div class="step fade-in">
-                <span class="step-num">1</span>
-                <h3>Describe your product</h3>
-                <p>Tell us what you're selling, who it's for, and your brand voice.</p>
-            </div>
-            <div class="step fade-in">
-                <span class="step-num">2</span>
-                <h3>Choose your format</h3>
-                <p>Pick from email, social media, ads, CTAs, and more.</p>
-            </div>
-            <div class="step fade-in">
-                <span class="step-num">3</span>
-                <h3>Copy, paste, publish</h3>
-                <p>Get 5 variations of high-converting copy in seconds.</p>
-            </div>
+        <div class="section-label">Why Businesses Choose CopyQuick</div>
+        <h2 class="section-title fade-in">More Power, Same Effort</h2>
+        <p class="section-subtitle fade-in">See what you can create with each plan.</p>
+        <div class="comparison-table-wrap fade-in">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>⚡ Quick</th>
+                        <th>📦 Bundle</th>
+                        <th class="col-featured">🚀 Campaign Studio™</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Single Content</td><td>✅</td><td>✅</td><td>✅</td></tr>
+                    <tr><td>Multiple Assets</td><td></td><td>✅</td><td>✅</td></tr>
+                    <tr><td>Email Campaign</td><td></td><td>✅</td><td>✅</td></tr>
+                    <tr><td>SEO Content</td><td></td><td>✅</td><td>✅</td></tr>
+                    <tr><td>Social Media</td><td></td><td>✅</td><td>✅</td></tr>
+                    <tr><td>Landing Pages</td><td></td><td></td><td>✅</td></tr>
+                    <tr><td>Product Pages</td><td></td><td></td><td>✅</td></tr>
+                    <tr><td>Video Scripts</td><td></td><td></td><td>✅</td></tr>
+                    <tr><td>Campaign Strategy</td><td></td><td></td><td>✅</td></tr>
+                    <tr><td>Publishing Calendar</td><td></td><td></td><td>✅</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </section>
 
-<section class="testimonials">
+<!-- ====== Testimonials ====== -->
+<section class="testimonials-section">
     <div class="container">
-        <h2 class="section-title fade-in">Loved by marketers</h2>
-        <p class="section-subtitle fade-in">Thousands of solopreneurs and founders use CopyQuick daily.</p>
+        <h2 class="section-title fade-in">Trusted by Marketers</h2>
         <div class="testimonial-grid">
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">★★★★★</div>
-                <blockquote>"Saved me hours every week. I used to spend an hour writing Instagram captions — now it takes 30 seconds."</blockquote>
-                <div class="testimonial-author">— Sarah K.</div>
+            <div class="test-card fade-in">
+                <div class="test-stars">★★★★★</div>
+                <blockquote>"We replaced three marketing tools with CopyQuick. Campaign Studio alone saves us hours every week."</blockquote>
+                <div class="test-author">
+                    <div class="test-avatar" style="background:#4f46e5;">JM</div>
+                    <div><strong>Jessica M.</strong><span>Marketing Director</span></div>
+                </div>
             </div>
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">★★★★★</div>
-                <blockquote>"Our ad conversion improved dramatically since we started using CopyQuick. The headlines just work better."</blockquote>
-                <div class="testimonial-author">— Michael R.</div>
+            <div class="test-card fade-in">
+                <div class="test-stars">★★★★★</div>
+                <blockquote>"Our weekly campaign planning now takes minutes instead of hours. The bundles are a game changer."</blockquote>
+                <div class="test-author">
+                    <div class="test-avatar" style="background:#059669;">DR</div>
+                    <div><strong>David R.</strong><span>Ecommerce Founder</span></div>
+                </div>
             </div>
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">★★★★★</div>
-                <blockquote>"The fastest copywriting tool I've used. No learning curve, no fluff — just results."</blockquote>
-                <div class="testimonial-author">— David L.</div>
+            <div class="test-card fade-in">
+                <div class="test-stars">★★★★★</div>
+                <blockquote>"The Campaign Studio feature alone is worth the subscription. It's like having a full marketing team in one tool."</blockquote>
+                <div class="test-author">
+                    <div class="test-avatar" style="background:#d97706;">SL</div>
+                    <div><strong>Sarah L.</strong><span>Freelance Creator</span></div>
+                </div>
             </div>
         </div>
     </div>
 </section>
 
+<!-- ====== Pricing (existing) ====== -->
 <section id="pricing" class="pricing">
     <div class="container">
         <h2 class="section-title fade-in">Simple Pricing</h2>
-        <p class="section-subtitle fade-in">Start free. Upgrade when you need more.</p>
+        <p class="section-subtitle fade-in">Start free. Upgrade when you need more power.</p>
         <div class="pricing-grid">
             <div class="pricing-card fade-in">
                 <h3>Free</h3>
                 <div class="price"><span>$</span>0<span>/mo</span></div>
                 <ul class="price-features">
                     <li>10 generations per month</li>
+                    <li>Quick Generate only</li>
                     <li>Basic templates</li>
-                    <li>Community support</li>
                 </ul>
                 <a href="/signup" class="btn btn-outline btn-block">Get Started</a>
             </div>
             <div class="pricing-card highlighted fade-in">
-                <div class="badge">Popular</div>
+                <div class="badge">Most Popular</div>
                 <h3>Pro</h3>
                 <div class="price"><span>$</span>9<span>/mo</span></div>
                 <ul class="price-features">
                     <li>200 generations per month</li>
+                    <li>Quick + Bundle modes</li>
                     <li>All templates</li>
-                    <li>Tone customization</li>
                     <li>Priority support</li>
                 </ul>
                 <a href="/subscribe?price=pro_price" class="btn btn-primary btn-block">Go Pro</a>
@@ -129,8 +238,8 @@
                 <div class="price"><span>$</span>29<span>/mo</span></div>
                 <ul class="price-features">
                     <li>Unlimited generations</li>
-                    <li>Team sharing</li>
-                    <li>API access</li>
+                    <li>Campaign Studio™ included</li>
+                    <li>Team sharing &amp; API</li>
                     <li>Dedicated account manager</li>
                 </ul>
                 <a href="/subscribe?price=unlimited_price" class="btn btn-outline btn-block">Go Unlimited</a>
@@ -139,127 +248,21 @@
     </div>
 </section>
 
-<section class="cta-bottom">
+<!-- ====== Final CTA ====== -->
+<section class="final-cta">
     <div class="container">
-        <h2 class="fade-in">Ready to level up your marketing?</h2>
-        <a href="/signup" class="btn btn-primary btn-lg fade-in">Start Now — It's Free</a>
+        <h2 class="fade-in">Ready to Build Your Next Campaign?</h2>
+        <p class="fade-in">Join businesses creating better marketing in minutes.</p>
+        <div class="final-cta-btns fade-in">
+            <a href="/signup" class="btn btn-primary btn-lg">🚀 Start Free</a>
+            <a href="/#pricing" class="btn btn-outline btn-lg">View Pricing</a>
+        </div>
     </div>
 </section>
 
 <script>
-(function() {
-    // Interactive Demo
-    var demoInput = document.getElementById('demoInput');
-    var demoRunBtn = document.getElementById('demoRunBtn');
-    var demoResults = document.getElementById('demoResults');
-    var demoArrow = document.getElementById('demoArrow');
-
-    var samples = {
-        "Wireless Noise-Cancelling Headphones": [
-            { cat: "Product Description", text: "Premium wireless headphones with active noise cancellation up to 40dB. 30-hour battery life." },
-            { cat: "Amazon Listing", text: "✓ ANC up to 40dB ✓ 30hr playtime ✓ Ultra-comfort fit ✓ USB-C fast charging" },
-            { cat: "Facebook Ad", text: "Escape the noise. 🎧 Immerse yourself in crystal-clear sound anywhere." },
-            { cat: "Google Ads", text: "Best Noise-Cancelling Headphones | 30-Day Trial | Free Shipping" },
-            { cat: "Instagram Caption", text: "Your focus, amplified. 🔇✨ #NoiseCancelling #WirelessAudio #FocusMode" },
-            { cat: "Email Campaign", text: "Subject: Finally, peace and quiet in a noisy world" }
-        ],
-        "Organic Turmeric Supplement": [
-            { cat: "Product Description", text: "Natural turmeric capsules for daily wellness. Reduces inflammation, boosts immunity." },
-            { cat: "Amazon Listing", text: "✓ 100% Organic ✓ 95% Curcumin ✓ 120 Capsules ✓ Third-party tested" },
-            { cat: "Facebook Ad", text: "Feel the difference naturally. 🌿 Try our organic turmeric today." },
-            { cat: "Google Ads", text: "Best Organic Turmeric | 30-Day Money-Back | Free Shipping" },
-            { cat: "Instagram Caption", text: "Your daily dose of golden wellness. ✨ #turmeric #wellness #organic" },
-            { cat: "Email Campaign", text: "Subject: Your journey to natural wellness starts here" }
-        ]
-    };
-
-    function generateDemoResults(product) {
-        var results;
-        if (samples[product]) {
-            results = samples[product];
-        } else {
-            // Generic fallback
-            results = [
-                { cat: "Product Description", text: "Premium " + product + " designed for modern needs. Quality you can trust." },
-                { cat: "Amazon Listing", text: "✓ Premium quality ✓ Satisfaction guaranteed ✓ Fast shipping ✓ Great value" },
-                { cat: "Facebook Ad", text: "Discover " + product + " — designed for people who demand the best." },
-                { cat: "Google Ads", text: product + " | Shop Now | Free Returns" },
-                { cat: "Instagram Caption", text: "Meet your new favorite " + product.toLowerCase() + ". ✨" },
-                { cat: "Email Campaign", text: "Subject: Introducing " + product + " — you'll love it" }
-            ];
-        }
-        return results;
-    }
-
-    function animateDemo(product) {
-        demoResults.innerHTML = '';
-        demoArrow.style.opacity = '1';
-        
-        var items = generateDemoResults(product);
-
-        // Show typing indicator first
-        var typingEl = document.createElement('div');
-        typingEl.className = 'demo-typing';
-        typingEl.innerHTML = '<span class="demo-pulse"></span> Generating content for <strong>' + product + '</strong><span class="typing-dots"><span></span><span></span><span></span></span>';
-        demoResults.appendChild(typingEl);
-
-        var delay = 0;
-        items.forEach(function(item, i) {
-            delay = 500 + i * 450;
-            setTimeout(function() {
-                // Remove typing indicator after first item appears
-                if (i === 0 && typingEl.parentNode) {
-                    typingEl.parentNode.removeChild(typingEl);
-                }
-
-                var el = document.createElement('div');
-                el.className = 'demo-result-item visible';
-                el.innerHTML = '<span class="check">✓</span>' +
-                    '<div class="copy-preview"><span class="category">' + item.cat + '</span><span>' + item.text + '</span></div>' +
-                    '<button class="demo-copy-btn" onclick="navigator.clipboard.writeText(\'' + item.text.replace(/'/g, "\\'") + '\');this.textContent=\'Copied!\';setTimeout(function(){this.textContent=\'Copy\'}.bind(this),1500)">Copy</button>';
-                demoResults.appendChild(el);
-
-                // After all items, hide arrow
-                if (i === items.length - 1) {
-                    setTimeout(function() {
-                        demoArrow.style.opacity = '0.3';
-                    }, 400);
-                }
-            }, delay);
-        });
-    }
-
-    // Run demo on click
-    demoRunBtn.addEventListener('click', function() {
-        var val = demoInput.value.trim() || "Wireless Noise-Cancelling Headphones";
-        demoInput.value = val;
-        animateDemo(val);
-    });
-
-    // Run demo on Enter
-    demoInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            demoRunBtn.click();
-        }
-    });
-
-    // Auto-run on page load
-    setTimeout(function() {
-        animateDemo("Wireless Noise-Cancelling Headphones");
-    }, 600);
-
-    // Scroll animation observer
-    var observer = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-            }
-        });
-    }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
-
-    document.querySelectorAll('.fade-in').forEach(function(el) {
-        observer.observe(el);
-    });
+(function(){
+    var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
+    document.querySelectorAll('.fade-in').forEach(function(e){o.observe(e);});
 })();
 </script>
