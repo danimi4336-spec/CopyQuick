@@ -15,57 +15,116 @@
         </div>
     </header>
 
-    <div class="stats-grid fade-in" id="statsGrid">
+    <div class="stats-grid fade-in">
         <div class="stat-card">
             <div class="stat-icon stat-icon-purple">📝</div>
             <div class="stat-info">
-                <span class="stat-value" id="totalGens"><%= totalGenerations %></span>
+                <span class="stat-value"><%= totalGenerations %></span>
                 <span class="stat-label">Total Generations</span>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon stat-icon-pink">⭐</div>
+            <div class="stat-icon stat-icon-purple">⚡</div>
             <div class="stat-info">
-                <span class="stat-value" id="favCount"><%= favorites %></span>
-                <span class="stat-label" id="favLabel">Favorites</span>
+                <span class="stat-value"><%= quickCount %></span>
+                <span class="stat-label">Quick</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-green">📦</div>
+            <div class="stat-info">
+                <span class="stat-value"><%= bundleCount %></span>
+                <span class="stat-label">Bundles</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-pink">🚀</div>
+            <div class="stat-info">
+                <span class="stat-value"><%= campaignCount %></span>
+                <span class="stat-label">Campaigns</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon stat-icon-amber">⭐</div>
+            <div class="stat-info">
+                <span class="stat-value"><%= favorites %></span>
+                <span class="stat-label">Favorites</span>
             </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon stat-icon-green">📅</div>
             <div class="stat-info">
-                <span class="stat-value" id="monthCount"><%= thisMonth %></span>
+                <span class="stat-value"><%= thisMonth %></span>
                 <span class="stat-label">This Month</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-amber">🎯</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= user.plan_tier.charAt(0).toUpperCase() + user.plan_tier.slice(1) %></span>
-                <span class="stat-label">Subscription</span>
             </div>
         </div>
     </div>
 
     <div class="dashboard-grid">
         <section class="generator-tool fade-in">
+            <!-- Mode Selector -->
+            <div class="mode-selector">
+                <button class="mode-btn active" data-mode="quick" onclick="switchMode('quick')">
+                    <span class="mode-icon">⚡</span>
+                    <span class="mode-label">Quick Generate</span>
+                </button>
+                <button class="mode-btn" data-mode="bundle" onclick="switchMode('bundle')">
+                    <span class="mode-icon">📦</span>
+                    <span class="mode-label">Marketing Bundle</span>
+                </button>
+                <button class="mode-btn" data-mode="campaign" onclick="switchMode('campaign')">
+                    <span class="mode-icon">🚀</span>
+                    <span class="mode-label">Complete Campaign</span>
+                    <span class="mode-badge">⭐ Recommended</span>
+                </button>
+            </div>
+
+            <% if (typeof error !== 'undefined' && error) { %>
+                <div class="alert alert-error"><%- error %></div>
+            <% } %>
+
             <div class="card p-4">
-                <h2 class="h3 mb-4">Generate New Copy</h2>
-                <% if (typeof error !== 'undefined' && error) { %>
-                    <div class="alert alert-error"><%- error %></div>
-                <% } %>
-                <form id="genForm" action="/dashboard/generate" method="POST">
+                <!-- Shared Inputs -->
+                <div class="shared-inputs">
                     <div class="form-group">
-                        <label for="productDescription">What are you selling?</label>
-                        <textarea id="productDescription" name="productDescription" rows="3" placeholder="Describe your product or service..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
+                        <label for="productDescription">Product / Service</label>
+                        <textarea id="productDescription" name="productDescription" rows="3" placeholder="Describe your product or service in detail..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
                     </div>
-                    <div class="form-grid">
+                    <div class="form-grid form-grid-3">
                         <div class="form-group">
                             <label for="targetAudience">Target Audience</label>
-                            <input type="text" id="targetAudience" name="targetAudience" placeholder="e.g. Busy moms, Tech founders" value="<%= typeof input !== 'undefined' ? input.targetAudience : '' %>">
+                            <select id="targetAudience" name="targetAudience">
+                                <% (audiencePresets || ['Custom']).forEach(function(a) { %>
+                                    <option value="<%= a %>"><%= a %></option>
+                                <% }); %>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label for="contentType">Content Type</label>
-                            <select id="contentType" name="contentType">
+                            <label for="brandVoice">Brand Voice</label>
+                            <select id="brandVoice" name="brandVoice">
+                                <% (brandVoices || ['Professional']).forEach(function(v) { %>
+                                    <option value="<%= v.toLowerCase() %>" <%= v === 'Professional' ? 'selected' : '' %>><%= v %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="goal">Goal <span class="field-optional">(optional)</span></label>
+                            <select id="goal" name="goal">
+                                <option value="">Select a goal</option>
+                                <% (goals || []).forEach(function(g) { %>
+                                    <option value="<%= g.toLowerCase().replace(/\s+/g, '_') %>"><%= g %></option>
+                                <% }); %>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode: Quick Generate -->
+                <div id="modeQuick" class="mode-panel active">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="quickContentType">Content Type</label>
+                            <select id="quickContentType" name="contentType">
                                 <option value="subject_line">Email Subject Lines</option>
                                 <option value="social_post">Social Media Posts</option>
                                 <option value="ad_headline">Ad Headlines &amp; Copy</option>
@@ -76,11 +135,9 @@
                                 <option value="sales_message">Sales Messages</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-grid">
                         <div class="form-group">
-                            <label for="tone">Tone</label>
-                            <select id="tone" name="tone">
+                            <label for="quickTone">Tone</label>
+                            <select id="quickTone" name="tone">
                                 <option value="professional">Professional</option>
                                 <option value="casual">Casual</option>
                                 <option value="urgent">Urgent</option>
@@ -88,36 +145,58 @@
                                 <option value="inspirational">Inspirational</option>
                             </select>
                         </div>
-                        <div class="form-group" style="display:flex;align-items:flex-end;">
-                            <button type="submit" class="btn btn-primary btn-block" id="genBtn">Generate Copy</button>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generate('quick')">⚡ Generate Copy</button>
+                </div>
+
+                <!-- Mode: Marketing Bundle -->
+                <div id="modeBundle" class="mode-panel">
+                    <p class="mode-description">Select the assets you want to generate. <span id="bundleCount">0 assets selected</span></p>
+                    <div class="bundle-grid">
+                        <% (bundleAssets || []).forEach(function(asset) { %>
+                            <label class="bundle-item <%= asset.default ? 'checked' : '' %>">
+                                <input type="checkbox" class="bundle-checkbox" value="<%= asset.id %>" <%= asset.default ? 'checked' : '' %> onchange="updateBundleCount()">
+                                <span class="bundle-icon"><%= asset.icon %></span>
+                                <span class="bundle-label"><%= asset.label %></span>
+                            </label>
+                        <% }); %>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generateBundle()">📦 Generate Bundle</button>
+                </div>
+
+                <!-- Mode: Complete Campaign -->
+                <div id="modeCampaign" class="mode-panel">
+                    <div class="campaign-card">
+                        <div class="campaign-header">
+                            <span class="campaign-badge">⭐ Recommended</span>
+                            <h3 style="margin:0.5rem 0;">Complete Campaign</h3>
+                        </div>
+                        <p class="campaign-desc">Generate a complete multi-channel marketing campaign from a single product description. Includes all assets for every channel.</p>
+                        <div class="campaign-channels">
+                            <% (campaignSections || []).forEach(function(s) { %>
+                                <div class="campaign-channel">
+                                    <span><%= s.icon %></span>
+                                    <span><%= s.label %></span>
+                                </div>
+                            <% }); %>
+                        </div>
+                        <div class="campaign-estimate">
+                            <span>⏱️ Estimated time: <strong>45–90 seconds</strong></span>
                         </div>
                     </div>
-                </form>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generateCampaign()">🚀 Generate Complete Campaign</button>
+                </div>
+
+                <input type="hidden" name="generationType" id="generationType" value="quick">
             </div>
 
-            <!-- Loading Skeletons -->
+            <!-- Loading Skeleton -->
             <div id="loadingSkeleton" style="display:none;">
-                <div class="result-card skeleton">
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-80"></div>
-                    <div class="skeleton-line w-60"></div>
-                    <div class="skeleton-line w-90"></div>
-                </div>
-                <div class="result-card skeleton">
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-80"></div>
-                    <div class="skeleton-line w-60"></div>
-                    <div class="skeleton-line w-90"></div>
-                </div>
-                <div class="result-card skeleton">
-                    <div class="skeleton-line w-40"></div>
-                    <div class="skeleton-line w-80"></div>
-                    <div class="skeleton-line w-60"></div>
-                    <div class="skeleton-line w-90"></div>
-                </div>
+                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
+                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
+                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
             </div>
 
-            <!-- Results -->
             <div id="resultsArea">
             <% if (results) { %>
                 <div class="results-container mt-5">
@@ -125,16 +204,15 @@
                         <h2 class="h3 mb-4">Results</h2>
                         <a href="/history" class="btn btn-outline btn-sm">View All History →</a>
                     </div>
-                    <div class="gen-success-msg" id="successMsg">✓ Content generated successfully</div>
-                    <div class="results-grid" id="resultsGrid">
-                        <% results.forEach((result, index) => { %>
-                            <div class="result-card premium-card" data-index="<%= index %>" style="animation:cardFadeIn 0.3s ease-out <%= index * 0.1 %>s both;">
-                                <div class="result-variation-label">Variation <%= index + 1 %></div>
-                                <div class="result-tone-badge"><%= result.tone %></div>
-                                <div class="result-body"><%= result.text.replace(/\n/g, '<br>') %></div>
+                    <div class="gen-success-msg">✓ Content generated successfully</div>
+                    <div class="results-grid">
+                        <% results.forEach(function(r, i) { %>
+                            <div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out <%= i*0.1 %>s both;">
+                                <div class="result-variation-label">Variation <%= i+1 %></div>
+                                <div class="result-tone-badge"><%= r.tone %></div>
+                                <div class="result-body"><%= r.text.replace(/\n/g, '<br>') %></div>
                                 <div class="result-card-actions">
-                                    <button class="result-action-btn" onclick="copyResult(<%= index %>)" aria-label="Copy">📋 <span>Copy</span></button>
-                                    <button class="result-action-btn fav-btn" onclick="toggleFav(<%= genId || 0 %>)" aria-label="Favorite">☆ <span>Favorite</span></button>
+                                    <button class="result-action-btn" onclick="copyText('<%= r.text.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>', this)" aria-label="Copy">📋 <span>Copy</span></button>
                                 </div>
                             </div>
                         <% }); %>
@@ -143,28 +221,30 @@
             <% } %>
             </div>
 
-            <!-- Empty State -->
             <div id="emptyState" class="empty-state-sm" style="<%= results ? 'display:none' : '' %>">
                 <div class="empty-icon-sm">✨</div>
                 <h3>No content generated yet</h3>
-                <p>Start by describing your product above.</p>
+                <p>Choose a mode above and start by describing your product.</p>
             </div>
         </section>
 
         <aside class="dashboard-sidebar">
-            <% if (typeBreakdown && typeBreakdown.length > 0) { %>
-                <div class="sidebar-card">
-                    <h3 class="h4">📊 Content Breakdown</h3>
+            <!-- Stats -->
+            <div class="sidebar-card">
+                <h3 class="h4">📊 Content Breakdown</h3>
+                <% if (typeBreakdown && typeBreakdown.length > 0) { %>
                     <div class="breakdown-list">
                         <% typeBreakdown.forEach(function(item) { %>
                             <div class="breakdown-item">
-                                <span class="breakdown-label"><%= (item.content_type === 'cta') ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></span>
+                                <span class="breakdown-label"><%= item.content_type === 'cta' ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}) %></span>
                                 <span class="breakdown-count"><%= item.count %></span>
                             </div>
                         <% }); %>
                     </div>
-                </div>
-            <% } %>
+                <% } else { %>
+                    <p class="sidebar-text">Generate content to see your breakdown here.</p>
+                <% } %>
+            </div>
 
             <div class="sidebar-card">
                 <h3 class="h4">🕐 Recent Activity</h3>
@@ -172,19 +252,17 @@
                     <div class="activity-list">
                         <% recent.slice(0, 5).forEach(function(item) { %>
                             <a href="/generation/<%= item.id %>" class="activity-item">
-                                <span class="activity-title"><%= item.title || item.input_text.substring(0, 40) %></span>
-                                <span class="activity-meta">
-                                    <%= (item.content_type === 'cta') ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %>
-                                    · <%= new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %>
+                                <span class="activity-title">
+                                    <% if (item.generation_type === 'campaign') { %>🚀<% } else if (item.generation_type === 'bundle') { %>📦<% } else { %>⚡<% } %>
+                                    <%= item.title || item.input_text.substring(0, 35) %>
                                 </span>
+                                <span class="activity-meta"><%= new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) %></span>
                             </a>
                         <% }); %>
                     </div>
                     <a href="/history" class="sidebar-link">View all →</a>
                 <% } else { %>
-                    <div class="empty-activity">
-                        <p style="font-size:0.85rem;color:var(--secondary);max-width:none;text-align:center;padding:1rem 0;">Generate your first copy to see it here ✨</p>
-                    </div>
+                    <div class="empty-activity"><p style="font-size:0.85rem;color:var(--secondary);max-width:none;text-align:center;padding:0.5rem 0;">Generate your first copy ✨</p></div>
                 <% } %>
             </div>
         </aside>
@@ -192,184 +270,196 @@
 </div>
 
 <style>
-.results-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-.gen-success-msg { background:#d1fae5;color:#065f46;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-weight:600;font-size:0.9rem;animation:slideDown 0.3s ease-out; }
-@keyframes slideDown { from { opacity:0;transform:translateY(-10px); } to { opacity:1;transform:translateY(0); } }
+.results-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;}
+.btn-sm{padding:0.4rem 0.8rem;font-size:0.85rem;}
+.gen-success-msg{background:#d1fae5;color:#065f46;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-weight:600;font-size:0.9rem;animation:slideDown 0.3s ease-out;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Mode Selector */
+.mode-selector{display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;}
+.mode-btn{flex:1;min-width:180px;display:flex;align-items:center;gap:0.5rem;padding:0.85rem 1rem;border:2px solid var(--border);border-radius:1rem;background:var(--white);cursor:pointer;transition:all 0.2s;text-align:left;position:relative;}
+.mode-btn:hover{border-color:var(--primary);background:var(--primary-light);}
+.mode-btn.active{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 3px rgba(79,70,229,0.15);}
+.mode-icon{font-size:1.5rem;flex-shrink:0;}
+.mode-label{font-size:0.85rem;font-weight:700;color:var(--dark);}
+.mode-badge{position:absolute;top:-6px;right:8px;background:#f59e0b;color:white;font-size:0.6rem;font-weight:700;padding:1px 6px;border-radius:8px;}
+
+/* Mode Panels */
+.mode-panel{display:none;padding-top:1.25rem;border-top:1px solid var(--border);margin-top:1.25rem;}
+.mode-panel.active{display:block;animation:fadeSlideIn 0.25s ease-out;}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+.mode-description{font-size:0.9rem;color:var(--secondary);margin-bottom:1rem;max-width:none;}
+.mode-description span{font-weight:700;color:var(--primary);}
+
+/* Bundle Grid */
+.bundle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.25rem;}
+.bundle-item{display:flex;align-items:center;gap:0.5rem;padding:0.7rem 0.85rem;border:1px solid var(--border);border-radius:0.75rem;cursor:pointer;transition:all 0.2s;background:var(--white);user-select:none;}
+.bundle-item:hover{border-color:var(--primary);}
+.bundle-item.checked{border-color:var(--primary);background:var(--primary-light);}
+.bundle-checkbox{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}
+.bundle-icon{font-size:1.1rem;flex-shrink:0;}
+.bundle-label{font-size:0.82rem;font-weight:600;color:var(--dark);}
+
+/* Campaign Card */
+.campaign-card{border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1.25rem;background:linear-gradient(135deg,#f5f3ff,var(--white));}
+.campaign-header{margin-bottom:0.75rem;}
+.campaign-badge{display:inline-block;background:#f59e0b;color:white;font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:6px;}
+.campaign-desc{font-size:0.9rem;color:var(--secondary);max-width:none;margin-bottom:1rem;line-height:1.6;}
+.campaign-channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.5rem;margin-bottom:1rem;}
+.campaign-channel{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.6rem;background:var(--white);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8rem;font-weight:500;color:var(--dark);}
+.campaign-estimate{padding:0.75rem;background:var(--white);border:1px solid var(--border);border-radius:0.5rem;font-size:0.85rem;color:var(--secondary);text-align:center;}
+
+/* Shared Inputs */
+.shared-inputs{margin-bottom:0.5rem;}
+.form-grid-3{grid-template-columns:1fr 1fr 1fr;}
+.field-optional{font-size:0.75rem;color:var(--secondary);font-weight:400;}
 
 /* Premium result card */
-.premium-card { border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1rem;background:var(--white);transition:all 0.2s;position:relative; }
-.premium-card:hover { box-shadow:var(--shadow-lg);border-color:var(--primary); }
-.result-variation-label { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.5rem; }
-.result-tone-badge { display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.7rem;font-weight:700;text-transform:uppercase;padding:0.2rem 0.6rem;border-radius:4px;margin-bottom:0.75rem; }
-.result-body { font-size:0.95rem;color:var(--dark);line-height:1.7;margin-bottom:1rem; }
-.result-card-actions { display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.75rem; }
-.result-action-btn { display:flex;align-items:center;gap:0.35rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.4rem 0.8rem;font-size:0.85rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500; }
-.result-action-btn:hover { border-color:var(--primary);color:var(--primary);background:var(--primary-light); }
-.result-action-btn.copied { background:var(--success);color:white;border-color:var(--success); }
-.result-action-btn.faved { color:#f59e0b;border-color:#f59e0b;background:#fffbeb; }
+.premium-card{border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1rem;background:var(--white);transition:all 0.2s;position:relative;}
+.premium-card:hover{box-shadow:var(--shadow-lg);border-color:var(--primary);}
+.result-variation-label{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.5rem;}
+.result-tone-badge{display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.7rem;font-weight:700;text-transform:uppercase;padding:0.2rem 0.6rem;border-radius:4px;margin-bottom:0.75rem;}
+.result-body{font-size:0.95rem;color:var(--dark);line-height:1.7;margin-bottom:1rem;}
+.result-card-actions{display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.75rem;}
+.result-action-btn{display:flex;align-items:center;gap:0.35rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.4rem 0.8rem;font-size:0.85rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500;}
+.result-action-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light);}
+.result-action-btn.copied{background:var(--success);color:white;border-color:var(--success);}
 
-/* Progress bar */
-.usage-bar-wrap { display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end;min-width:160px; }
-.usage-bar { width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden; }
-.usage-bar-fill { height:100%;border-radius:3px;transition:width 0.5s ease-out;background:var(--success); }
-.usage-bar-fill.orange { background:#f59e0b; }
-.usage-bar-fill.red { background:#ef4444; }
-.usage-text { font-size:0.8rem;color:var(--secondary); }
+/* Usage bar */
+.usage-bar-wrap{display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end;min-width:160px;}
+.usage-bar{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.usage-bar-fill{height:100%;border-radius:3px;transition:width 0.5s ease-out;background:var(--success);}
+.usage-bar-fill.orange{background:#f59e0b;}
+.usage-bar-fill.red{background:#ef4444;}
+.usage-text{font-size:0.8rem;color:var(--secondary);}
 
-/* Skeleton loading */
-.result-card.skeleton { padding:1.5rem; }
-.skeleton-line { height:12px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:0.75rem; }
-.skeleton-line:last-child { margin-bottom:0; }
-.w-40 { width:40%; } .w-60 { width:60%; } .w-80 { width:80%; } .w-90 { width:90%; }
-@keyframes shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
-@keyframes cardFadeIn { from { opacity:0;transform:translateY(12px); } to { opacity:1;transform:translateY(0); } }
+/* Skeleton */
+.result-card.skeleton{padding:1.5rem;}
+.skeleton-line{height:12px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:0.75rem;}
+.skeleton-line:last-child{margin-bottom:0;}
+.w-40{width:40%}.w-60{width:60%}.w-80{width:80%}.w-90{width:90%}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes cardFadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
 /* Empty state */
-.empty-state-sm { text-align:center;padding:3rem 1rem; }
-.empty-icon-sm { font-size:3rem;margin-bottom:0.75rem; }
-.empty-state-sm h3 { font-size:1.1rem;margin-bottom:0.25rem; }
-.empty-state-sm p { font-size:0.9rem;color:var(--secondary);max-width:none; }
+.empty-state-sm{text-align:center;padding:3rem 1rem;}
+.empty-icon-sm{font-size:3rem;margin-bottom:0.75rem;}
+.empty-state-sm h3{font-size:1.1rem;margin-bottom:0.25rem;}
+.empty-state-sm p{font-size:0.9rem;color:var(--secondary);max-width:none;}
+
+/* Toast */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:var(--white);padding:0.75rem 1.5rem;border-radius:0.75rem;font-size:0.9rem;font-weight:500;z-index:9999;opacity:0;transition:all 0.3s;box-shadow:var(--shadow-xl);white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media(max-width:768px){
+  .form-grid-3{grid-template-columns:1fr;}
+  .mode-btn{min-width:100%;}
+  .bundle-grid{grid-template-columns:repeat(2,1fr);}
+  .campaign-channels{grid-template-columns:repeat(2,1fr);}
+}
 </style>
 
 <script>
 // Dynamic greeting
-(function() {
-    var h = new Date().getHours();
-    var greet = 'Welcome back';
-    if (h < 12) greet = 'Good morning';
-    else if (h < 17) greet = 'Good afternoon';
-    else if (h < 22) greet = 'Good evening';
-    document.getElementById('greeting').textContent = greet;
+(function(){
+  var h=new Date().getHours();
+  var g='Welcome back';
+  if(h<12)g='Good morning';else if(h<17)g='Good afternoon';else if(h<22)g='Good evening';
+  document.getElementById('greeting').textContent=g;
 })();
 
 // Progress bar color
-(function() {
-    var fill = document.getElementById('usageFill');
-    if (fill) {
-        var pct = parseFloat(fill.style.width);
-        if (pct > 90) fill.classList.add('red');
-        else if (pct > 60) fill.classList.add('orange');
-    }
+(function(){
+  var f=document.getElementById('usageFill');
+  if(f){var p=parseFloat(f.style.width);if(p>90)f.classList.add('red');else if(p>60)f.classList.add('orange');}
 })();
 
-// AJAX form submission
-document.getElementById('genForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    var btn = document.getElementById('genBtn');
-    var skel = document.getElementById('loadingSkeleton');
-    var resultsArea = document.getElementById('resultsArea');
-    var emptyState = document.getElementById('emptyState');
-
-    btn.disabled = true;
-    btn.textContent = '⏳ Generating…';
-    skel.style.display = 'block';
-    resultsArea.innerHTML = '';
-    if (emptyState) emptyState.style.display = 'none';
-
-    var formData = new FormData(this);
-    var params = new URLSearchParams();
-    for (var pair of formData.entries()) { params.append(pair[0], pair[1]); }
-
-    fetch('/dashboard/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-        body: params.toString()
-    })
-    .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Generation failed'); return d; }); })
-    .then(function(data) {
-        skel.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = 'Generate Copy';
-
-        // Build results HTML
-        var html = '<div class="results-container mt-5"><div class="results-header"><h2 class="h3 mb-4">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All History →</a></div>';
-        html += '<div class="gen-success-msg">✓ Content generated successfully</div>';
-        html += '<div class="results-grid">';
-        data.results.forEach(function(r, i) {
-            html += '<div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out ' + (i*0.1) + 's both;">';
-            html += '<div class="result-variation-label">Variation ' + (i+1) + '</div>';
-            html += '<div class="result-tone-badge">' + r.tone + '</div>';
-            html += '<div class="result-body">' + r.text.replace(/\n/g, '<br>') + '</div>';
-            html += '<div class="result-card-actions">';
-            html += '<button class="result-action-btn" onclick="copyResultStatic(' + i + ',\'' + r.text.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" aria-label="Copy">📋 <span>Copy</span></button>';
-            html += '<button class="result-action-btn" onclick="favGen(' + data.genId + ')" aria-label="Favorite">☆ <span>Favorite</span></button>';
-            html += '</div></div>';
-        });
-        html += '</div></div>';
-        resultsArea.innerHTML = html;
-
-        // Update dashboard stats
-        document.getElementById('totalGens').textContent = data.totalGenerations;
-        document.getElementById('favCount').textContent = data.favorites;
-        document.getElementById('monthCount').textContent = data.thisMonth;
-
-        // Update progress bar
-        var fill = document.getElementById('usageFill');
-        var pct = Math.min((data.generationsUsed / data.monthlyLimit) * 100, 100);
-        fill.style.width = pct + '%';
-        fill.classList.remove('orange','red');
-        if (pct > 90) fill.classList.add('red');
-        else if (pct > 60) fill.classList.add('orange');
-        var ut = document.querySelector('.usage-text');
-        if (ut) ut.textContent = data.generationsUsed + ' / ' + data.monthlyLimit + ' Used';
-
-        setTimeout(function() {
-            var msg = document.querySelector('.gen-success-msg');
-            if (msg) { msg.style.opacity = '0'; msg.style.transition = 'opacity 0.5s'; }
-        }, 2000);
-    })
-    .catch(function(err) {
-        skel.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = 'Generate Copy';
-        resultsArea.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
-    });
-});
-
-function copyResultStatic(idx, text) {
-    navigator.clipboard.writeText(text).then(function() {
-        var btns = document.querySelectorAll('.result-action-btn');
-        for (var i = 0, j = 0; i < btns.length; i++) {
-            if (btns[i].getAttribute('aria-label') === 'Copy') {
-                if (j === idx) {
-                    btns[i].classList.add('copied');
-                    btns[i].innerHTML = '✅ <span>Copied!</span>';
-                    setTimeout(function(b) { b.classList.remove('copied'); b.innerHTML = '📋 <span>Copy</span>'; }.bind(null, btns[i]), 2000);
-                    break;
-                }
-                j++;
-            }
-        }
-    });
+// Mode switching
+function switchMode(mode){
+  document.querySelectorAll('.mode-btn').forEach(function(b){b.classList.toggle('active',b.dataset.mode===mode);});
+  document.querySelectorAll('.mode-panel').forEach(function(p){p.classList.toggle('active',p.id==='mode'+mode.charAt(0).toUpperCase()+mode.slice(1));});
+  document.getElementById('generationType').value=mode;
 }
 
-function favGen(id) {
-    fetch('/generation/' + id + '/favorite', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            var favCount = document.getElementById('favCount');
-            favCount.textContent = parseInt(favCount.textContent) + (d.favorite ? 1 : -1);
-            showToast(d.favorite ? '⭐ Added to favorites' : 'Removed from favorites');
-        });
+// Bundle counter
+function updateBundleCount(){
+  var count=document.querySelectorAll('.bundle-checkbox:checked').length;
+  document.getElementById('bundleCount').textContent=count+' asset'+(count!==1?'s':'')+' selected';
 }
 
-function showToast(msg) {
-    var t = document.createElement('div');
-    t.className = 'toast';
-    t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function() { t.classList.add('show'); }, 10);
-    setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 2500);
+// Generate Quick
+function generate(type){
+  var btn=event.target;btn.disabled=true;btn.innerHTML='⏳ Generating…';
+  var skel=document.getElementById('loadingSkeleton'),res=document.getElementById('resultsArea'),empty=document.getElementById('emptyState');
+  if(skel)skel.style.display='block';if(res)res.innerHTML='';if(empty)empty.style.display='none';
+  
+  var data=new URLSearchParams();
+  data.append('productDescription',document.getElementById('productDescription').value);
+  data.append('targetAudience',document.getElementById('targetAudience').value);
+  data.append('contentType',document.getElementById('quickContentType').value);
+  data.append('tone',document.getElementById('quickTone').value);
+  data.append('brandVoice',document.getElementById('brandVoice').value);
+  data.append('goal',document.getElementById('goal').value);
+  data.append('generationType','quick');
+
+  fetch('/dashboard/generate',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:data.toString()})
+  .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Failed');return d;});})
+  .then(function(d){renderResults(d);btn.disabled=false;btn.innerHTML='⚡ Generate Copy';})
+  .catch(function(e){skel.style.display='none';btn.disabled=false;btn.innerHTML='⚡ Generate Copy';res.innerHTML='<div class="alert alert-error">'+e.message+'</div>';});
 }
 
-// Intersection observer for scroll animations
-(function() {
-    var observer = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-            if (entry.isIntersecting) entry.target.classList.add('visible');
-        });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
+function generateBundle(){showToast('📦 Bundle generation coming in Sprint 2');}
+function generateCampaign(){showToast('🚀 Campaign generation coming in Sprint 2');}
+
+function renderResults(data){
+  var skel=document.getElementById('loadingSkeleton'),res=document.getElementById('resultsArea');
+  if(skel)skel.style.display='none';
+  var html='<div class="results-container mt-5"><div class="results-header"><h2 class="h3 mb-4">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All History →</a></div>';
+  html+='<div class="gen-success-msg">✓ Content generated successfully</div><div class="results-grid">';
+  data.results.forEach(function(r,i){
+    html+='<div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out '+(i*0.1)+'s both;">';
+    html+='<div class="result-variation-label">Variation '+(i+1)+'</div>';
+    html+='<div class="result-tone-badge">'+r.tone+'</div>';
+    html+='<div class="result-body">'+r.text.replace(/\n/g,'<br>')+'</div>';
+    html+='<div class="result-card-actions">';
+    html+='<button class="result-action-btn" onclick="copyText(\''+r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n')+'\',this)" aria-label="Copy">📋 <span>Copy</span></button>';
+    html+='</div></div>';
+  });
+  html+='</div></div>';
+  res.innerHTML=html;
+
+  // Update stats
+  var el=document.getElementById('totalGens');if(el)el.textContent=data.totalGenerations;
+  document.querySelectorAll('.stat-value').forEach(function(s){if(s.textContent==='0'||parseInt(s.textContent)>=0){}});
+  
+  // Update usage bar
+  var fill=document.getElementById('usageFill'),p=Math.min((data.generationsUsed/data.monthlyLimit)*100,100);
+  if(fill){fill.style.width=p+'%';fill.classList.remove('orange','red');if(p>90)fill.classList.add('red');else if(p>60)fill.classList.add('orange');}
+  var ut=document.querySelector('.usage-text');if(ut)ut.textContent=data.generationsUsed+' / '+data.monthlyLimit+' Used';
+
+  setTimeout(function(){var msg=document.querySelector('.gen-success-msg');if(msg){msg.style.opacity='0';msg.style.transition='opacity 0.5s';}},2000);
+}
+
+function copyText(text,btn){
+  navigator.clipboard.writeText(text).then(function(){
+    btn.classList.add('copied');btn.innerHTML='✅ <span>Copied!</span>';
+    setTimeout(function(){btn.classList.remove('copied');btn.innerHTML='📋 <span>Copy</span>';},2000);
+  });
+}
+
+function showToast(msg){
+  var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
+  setTimeout(function(){t.classList.add('show');},10);
+  setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2500);
+}
+
+// Bundle init
+updateBundleCount();
+
+// IntersectionObserver
+(function(){
+  var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
+  document.querySelectorAll('.fade-in').forEach(function(e){o.observe(e);});
 })();
 </script>

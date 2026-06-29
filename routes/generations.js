@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
+const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
@@ -13,24 +14,22 @@ router.get('/dashboard', requireAuth, (req, res) => {
   const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId).count;
   const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId).count;
   const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId).count;
-  const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId);
-
-  // Content type breakdown
+  const quickCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId).count;
+  const bundleCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId).count;
+  const campaignCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(userId).count;
+  const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId);
   const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId);
-
   const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId);
 
   res.render('dashboard', {
     title: 'Dashboard - CopyQuick',
     contentTypes: getContentTypes(),
     tones: getTones(),
-    history: history,
-    results: null,
-    totalGenerations,
-    favorites,
-    thisMonth,
-    recent,
-    typeBreakdown,
+    history, results: null,
+    totalGenerations, favorites, thisMonth,
+    quickCount, bundleCount, campaignCount,
+    recent, typeBreakdown,
+    bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
     currentPage: 'dashboard'
   });
 });
@@ -51,8 +50,11 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
       results: null,
       error: 'Monthly generation limit reached. <a href=\"/pricing\">Upgrade your plan</a> to continue.',
-      totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: [],
-      input: { productDescription, targetAudience, contentType, tone }
+      totalGenerations: 0, favorites: 0, thisMonth: 0,
+      quickCount: 0, bundleCount: 0, campaignCount: 0,
+      recent: [], typeBreakdown: [],
+      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
   }
 
@@ -97,7 +99,10 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
       history, results,
-      totalGenerations, favorites, thisMonth, recent, typeBreakdown,
+      totalGenerations, favorites, thisMonth,
+      quickCount, bundleCount, campaignCount,
+      recent, typeBreakdown,
+      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
       input: { productDescription, targetAudience, contentType, tone },
       genId
     });
@@ -108,7 +113,11 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
       history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
-      results: null, error: 'An error occurred', totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: []
+      results: null, error: 'An error occurred',
+      totalGenerations: 0, favorites: 0, thisMonth: 0,
+      quickCount: 0, bundleCount: 0, campaignCount: 0,
+      recent: [], typeBreakdown: [],
+      bundleAssets, campaignSections, brandVoices, goals, audiencePresets
     });
   }
 });

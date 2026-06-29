@@ -57,7 +57,10 @@ function initDb() {
     'tags TEXT DEFAULT \'\'',
     'is_deleted INTEGER DEFAULT 0',
     'deleted_at DATETIME',
-    'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP'
+    'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP',
+    'generation_type TEXT DEFAULT \'quick\'',
+    'brand_voice TEXT DEFAULT \'professional\'',
+    'goal TEXT DEFAULT \'\''
   ];
 
   columns.forEach(col => {
