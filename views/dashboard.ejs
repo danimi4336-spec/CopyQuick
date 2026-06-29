@@ -1,34 +1,39 @@
 <div class="container dashboard">
     <header class="dashboard-header fade-in">
         <div>
-            <h1>Welcome back, <%= user.name || 'there' %>!</h1>
+            <h1><span id="greeting"></span>, <%= user.name || 'there' %> 👋</h1>
             <p class="text-secondary">Here's your CopyQuick activity overview.</p>
         </div>
         <div class="dashboard-plan">
-            <span class="badge badge-<%= user.plan_tier %>"><%= user.plan_tier %></span>
-            <span class="usage-text"><%= user.generations_used %> / <%= user.monthly_limit %> used</span>
+            <span class="badge badge-<%= user.plan_tier %>"><%= user.plan_tier.charAt(0).toUpperCase() + user.plan_tier.slice(1) %></span>
+            <div class="usage-bar-wrap">
+                <div class="usage-bar">
+                    <div class="usage-bar-fill" id="usageFill" style="width:<%= Math.min((user.generations_used / user.monthly_limit) * 100, 100) %>%"></div>
+                </div>
+                <span class="usage-text"><%= user.generations_used %> / <%= user.monthly_limit %> Used</span>
+            </div>
         </div>
     </header>
 
-    <div class="stats-grid fade-in">
+    <div class="stats-grid fade-in" id="statsGrid">
         <div class="stat-card">
             <div class="stat-icon stat-icon-purple">📝</div>
             <div class="stat-info">
-                <span class="stat-value"><%= totalGenerations %></span>
+                <span class="stat-value" id="totalGens"><%= totalGenerations %></span>
                 <span class="stat-label">Total Generations</span>
             </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon stat-icon-pink">⭐</div>
             <div class="stat-info">
-                <span class="stat-value"><%= favorites %></span>
-                <span class="stat-label">Favorites</span>
+                <span class="stat-value" id="favCount"><%= favorites %></span>
+                <span class="stat-label" id="favLabel">Favorites</span>
             </div>
         </div>
         <div class="stat-card">
             <div class="stat-icon stat-icon-green">📅</div>
             <div class="stat-info">
-                <span class="stat-value"><%= thisMonth %></span>
+                <span class="stat-value" id="monthCount"><%= thisMonth %></span>
                 <span class="stat-label">This Month</span>
             </div>
         </div>
@@ -48,7 +53,7 @@
                 <% if (typeof error !== 'undefined' && error) { %>
                     <div class="alert alert-error"><%- error %></div>
                 <% } %>
-                <form action="/dashboard/generate" method="POST">
+                <form id="genForm" action="/dashboard/generate" method="POST">
                     <div class="form-group">
                         <label for="productDescription">What are you selling?</label>
                         <textarea id="productDescription" name="productDescription" rows="3" placeholder="Describe your product or service..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
@@ -61,14 +66,14 @@
                         <div class="form-group">
                             <label for="contentType">Content Type</label>
                             <select id="contentType" name="contentType">
-                                <option value="subject_line" <%= (typeof input !== 'undefined' && input.contentType === 'subject_line') ? 'selected' : '' %>>Email Subject Lines</option>
-                                <option value="social_post" <%= (typeof input !== 'undefined' && input.contentType === 'social_post') ? 'selected' : '' %>>Social Media Posts</option>
-                                <option value="ad_headline" <%= (typeof input !== 'undefined' && input.contentType === 'ad_headline') ? 'selected' : '' %>>Ad Headlines & Copy</option>
-                                <option value="product_description" <%= (typeof input !== 'undefined' && input.contentType === 'product_description') ? 'selected' : '' %>>Product Descriptions</option>
-                                <option value="cta" <%= (typeof input !== 'undefined' && input.contentType === 'cta') ? 'selected' : '' %>>Call-to-Actions</option>
-                                <option value="email_campaign" <%= (typeof input !== 'undefined' && input.contentType === 'email_campaign') ? 'selected' : '' %>>Email Campaigns</option>
-                                <option value="blog_intro" <%= (typeof input !== 'undefined' && input.contentType === 'blog_intro') ? 'selected' : '' %>>Blog Post Introductions</option>
-                                <option value="sales_message" <%= (typeof input !== 'undefined' && input.contentType === 'sales_message') ? 'selected' : '' %>>Sales Messages</option>
+                                <option value="subject_line">Email Subject Lines</option>
+                                <option value="social_post">Social Media Posts</option>
+                                <option value="ad_headline">Ad Headlines &amp; Copy</option>
+                                <option value="product_description">Product Descriptions</option>
+                                <option value="cta">Call-to-Actions (CTA)</option>
+                                <option value="email_campaign">Email Campaigns</option>
+                                <option value="blog_intro">Blog Post Introductions</option>
+                                <option value="sales_message">Sales Messages</option>
                             </select>
                         </div>
                     </div>
@@ -76,52 +81,84 @@
                         <div class="form-group">
                             <label for="tone">Tone</label>
                             <select id="tone" name="tone">
-                                <option value="professional" <%= (typeof input !== 'undefined' && input.tone === 'professional') ? 'selected' : '' %>>Professional</option>
-                                <option value="casual" <%= (typeof input !== 'undefined' && input.tone === 'casual') ? 'selected' : '' %>>Casual</option>
-                                <option value="urgent" <%= (typeof input !== 'undefined' && input.tone === 'urgent') ? 'selected' : '' %>>Urgent</option>
-                                <option value="humorous" <%= (typeof input !== 'undefined' && input.tone === 'humorous') ? 'selected' : '' %>>Humorous</option>
-                                <option value="inspirational" <%= (typeof input !== 'undefined' && input.tone === 'inspirational') ? 'selected' : '' %>>Inspirational</option>
+                                <option value="professional">Professional</option>
+                                <option value="casual">Casual</option>
+                                <option value="urgent">Urgent</option>
+                                <option value="humorous">Humorous</option>
+                                <option value="inspirational">Inspirational</option>
                             </select>
                         </div>
                         <div class="form-group" style="display:flex;align-items:flex-end;">
-                            <button type="submit" class="btn btn-primary btn-block">Generate Copy</button>
+                            <button type="submit" class="btn btn-primary btn-block" id="genBtn">Generate Copy</button>
                         </div>
                     </div>
                 </form>
             </div>
 
+            <!-- Loading Skeletons -->
+            <div id="loadingSkeleton" style="display:none;">
+                <div class="result-card skeleton">
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-80"></div>
+                    <div class="skeleton-line w-60"></div>
+                    <div class="skeleton-line w-90"></div>
+                </div>
+                <div class="result-card skeleton">
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-80"></div>
+                    <div class="skeleton-line w-60"></div>
+                    <div class="skeleton-line w-90"></div>
+                </div>
+                <div class="result-card skeleton">
+                    <div class="skeleton-line w-40"></div>
+                    <div class="skeleton-line w-80"></div>
+                    <div class="skeleton-line w-60"></div>
+                    <div class="skeleton-line w-90"></div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="resultsArea">
             <% if (results) { %>
                 <div class="results-container mt-5">
                     <div class="results-header">
                         <h2 class="h3 mb-4">Results</h2>
                         <a href="/history" class="btn btn-outline btn-sm">View All History →</a>
                     </div>
-                    <div class="results-grid">
+                    <div class="gen-success-msg" id="successMsg">✓ Content generated successfully</div>
+                    <div class="results-grid" id="resultsGrid">
                         <% results.forEach((result, index) => { %>
-                            <div class="result-card">
-                                <div class="result-header">
-                                    <span class="result-tag"><%= result.tone %></span>
-                                    <div class="result-actions">
-                                        <button class="copy-btn" onclick="copyToClipboard('copy-text-<%= index %>', this)" title="Copy">📋</button>
-                                    </div>
+                            <div class="result-card premium-card" data-index="<%= index %>" style="animation:cardFadeIn 0.3s ease-out <%= index * 0.1 %>s both;">
+                                <div class="result-variation-label">Variation <%= index + 1 %></div>
+                                <div class="result-tone-badge"><%= result.tone %></div>
+                                <div class="result-body"><%= result.text.replace(/\n/g, '<br>') %></div>
+                                <div class="result-card-actions">
+                                    <button class="result-action-btn" onclick="copyResult(<%= index %>)" aria-label="Copy">📋 <span>Copy</span></button>
+                                    <button class="result-action-btn fav-btn" onclick="toggleFav(<%= genId || 0 %>)" aria-label="Favorite">☆ <span>Favorite</span></button>
                                 </div>
-                                <p class="result-text" id="copy-text-<%= index %>"><%= result.text %></p>
                             </div>
                         <% }); %>
                     </div>
                 </div>
             <% } %>
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="empty-state-sm" style="<%= results ? 'display:none' : '' %>">
+                <div class="empty-icon-sm">✨</div>
+                <h3>No content generated yet</h3>
+                <p>Start by describing your product above.</p>
+            </div>
         </section>
 
         <aside class="dashboard-sidebar">
-            <!-- Content Type Breakdown -->
             <% if (typeBreakdown && typeBreakdown.length > 0) { %>
                 <div class="sidebar-card">
-                    <h3 class="h4">Content Breakdown</h3>
+                    <h3 class="h4">📊 Content Breakdown</h3>
                     <div class="breakdown-list">
                         <% typeBreakdown.forEach(function(item) { %>
                             <div class="breakdown-item">
-                                <span class="breakdown-label"><%= item.content_type.replace(/_/g, ' ') %></span>
+                                <span class="breakdown-label"><%= (item.content_type === 'cta') ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %></span>
                                 <span class="breakdown-count"><%= item.count %></span>
                             </div>
                         <% }); %>
@@ -129,39 +166,204 @@
                 </div>
             <% } %>
 
-            <!-- Recent Activity -->
-            <% if (recent && recent.length > 0) { %>
-                <div class="sidebar-card">
-                    <h3 class="h4">Recent Activity</h3>
+            <div class="sidebar-card">
+                <h3 class="h4">🕐 Recent Activity</h3>
+                <% if (recent && recent.length > 0) { %>
                     <div class="activity-list">
                         <% recent.slice(0, 5).forEach(function(item) { %>
                             <a href="/generation/<%= item.id %>" class="activity-item">
                                 <span class="activity-title"><%= item.title || item.input_text.substring(0, 40) %></span>
-                                <span class="activity-meta"><%= item.content_type.replace(/_/g, ' ') %> · <%= new Date(item.created_at).toLocaleDateString() %></span>
+                                <span class="activity-meta">
+                                    <%= (item.content_type === 'cta') ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) %>
+                                    · <%= new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) %>
+                                </span>
                             </a>
                         <% }); %>
                     </div>
                     <a href="/history" class="sidebar-link">View all →</a>
-                </div>
-            <% } else { %>
-                <div class="sidebar-card">
-                    <h3 class="h4">Getting Started</h3>
-                    <p class="sidebar-text">Describe your product above and click "Generate Copy" to create your first marketing content.</p>
-                </div>
-            <% } %>
+                <% } else { %>
+                    <div class="empty-activity">
+                        <p style="font-size:0.85rem;color:var(--secondary);max-width:none;text-align:center;padding:1rem 0;">Generate your first copy to see it here ✨</p>
+                    </div>
+                <% } %>
+            </div>
         </aside>
     </div>
 </div>
 
+<style>
+.results-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+.gen-success-msg { background:#d1fae5;color:#065f46;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-weight:600;font-size:0.9rem;animation:slideDown 0.3s ease-out; }
+@keyframes slideDown { from { opacity:0;transform:translateY(-10px); } to { opacity:1;transform:translateY(0); } }
+
+/* Premium result card */
+.premium-card { border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1rem;background:var(--white);transition:all 0.2s;position:relative; }
+.premium-card:hover { box-shadow:var(--shadow-lg);border-color:var(--primary); }
+.result-variation-label { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.5rem; }
+.result-tone-badge { display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.7rem;font-weight:700;text-transform:uppercase;padding:0.2rem 0.6rem;border-radius:4px;margin-bottom:0.75rem; }
+.result-body { font-size:0.95rem;color:var(--dark);line-height:1.7;margin-bottom:1rem; }
+.result-card-actions { display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.75rem; }
+.result-action-btn { display:flex;align-items:center;gap:0.35rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.4rem 0.8rem;font-size:0.85rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500; }
+.result-action-btn:hover { border-color:var(--primary);color:var(--primary);background:var(--primary-light); }
+.result-action-btn.copied { background:var(--success);color:white;border-color:var(--success); }
+.result-action-btn.faved { color:#f59e0b;border-color:#f59e0b;background:#fffbeb; }
+
+/* Progress bar */
+.usage-bar-wrap { display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end;min-width:160px; }
+.usage-bar { width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden; }
+.usage-bar-fill { height:100%;border-radius:3px;transition:width 0.5s ease-out;background:var(--success); }
+.usage-bar-fill.orange { background:#f59e0b; }
+.usage-bar-fill.red { background:#ef4444; }
+.usage-text { font-size:0.8rem;color:var(--secondary); }
+
+/* Skeleton loading */
+.result-card.skeleton { padding:1.5rem; }
+.skeleton-line { height:12px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:0.75rem; }
+.skeleton-line:last-child { margin-bottom:0; }
+.w-40 { width:40%; } .w-60 { width:60%; } .w-80 { width:80%; } .w-90 { width:90%; }
+@keyframes shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+@keyframes cardFadeIn { from { opacity:0;transform:translateY(12px); } to { opacity:1;transform:translateY(0); } }
+
+/* Empty state */
+.empty-state-sm { text-align:center;padding:3rem 1rem; }
+.empty-icon-sm { font-size:3rem;margin-bottom:0.75rem; }
+.empty-state-sm h3 { font-size:1.1rem;margin-bottom:0.25rem; }
+.empty-state-sm p { font-size:0.9rem;color:var(--secondary);max-width:none; }
+</style>
+
 <script>
-function copyToClipboard(elementId, btn) {
-    const text = document.getElementById(elementId).innerText;
-    navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = '✅';
-        setTimeout(() => { btn.textContent = '📋'; }, 1500);
+// Dynamic greeting
+(function() {
+    var h = new Date().getHours();
+    var greet = 'Welcome back';
+    if (h < 12) greet = 'Good morning';
+    else if (h < 17) greet = 'Good afternoon';
+    else if (h < 22) greet = 'Good evening';
+    document.getElementById('greeting').textContent = greet;
+})();
+
+// Progress bar color
+(function() {
+    var fill = document.getElementById('usageFill');
+    if (fill) {
+        var pct = parseFloat(fill.style.width);
+        if (pct > 90) fill.classList.add('red');
+        else if (pct > 60) fill.classList.add('orange');
+    }
+})();
+
+// AJAX form submission
+document.getElementById('genForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('genBtn');
+    var skel = document.getElementById('loadingSkeleton');
+    var resultsArea = document.getElementById('resultsArea');
+    var emptyState = document.getElementById('emptyState');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating…';
+    skel.style.display = 'block';
+    resultsArea.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'none';
+
+    var formData = new FormData(this);
+    var params = new URLSearchParams();
+    for (var pair of formData.entries()) { params.append(pair[0], pair[1]); }
+
+    fetch('/dashboard/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+        body: params.toString()
+    })
+    .then(function(r) { return r.json().then(function(d) { if (!r.ok) throw new Error(d.error || 'Generation failed'); return d; }); })
+    .then(function(data) {
+        skel.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = 'Generate Copy';
+
+        // Build results HTML
+        var html = '<div class="results-container mt-5"><div class="results-header"><h2 class="h3 mb-4">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All History →</a></div>';
+        html += '<div class="gen-success-msg">✓ Content generated successfully</div>';
+        html += '<div class="results-grid">';
+        data.results.forEach(function(r, i) {
+            html += '<div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out ' + (i*0.1) + 's both;">';
+            html += '<div class="result-variation-label">Variation ' + (i+1) + '</div>';
+            html += '<div class="result-tone-badge">' + r.tone + '</div>';
+            html += '<div class="result-body">' + r.text.replace(/\n/g, '<br>') + '</div>';
+            html += '<div class="result-card-actions">';
+            html += '<button class="result-action-btn" onclick="copyResultStatic(' + i + ',\'' + r.text.replace(/'/g, "\\'").replace(/\n/g, '\\n') + '\')" aria-label="Copy">📋 <span>Copy</span></button>';
+            html += '<button class="result-action-btn" onclick="favGen(' + data.genId + ')" aria-label="Favorite">☆ <span>Favorite</span></button>';
+            html += '</div></div>';
+        });
+        html += '</div></div>';
+        resultsArea.innerHTML = html;
+
+        // Update dashboard stats
+        document.getElementById('totalGens').textContent = data.totalGenerations;
+        document.getElementById('favCount').textContent = data.favorites;
+        document.getElementById('monthCount').textContent = data.thisMonth;
+
+        // Update progress bar
+        var fill = document.getElementById('usageFill');
+        var pct = Math.min((data.generationsUsed / data.monthlyLimit) * 100, 100);
+        fill.style.width = pct + '%';
+        fill.classList.remove('orange','red');
+        if (pct > 90) fill.classList.add('red');
+        else if (pct > 60) fill.classList.add('orange');
+        var ut = document.querySelector('.usage-text');
+        if (ut) ut.textContent = data.generationsUsed + ' / ' + data.monthlyLimit + ' Used';
+
+        setTimeout(function() {
+            var msg = document.querySelector('.gen-success-msg');
+            if (msg) { msg.style.opacity = '0'; msg.style.transition = 'opacity 0.5s'; }
+        }, 2000);
+    })
+    .catch(function(err) {
+        skel.style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = 'Generate Copy';
+        resultsArea.innerHTML = '<div class="alert alert-error">' + err.message + '</div>';
+    });
+});
+
+function copyResultStatic(idx, text) {
+    navigator.clipboard.writeText(text).then(function() {
+        var btns = document.querySelectorAll('.result-action-btn');
+        for (var i = 0, j = 0; i < btns.length; i++) {
+            if (btns[i].getAttribute('aria-label') === 'Copy') {
+                if (j === idx) {
+                    btns[i].classList.add('copied');
+                    btns[i].innerHTML = '✅ <span>Copied!</span>';
+                    setTimeout(function(b) { b.classList.remove('copied'); b.innerHTML = '📋 <span>Copy</span>'; }.bind(null, btns[i]), 2000);
+                    break;
+                }
+                j++;
+            }
+        }
     });
 }
 
+function favGen(id) {
+    fetch('/generation/' + id + '/favorite', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var favCount = document.getElementById('favCount');
+            favCount.textContent = parseInt(favCount.textContent) + (d.favorite ? 1 : -1);
+            showToast(d.favorite ? '⭐ Added to favorites' : 'Removed from favorites');
+        });
+}
+
+function showToast(msg) {
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.classList.add('show'); }, 10);
+    setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 300); }, 2500);
+}
+
+// Intersection observer for scroll animations
 (function() {
     var observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
@@ -171,8 +373,3 @@ function copyToClipboard(elementId, btn) {
     document.querySelectorAll('.fade-in').forEach(function(el) { observer.observe(el); });
 })();
 </script>
-
-<style>
-.results-header { display: flex; justify-content: space-between; align-items: center; }
-.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
-</style>

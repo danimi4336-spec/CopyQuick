@@ -40,15 +40,17 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   const { productDescription, targetAudience, contentType, tone } = req.body;
   const db = getDb();
   const user = res.locals.user;
+  const isAjax = req.xhr || req.headers.accept?.includes('json');
 
   if (user.generations_used >= user.monthly_limit) {
+    if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
     return res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(),
       tones: getTones(),
       history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
       results: null,
-      error: 'Monthly generation limit reached. <a href="/pricing">Upgrade your plan</a> to continue.',
+      error: 'Monthly generation limit reached. <a href=\"/pricing\">Upgrade your plan</a> to continue.',
       totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: [],
       input: { productDescription, targetAudience, contentType, tone }
     });
@@ -69,39 +71,44 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 
     db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
 
+    if (isAjax) {
+      const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+      res.json({
+        results,
+        genId,
+        generationsUsed: updatedUser.generations_used,
+        monthlyLimit: updatedUser.monthly_limit,
+        totalGenerations: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count,
+        favorites: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count,
+        thisMonth: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count
+      });
+      return;
+    }
+
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     res.locals.user = updatedUser;
-
-    // Get fresh data for sidebar
     const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
     const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
     const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count;
     const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(user.id);
     const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(user.id);
     const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id);
-
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
-      contentTypes: getContentTypes(),
-      tones: getTones(),
-      history,
-      results,
+      contentTypes: getContentTypes(), tones: getTones(),
+      history, results,
       totalGenerations, favorites, thisMonth, recent, typeBreakdown,
       input: { productDescription, targetAudience, contentType, tone },
-      genId,
-      currentPage: 'dashboard'
+      genId
     });
   } catch (err) {
     console.error(err);
+    if (isAjax) return res.status(500).json({ error: 'Generation failed' });
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
-      contentTypes: getContentTypes(),
-      tones: getTones(),
+      contentTypes: getContentTypes(), tones: getTones(),
       history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
-      results: null,
-      error: 'An error occurred during generation. Please try again.',
-      totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: [],
-      currentPage: 'dashboard'
+      results: null, error: 'An error occurred', totalGenerations: 0, favorites: 0, thisMonth: 0, recent: [], typeBreakdown: []
     });
   }
 });
