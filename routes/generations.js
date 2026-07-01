@@ -20,6 +20,28 @@ router.get('/dashboard', requireAuth, (req, res) => {
   const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId);
   const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId);
   const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId);
+  
+  // Brand Brain data for progress
+  let brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId);
+  if (!brain) {
+    db.prepare('INSERT INTO brand_brain (user_id) VALUES (?)').run(userId);
+    brain = { business_name: '', industry: '', target_audience: '', brand_voice: 'professional', unique_value: '', competitors: '', goals: '', key_messages: '' };
+  }
+  const brainFields = ['business_name', 'industry', 'target_audience', 'brand_voice', 'unique_value', 'competitors', 'goals', 'key_messages'];
+  const brainFilled = brainFields.filter(f => brain[f] && brain[f].trim()).length;
+  const brainPct = Math.round((brainFilled / brainFields.length) * 100);
+
+  // Builder journey progress
+  const journey = {
+    accountCreated: true,
+    loggedIn: true,
+    brandBrainStarted: brainFilled > 0,
+    firstQuickGenerate: quickCount > 0,
+    firstMarketingBundle: bundleCount > 0,
+    firstCompleteCampaign: campaignCount > 0,
+    firstFavorite: favorites > 0,
+    firstDownload: false // TODO: track downloads
+  };
 
   res.render('dashboard', {
     title: 'Dashboard - CopyQuick',
@@ -30,6 +52,9 @@ router.get('/dashboard', requireAuth, (req, res) => {
     quickCount, bundleCount, campaignCount,
     recent, typeBreakdown,
     bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+    brain, brainPct, brainFilled,
+    journey,
+    builderGoal: user.builder_goal || '',
     currentPage: 'dashboard'
   });
 });

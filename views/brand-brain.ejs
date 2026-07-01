@@ -2,7 +2,7 @@
     <div class="brain-header fade-in">
         <div>
             <h1>🧠 Brand Brain</h1>
-            <p class="text-secondary">This is where CopyQuick learns your business. The more you share, the better your content.</p>
+            <p class="text-secondary">This is where CopyQuick learns about your business. The more you share, the better your content will be.</p>
         </div>
         <div class="brain-pct">
             <div class="brain-pct-circle"><%= pct %>%</div>
@@ -13,19 +13,19 @@
     <form action="/brand-brain" method="POST" class="brain-form fade-in">
         <div class="brain-grid">
             <div class="form-group">
-                <label for="business_name">Business Name</label>
-                <input type="text" id="business_name" name="business_name" value="<%= brain.business_name %>" placeholder="e.g. Acme Marketing">
+                <label for="business_name">What should CopyQuick call your business? <span class="brain-helper">Your business name makes everything personal.</span></label>
+                <input type="text" id="business_name" name="business_name" value="<%= brain.business_name %>" placeholder="e.g. Acme Marketing Co.">
             </div>
             <div class="form-group">
-                <label for="industry">Industry</label>
-                <input type="text" id="industry" name="industry" value="<%= brain.industry %>" placeholder="e.g. SaaS, Ecommerce, Health">
+                <label for="industry">What industry are you in? <span class="brain-helper">Helps us match your industry tone and vocabulary.</span></label>
+                <input type="text" id="industry" name="industry" value="<%= brain.industry %>" placeholder="e.g. SaaS, Ecommerce, Health & Wellness">
             </div>
             <div class="form-group">
-                <label for="target_audience">Target Audience</label>
-                <input type="text" id="target_audience" name="target_audience" value="<%= brain.target_audience %>" placeholder="e.g. Small business owners, parents">
+                <label for="target_audience">Describe your ideal customer. <span class="brain-helper">Who are you trying to reach? Be specific.</span></label>
+                <input type="text" id="target_audience" name="target_audience" value="<%= brain.target_audience %>" placeholder="e.g. Small business owners, busy working mothers, fitness enthusiasts">
             </div>
             <div class="form-group">
-                <label for="brand_voice">Brand Voice</label>
+                <label for="brand_voice">How should your brand sound? <span class="brain-helper">Choose a voice that matches your brand personality.</span></label>
                 <div class="custom-select-wrap">
                     <select id="brand_voice" name="brand_voice" data-custom="custom-voice-wrap">
                         <option value="professional" <%= brain.brand_voice === 'professional' ? 'selected' : '' %>>Professional</option>
@@ -42,35 +42,36 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="unique_value">Unique Value Proposition</label>
-                <input type="text" id="unique_value" name="unique_value" value="<%= brain.unique_value %>" placeholder="What makes you different?">
+                <label for="unique_value">What makes your business different? <span class="brain-helper">Your unique value proposition sets you apart from competitors.</span></label>
+                <input type="text" id="unique_value" name="unique_value" value="<%= brain.unique_value %>" placeholder="e.g. Only organic supplement with 30-day satisfaction guarantee">
             </div>
             <div class="form-group">
-                <label for="competitors">Main Competitors</label>
+                <label for="competitors">Who do customers compare you with? <span class="brain-helper">Knowing your competitors helps us position you better.</span></label>
                 <input type="text" id="competitors" name="competitors" value="<%= brain.competitors %>" placeholder="e.g. Competitor A, Competitor B">
             </div>
             <div class="form-group">
-                <label for="goals">Marketing Goals</label>
-                <input type="text" id="goals" name="goals" value="<%= brain.goals %>" placeholder="e.g. Increase sales, build awareness">
+                <label for="goals">What do you want CopyQuick to help you accomplish? <span class="brain-helper">Your goals shape the content we recommend.</span></label>
+                <input type="text" id="goals" name="goals" value="<%= brain.goals %>" placeholder="e.g. Increase sales, build brand awareness, generate leads">
             </div>
             <div class="form-group">
-                <label for="key_messages">Key Messages</label>
-                <input type="text" id="key_messages" name="key_messages" value="<%= brain.key_messages %>" placeholder="e.g. Quality, affordability, trust">
+                <label for="key_messages">What key messages should your content always include? <span class="brain-helper">These themes will appear across all your marketing.</span></label>
+                <input type="text" id="key_messages" name="key_messages" value="<%= brain.key_messages %>" placeholder="e.g. Quality, affordability, trust, sustainability">
             </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg">Save Brand Brain</button>
     </form>
 </div>
 <style>
-.brain-page{padding:3rem 0;}
+.brain-page{padding:3rem 0;max-width:800px;margin:0 auto;}
 .brain-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;}
 .brain-pct{text-align:center;}
 .brain-pct-circle{width:4rem;height:4rem;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:800;}
 .brain-pct-label{font-size:0.75rem;color:var(--secondary);display:block;margin-top:0.25rem;}
 .brain-progress-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:2.5rem;}
 .brain-progress-fill{height:100%;background:var(--primary);border-radius:3px;transition:width 0.5s ease-out;}
-.brain-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem;max-width:800px;}
-.brain-grid .form-group label{font-size:0.85rem;font-weight:600;color:var(--dark);margin-bottom:0.35rem;display:block;}
+.brain-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:2rem;}
+.brain-grid .form-group label{font-size:0.85rem;font-weight:600;color:var(--dark);margin-bottom:0.25rem;display:block;line-height:1.4;}
+.brain-helper{font-weight:400;font-size:0.75rem;color:var(--secondary);display:block;margin-top:0.1rem;line-height:1.3;}
 .brain-grid .form-group input,.brain-grid .form-group select{width:100%;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:0.75rem;font-size:0.9rem;font-family:inherit;transition:border-color 0.2s;background:var(--white);}
 .brain-grid .form-group input:focus,.brain-grid .form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
 .custom-select-wrap{display:flex;flex-direction:column;gap:0.5rem;}
@@ -82,14 +83,11 @@
 </style>
 <script>
 (function(){
-  // Custom dropdown reveal for Brand Brain
   document.querySelectorAll('[data-custom]').forEach(function(select){
-    var wrap = document.getElementById(select.getAttribute('data-custom'));
-    function toggle(){if(wrap){if(select.value === 'custom'){wrap.classList.add('custom-field-visible');}else{wrap.classList.remove('custom-field-visible');}}}
-    select.addEventListener('change', toggle);
-    toggle();
+    var wrap=document.getElementById(select.getAttribute('data-custom'));
+    function toggle(){if(wrap){if(select.value==='custom'){wrap.classList.add('custom-field-visible');}else{wrap.classList.remove('custom-field-visible');}}}
+    select.addEventListener('change',toggle);toggle();
   });
-  // Intersection observer for fade-in
   var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
   document.querySelectorAll('.fade-in').forEach(function(e){o.observe(e);});
 })();
