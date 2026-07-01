@@ -598,7 +598,7 @@
   });
 
   // ===== Campaign Section Buttons =====
-  var sections = <%= JSON.stringify(campaignSections) %>;
+  var sections = <%- JSON.stringify(campaignSections) %>;
   var secBtns=document.querySelectorAll('.campaign-sec-btn');
   var titleEl=document.getElementById('deliverables-title');
   var listEl=document.getElementById('deliverables-list');
