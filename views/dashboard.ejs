@@ -717,7 +717,8 @@
   var goalsTitle = document.getElementById('bc-goals-title');
   var otherWrap = document.getElementById('otherCustomWrap');
   var otherInput = document.getElementById('otherGoalInput');
-  var goalLabels = {
+  var selectedGoal = null;
+  var goalLabelsMap = {
     launch_product: { label:'Launch a New Product', cta:'🚀 Start Product Launch', icon:'🚀' },
     grow_business: { label:'Grow My Existing Business', cta:'📈 Grow My Business', icon:'📈' },
     start_store: { label:'Start an Online Store', cta:'🛒 Build My Store Campaign', icon:'🛒' },
@@ -729,17 +730,14 @@
   var brainPct = <%= typeof brainPct !== 'undefined' ? brainPct : 0 %>;
 
   function updateCta(goalId, customText){
-    var info = goalLabels[goalId] || goalLabels.other;
+    var info = goalLabelsMap[goalId] || goalLabelsMap.other;
     var ctaText = info.cta;
-    // If Brand Brain is incomplete, go to /brand-brain; else go to /campaign-studio
     var route = brainPct >= 100 ? '/campaign-studio' : '/brand-brain';
-    // Custom text for "other"
     if(goalId === 'other' && customText && customText.trim()){
       ctaText = '🚀 ' + customText.trim().substring(0, 40) + (customText.trim().length > 40 ? '...' : '');
     }
     ctaBtn.textContent = ctaText;
     ctaBtn.href = route;
-    // Update title
     if(goalId){
       goalsTitle.textContent = '🎯 Your Goal: ' + (goalId === 'other' && customText ? customText : info.label);
     } else {
@@ -747,17 +745,12 @@
     }
   }
 
-  function saveGoal(goalId, customText){
-    var d = new URLSearchParams();
-    d.append('goal', goalId);
-    if(goalId === 'other' && customText) d.append('goalCustom', customText);
-    fetch('/dashboard/update-goal', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:d.toString() })
-      .catch(function(e){ console.warn('Goal save failed (non-critical):', e); });
-  }
-
   goalCards.forEach(function(card){
-    card.addEventListener('click', function(){
+    card.addEventListener('click', function(e){
+      // Stop any event propagation that could cause navigation
+      e.stopPropagation();
       var goalId = card.getAttribute('data-goal');
+      selectedGoal = goalId;
       // Deselect all
       goalCards.forEach(function(c){ c.classList.remove('selected'); });
       card.classList.add('selected');
@@ -765,34 +758,48 @@
       if(goalId === 'other'){
         otherWrap.classList.add('visible');
         otherInput.focus();
-        var customVal = otherInput.value.trim();
-        updateCta('other', customVal);
-        saveGoal('other', customVal);
+        updateCta('other', otherInput.value.trim());
       } else {
         otherWrap.classList.remove('visible');
         updateCta(goalId, '');
-        saveGoal(goalId, '');
       }
     });
   });
 
-  // "Something Else" text input changes
+  // "Something Else" text input changes — visual only, no fetch
   if(otherInput){
     otherInput.addEventListener('input', function(){
-      var val = otherInput.value.trim();
-      updateCta('other', val);
-      saveGoal('other', val);
+      updateCta('other', otherInput.value.trim());
     });
   }
+
+  // CTA button click — save goal then navigate
+  ctaBtn.addEventListener('click', function(e){
+    if(selectedGoal){
+      var d = new URLSearchParams();
+      d.append('goal', selectedGoal);
+      if(selectedGoal === 'other' && otherInput){
+        var customVal = otherInput.value.trim();
+        if(customVal) d.append('goalCustom', customVal);
+      }
+      // Fire-and-forget save in background, then navigate
+      fetch('/dashboard/update-goal', {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        body: d.toString()
+      }).catch(function(err){ console.warn('Goal save:', err); });
+    }
+    // Allow default navigation to /brand-brain or /campaign-studio
+  });
 
   // Initialize CTA + selection state on page load
   (function initGoals(){
     var selected = document.querySelector('.builder-goal-card.selected');
     if(selected){
       var g = selected.getAttribute('data-goal');
+      selectedGoal = g;
       if(g === 'other'){
-        var customVal = otherInput ? otherInput.value.trim() : '';
-        updateCta('other', customVal);
+        updateCta('other', otherInput ? otherInput.value.trim() : '');
       } else {
         updateCta(g, '');
       }
