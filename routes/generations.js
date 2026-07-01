@@ -17,57 +17,89 @@ const goalLabels = {
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
-  const db = getDb();
-  const user = res.locals.user;
-  const userId = user.id;
+  try {
+    const db = getDb();
+    const user = res.locals.user;
+    if (!user) return res.redirect('/login');
+    const userId = user.id;
 
-  const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId).count;
-  const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId).count;
-  const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId).count;
-  const quickCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId).count;
-  const bundleCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId).count;
-  const campaignCount = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(userId).count;
-  const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId);
-  const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId);
-  const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId);
-  
-  // Brand Brain data for progress
-  let brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId);
-  if (!brain) {
-    db.prepare('INSERT INTO brand_brain (user_id) VALUES (?)').run(userId);
-    brain = { business_name: '', industry: '', target_audience: '', brand_voice: 'professional', unique_value: '', competitors: '', goals: '', key_messages: '' };
+    const safeVal = function(val, fallback) { return val !== null && val !== undefined ? val : fallback; };
+
+    const totalGenerations = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId)?.count, 0);
+    const favorites = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId)?.count, 0);
+    const thisMonth = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId)?.count, 0);
+    const quickCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId)?.count, 0);
+    const bundleCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId)?.count, 0);
+    const campaignCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(userId)?.count, 0);
+    const recent = safeVal(db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId), []);
+    const typeBreakdown = safeVal(db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId), []);
+    const history = safeVal(db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId), []);
+
+    // Brand Brain data for progress
+    let brain = {};
+    let brainFilled = 0;
+    let brainPct = 0;
+    try {
+      const brainRow = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId);
+      if (brainRow) {
+        brain = brainRow;
+        const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
+        brainFilled = brainFields.filter(function(f){ return brainRow[f] && brainRow[f].trim(); }).length;
+        brainPct = Math.round((brainFilled / brainFields.length) * 100);
+      }
+    } catch(e) {
+      console.warn('Brand Brain query failed (non-critical):', e.message);
+    }
+
+    // Builder journey progress
+    const journey = {
+      accountCreated: true,
+      loggedIn: true,
+      brandBrainStarted: brainFilled > 0,
+      firstQuickGenerate: quickCount > 0,
+      firstMarketingBundle: bundleCount > 0,
+      firstCompleteCampaign: campaignCount > 0,
+      firstFavorite: favorites > 0,
+      firstDownload: false
+    };
+
+    res.render('dashboard', {
+      title: 'Dashboard - CopyQuick',
+      contentTypes: getContentTypes(),
+      tones: getTones(),
+      history: history, results: null,
+      totalGenerations: totalGenerations, favorites: favorites, thisMonth: thisMonth,
+      quickCount: quickCount, bundleCount: bundleCount, campaignCount: campaignCount,
+      recent: recent, typeBreakdown: typeBreakdown,
+      bundleAssets: bundleAssets, campaignSections: campaignSections,
+      brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
+      brain: brain, brainPct: brainPct, brainFilled: brainFilled,
+      journey: journey,
+      goalLabels: goalLabels,
+      builderGoal: safeVal(user.builder_goal, '') || '',
+      currentPage: 'dashboard'
+    });
+  } catch(err) {
+    console.error('Dashboard route error:', err);
+    // Always render dashboard with safe defaults - never show blank
+    res.render('dashboard', {
+      title: 'Dashboard - CopyQuick',
+      contentTypes: getContentTypes(), tones: getTones(),
+      history: [], results: null,
+      totalGenerations: 0, favorites: 0, thisMonth: 0,
+      quickCount: 0, bundleCount: 0, campaignCount: 0,
+      recent: [], typeBreakdown: [],
+      bundleAssets: bundleAssets, campaignSections: campaignSections,
+      brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
+      brain: {}, brainPct: 0, brainFilled: 0,
+      journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false,
+                 firstQuickGenerate:false, firstMarketingBundle:false,
+                 firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
+      goalLabels: goalLabels,
+      builderGoal: '',
+      currentPage: 'dashboard'
+    });
   }
-  const brainFields = ['business_name', 'industry', 'target_audience', 'brand_voice', 'unique_value', 'competitors', 'goals', 'key_messages'];
-  const brainFilled = brainFields.filter(f => brain[f] && brain[f].trim()).length;
-  const brainPct = Math.round((brainFilled / brainFields.length) * 100);
-
-  // Builder journey progress
-  const journey = {
-    accountCreated: true,
-    loggedIn: true,
-    brandBrainStarted: brainFilled > 0,
-    firstQuickGenerate: quickCount > 0,
-    firstMarketingBundle: bundleCount > 0,
-    firstCompleteCampaign: campaignCount > 0,
-    firstFavorite: favorites > 0,
-    firstDownload: false // TODO: track downloads
-  };
-
-  res.render('dashboard', {
-    title: 'Dashboard - CopyQuick',
-    contentTypes: getContentTypes(),
-    tones: getTones(),
-    history, results: null,
-    totalGenerations, favorites, thisMonth,
-    quickCount, bundleCount, campaignCount,
-    recent, typeBreakdown,
-    bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
-    brain, brainPct, brainFilled,
-    journey,
-    goalLabels,
-    builderGoal: user.builder_goal || '',
-    currentPage: 'dashboard'
-  });
 });
 
 // ====== Update Builder Goal ======
