@@ -17,13 +17,19 @@ const goalLabels = {
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
+  console.log('📊 Dashboard route called, user.id:', res.locals.user?.id);
   try {
     const db = getDb();
     const user = res.locals.user;
-    if (!user) return res.redirect('/login');
+    if (!user) { console.log('⛔ No user in locals, redirecting to login'); return res.redirect('/login'); }
     const userId = user.id;
 
     const safeVal = function(val, fallback) { return val !== null && val !== undefined ? val : fallback; };
+
+    // Validate critical data before rendering
+    const sections = campaignSections;
+    if (!sections || !sections.length) { console.log('⚠️ campaignSections is empty!'); }
+    if (!goalLabels) { console.log('⚠️ goalLabels is missing!'); }
 
     const totalGenerations = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId)?.count, 0);
     const favorites = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId)?.count, 0);
@@ -46,15 +52,15 @@ router.get('/dashboard', requireAuth, (req, res) => {
         const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
         brainFilled = brainFields.filter(function(f){ return brainRow[f] && brainRow[f].trim(); }).length;
         brainPct = Math.round((brainFilled / brainFields.length) * 100);
+      } else {
+        console.log('ℹ️ No brand_brain row for user', userId);
       }
     } catch(e) {
-      console.warn('Brand Brain query failed (non-critical):', e.message);
+      console.warn('Brand Brain query failed:', e.message);
     }
 
-    // Builder journey progress
     const journey = {
-      accountCreated: true,
-      loggedIn: true,
+      accountCreated: true, loggedIn: true,
       brandBrainStarted: brainFilled > 0,
       firstQuickGenerate: quickCount > 0,
       firstMarketingBundle: bundleCount > 0,
@@ -62,6 +68,10 @@ router.get('/dashboard', requireAuth, (req, res) => {
       firstFavorite: favorites > 0,
       firstDownload: false
     };
+
+    console.log('✅ Rendering dashboard — stats:',
+      'gens:', totalGenerations, 'fav:', favorites, 'month:', thisMonth,
+      'quick:', quickCount, 'bundle:', bundleCount, 'campaign:', campaignCount);
 
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
@@ -80,25 +90,30 @@ router.get('/dashboard', requireAuth, (req, res) => {
       currentPage: 'dashboard'
     });
   } catch(err) {
-    console.error('Dashboard route error:', err);
-    // Always render dashboard with safe defaults - never show blank
-    res.render('dashboard', {
-      title: 'Dashboard - CopyQuick',
-      contentTypes: getContentTypes(), tones: getTones(),
-      history: [], results: null,
-      totalGenerations: 0, favorites: 0, thisMonth: 0,
-      quickCount: 0, bundleCount: 0, campaignCount: 0,
-      recent: [], typeBreakdown: [],
-      bundleAssets: bundleAssets, campaignSections: campaignSections,
-      brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
-      brain: {}, brainPct: 0, brainFilled: 0,
-      journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false,
-                 firstQuickGenerate:false, firstMarketingBundle:false,
-                 firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
-      goalLabels: goalLabels,
-      builderGoal: '',
-      currentPage: 'dashboard'
-    });
+    console.error('❌ Dashboard route CRASHED:', err.message);
+    console.error('   Stack:', err.stack?.split('\\n').slice(0,3).join('\\n   '));
+    try {
+      res.render('dashboard', {
+        title: 'Dashboard - CopyQuick',
+        contentTypes: getContentTypes(), tones: getTones(),
+        history: [], results: null,
+        totalGenerations: 0, favorites: 0, thisMonth: 0,
+        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        recent: [], typeBreakdown: [],
+        bundleAssets: bundleAssets, campaignSections: campaignSections,
+        brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
+        brain: {}, brainPct: 0, brainFilled: 0,
+        journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false,
+                   firstQuickGenerate:false, firstMarketingBundle:false,
+                   firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
+        goalLabels: goalLabels,
+        builderGoal: '',
+        currentPage: 'dashboard'
+      });
+    } catch(e2) {
+      console.error('💀 Even safe render failed:', e2.message);
+      res.status(500).send('Dashboard error. Please check server logs.');
+    }
   }
 });
 
