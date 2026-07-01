@@ -85,59 +85,43 @@
         </div>
     </section>
 
-    <!-- ===== BUILDER GOALS (persistent welcome cards) ===== -->
+    <!-- ===== BUILDER GOALS (interactive welcome cards) ===== -->
     <section class="bc-goals fade-in">
-        <h2 class="bc-section-title"><%= builderGoal ? '🎯 Your Goal: ' + goalLabels[builderGoal] : '👋 What would you like to build today?' %></h2>
-        <% if (builderGoal) { %><p class="bc-goals-sub">You can update your goal anytime — it helps CopyQuick personalize your recommendations.</p><% } %>
-        <form action="/dashboard/update-goal" method="POST" class="bc-goals-form">
-            <div class="builder-goals-grid">
-                <label class="builder-goal-card <%= builderGoal === 'launch_product' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="launch_product" class="goal-radio" <%= builderGoal === 'launch_product' ? 'checked' : '' %>>
-                    <span class="goal-icon">🚀</span>
-                    <span class="goal-title">Launch a New Product</span>
-                    <span class="goal-desc">Generate copy for your product launch across all channels</span>
-                </label>
-                <label class="builder-goal-card <%= builderGoal === 'grow_business' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="grow_business" class="goal-radio" <%= builderGoal === 'grow_business' ? 'checked' : '' %>>
-                    <span class="goal-icon">📈</span>
-                    <span class="goal-title">Grow My Existing Business</span>
-                    <span class="goal-desc">Create marketing content to attract more customers</span>
-                </label>
-                <label class="builder-goal-card <%= builderGoal === 'start_store' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="start_store" class="goal-radio" <%= builderGoal === 'start_store' ? 'checked' : '' %>>
-                    <span class="goal-icon">🛒</span>
-                    <span class="goal-title">Start an Online Store</span>
-                    <span class="goal-desc">Build product descriptions, ads, and email campaigns</span>
-                </label>
-                <label class="builder-goal-card <%= builderGoal === 'promote_service' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="promote_service" class="goal-radio" <%= builderGoal === 'promote_service' ? 'checked' : '' %>>
-                    <span class="goal-icon">💼</span>
-                    <span class="goal-title">Promote My Service</span>
-                    <span class="goal-desc">Create compelling copy for your service-based business</span>
-                </label>
-                <label class="builder-goal-card <%= builderGoal === 'build_brand' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="build_brand" class="goal-radio" <%= builderGoal === 'build_brand' ? 'checked' : '' %>>
-                    <span class="goal-icon">✨</span>
-                    <span class="goal-title">Build My Brand</span>
-                    <span class="goal-desc">Establish your brand voice across all marketing touchpoints</span>
-                </label>
-                <label class="builder-goal-card <%= builderGoal === 'campaigns' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="campaigns" class="goal-radio" <%= builderGoal === 'campaigns' ? 'checked' : '' %>>
-                    <span class="goal-icon">📢</span>
-                    <span class="goal-title">Generate Marketing Campaigns</span>
-                    <span class="goal-desc">Create complete multi-channel campaigns from one idea</span>
-                </label>
-                <label class="builder-goal-card builder-goal-card-wide <%= builderGoal === 'other' ? 'selected' : '' %>">
-                    <input type="radio" name="goal" value="other" class="goal-radio" <%= builderGoal === 'other' ? 'checked' : '' %>>
-                    <span class="goal-icon">💡</span>
-                    <span class="goal-title">Something Else</span>
-                    <span class="goal-desc">I'll figure it out as I go</span>
-                </label>
+        <h2 class="bc-section-title" id="bc-goals-title"><%= builderGoal && goalLabels && goalLabels[builderGoal] ? '🎯 Your Goal: ' + goalLabels[builderGoal] : '👋 What would you like to build today?' %></h2>
+        <% if (builderGoal && goalLabels && goalLabels[builderGoal]) { %><p class="bc-goals-sub">You can update your goal anytime — it helps CopyQuick personalize your recommendations.</p><% } %>
+        <div class="builder-goals-grid" id="builderGoalsGrid">
+            <% var goalsList = [
+              { id:'launch_product', icon:'🚀', title:'Launch a New Product', desc:'Generate copy for your product launch across all channels' },
+              { id:'grow_business', icon:'📈', title:'Grow My Existing Business', desc:'Create marketing content to attract more customers' },
+              { id:'start_store', icon:'🛒', title:'Start an Online Store', desc:'Build product descriptions, ads, and email campaigns' },
+              { id:'promote_service', icon:'💼', title:'Promote My Service', desc:'Create compelling copy for your service-based business' },
+              { id:'build_brand', icon:'✨', title:'Build My Brand', desc:'Establish your brand voice across all marketing touchpoints' },
+              { id:'campaigns', icon:'📢', title:'Generate Marketing Campaigns', desc:'Create complete multi-channel campaigns from one idea' }
+            ]; %>
+            <% goalsList.forEach(function(g){ %>
+                <div class="builder-goal-card <%= builderGoal === g.id ? 'selected' : '' %>" data-goal="<%= g.id %>" data-icon="<%= g.icon %>">
+                    <span class="goal-icon"><%= g.icon %></span>
+                    <span class="goal-title"><%= g.title %></span>
+                    <span class="goal-desc"><%= g.desc %></span>
+                </div>
+            <% }); %>
+            <!-- Something Else (wide card) -->
+            <div class="builder-goal-card builder-goal-card-wide <%= builderGoal === 'other' ? 'selected' : '' %>" data-goal="other" id="otherGoalCard">
+                <span class="goal-icon">💡</span>
+                <span class="goal-title">Something Else</span>
+                <span class="goal-desc">Tell us what you want to build</span>
             </div>
-            <div class="bc-goals-action">
-                <button type="submit" class="btn btn-primary btn-lg">Let's Get Started →</button>
-            </div>
-        </form>
+        </div>
+
+        <!-- Custom input for "Something Else" -->
+        <div id="otherCustomWrap" class="other-custom-wrap <%= builderGoal === 'other' ? 'visible' : '' %>">
+            <label for="otherGoalInput">Tell CopyQuick what you want to build</label>
+            <textarea id="otherGoalInput" rows="2" placeholder="Example: I want to promote a church event, launch a local service, or create content for my nonprofit."><%= builderGoalCustom || '' %></textarea>
+        </div>
+
+        <div class="bc-goals-action" id="bcGoalsAction">
+            <a href="/brand-brain" class="btn btn-primary btn-lg" id="bcCtaBtn">🚀 Let's Get Started →</a>
+        </div>
     </section>
 
     <!-- ===== SECTION 4: Builder Journey Progress ===== -->
@@ -440,6 +424,11 @@
 .builder-goal-card-wide .goal-icon{font-size:1.2rem;margin-bottom:0;}
 .builder-goal-card-wide .goal-desc{flex:1;}
 .bc-goals-action{margin-top:1rem;}
+.other-custom-wrap{display:none;max-height:0;overflow:hidden;transition:all 0.3s ease;margin-top:0.75rem;max-width:400px;}
+.other-custom-wrap.visible{display:block;max-height:150px;}
+.other-custom-wrap label{font-size:0.85rem;font-weight:600;margin-bottom:0.35rem;display:block;}
+.other-custom-wrap textarea{width:100%;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:0.75rem;font-size:0.85rem;font-family:inherit;transition:border-color 0.2s;resize:vertical;}
+.other-custom-wrap textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
 
 /* ===== Recommendation ===== */
 .bc-recommendation{margin-bottom:2.5rem;}
@@ -721,6 +710,94 @@
       setTimeout(function(){b.classList.remove('copied');b.innerHTML='📋 <span>Copy</span>';},2000);
     });
   };
+
+  // ===== Builder Goal Card Interactions =====
+  var goalCards = document.querySelectorAll('.builder-goal-card');
+  var ctaBtn = document.getElementById('bcCtaBtn');
+  var goalsTitle = document.getElementById('bc-goals-title');
+  var otherWrap = document.getElementById('otherCustomWrap');
+  var otherInput = document.getElementById('otherGoalInput');
+  var goalLabels = {
+    launch_product: { label:'Launch a New Product', cta:'🚀 Start Product Launch', icon:'🚀' },
+    grow_business: { label:'Grow My Existing Business', cta:'📈 Grow My Business', icon:'📈' },
+    start_store: { label:'Start an Online Store', cta:'🛒 Build My Store Campaign', icon:'🛒' },
+    promote_service: { label:'Promote My Service', cta:'💼 Promote My Service', icon:'💼' },
+    build_brand: { label:'Build My Brand', cta:'✨ Build My Brand', icon:'✨' },
+    campaigns: { label:'Generate Marketing Campaigns', cta:'🚀 Build My Campaign', icon:'📢' },
+    other: { label:'Something Else', cta:'🚀 Get Started', icon:'💡' }
+  };
+  var brainPct = <%= typeof brainPct !== 'undefined' ? brainPct : 0 %>;
+
+  function updateCta(goalId, customText){
+    var info = goalLabels[goalId] || goalLabels.other;
+    var ctaText = info.cta;
+    // If Brand Brain is incomplete, go to /brand-brain; else go to /campaign-studio
+    var route = brainPct >= 100 ? '/campaign-studio' : '/brand-brain';
+    // Custom text for "other"
+    if(goalId === 'other' && customText && customText.trim()){
+      ctaText = '🚀 ' + customText.trim().substring(0, 40) + (customText.trim().length > 40 ? '...' : '');
+    }
+    ctaBtn.textContent = ctaText;
+    ctaBtn.href = route;
+    // Update title
+    if(goalId){
+      goalsTitle.textContent = '🎯 Your Goal: ' + (goalId === 'other' && customText ? customText : info.label);
+    } else {
+      goalsTitle.textContent = '👋 What would you like to build today?';
+    }
+  }
+
+  function saveGoal(goalId, customText){
+    var d = new URLSearchParams();
+    d.append('goal', goalId);
+    if(goalId === 'other' && customText) d.append('goalCustom', customText);
+    fetch('/dashboard/update-goal', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:d.toString() })
+      .catch(function(e){ console.warn('Goal save failed (non-critical):', e); });
+  }
+
+  goalCards.forEach(function(card){
+    card.addEventListener('click', function(){
+      var goalId = card.getAttribute('data-goal');
+      // Deselect all
+      goalCards.forEach(function(c){ c.classList.remove('selected'); });
+      card.classList.add('selected');
+      // Show/hide "Something Else" custom input
+      if(goalId === 'other'){
+        otherWrap.classList.add('visible');
+        otherInput.focus();
+        var customVal = otherInput.value.trim();
+        updateCta('other', customVal);
+        saveGoal('other', customVal);
+      } else {
+        otherWrap.classList.remove('visible');
+        updateCta(goalId, '');
+        saveGoal(goalId, '');
+      }
+    });
+  });
+
+  // "Something Else" text input changes
+  if(otherInput){
+    otherInput.addEventListener('input', function(){
+      var val = otherInput.value.trim();
+      updateCta('other', val);
+      saveGoal('other', val);
+    });
+  }
+
+  // Initialize CTA + selection state on page load
+  (function initGoals(){
+    var selected = document.querySelector('.builder-goal-card.selected');
+    if(selected){
+      var g = selected.getAttribute('data-goal');
+      if(g === 'other'){
+        var customVal = otherInput ? otherInput.value.trim() : '';
+        updateCta('other', customVal);
+      } else {
+        updateCta(g, '');
+      }
+    }
+  })();
 
   // Fade-in
   var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});

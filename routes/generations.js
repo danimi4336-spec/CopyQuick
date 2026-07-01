@@ -72,10 +72,13 @@ router.get('/dashboard', requireAuth, (req, res) => {
 
 // ====== Update Builder Goal ======
 router.post('/dashboard/update-goal', requireAuth, (req, res) => {
-  const { goal } = req.body;
+  const { goal, goalCustom } = req.body;
   if (goal) {
     const db = getDb();
     db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
+    // If it's AJAX (fetch), return success JSON
+    const isAjax = req.xhr || req.headers.accept?.includes('json');
+    if (isAjax) return res.json({ success: true, goal });
   }
   res.redirect('/dashboard');
 });
@@ -90,6 +93,12 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 
   if (user.generations_used >= user.monthly_limit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
+    // Fetch brain + journey for safe render
+    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
+    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
+    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
+    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
+    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
     return res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(),
@@ -101,6 +110,10 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       quickCount: 0, bundleCount: 0, campaignCount: 0,
       recent: [], typeBreakdown: [],
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
+      journey: journeySafe,
+      goalLabels,
+      builderGoal: user.builder_goal || '',
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
   }
@@ -181,6 +194,12 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(user.id);
     const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(user.id);
     const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id);
+    // Safe brain + journey for render
+    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
+    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
+    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
+    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
+    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
@@ -189,6 +208,10 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       quickCount, bundleCount, campaignCount,
       recent, typeBreakdown,
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
+      journey: journeySafe,
+      goalLabels,
+      builderGoal: updatedUser.builder_goal || '',
       input: { productDescription, targetAudience, contentType, tone },
       genId,
       genMode: genType
@@ -196,6 +219,11 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   } catch (err) {
     console.error(err);
     if (isAjax) return res.status(500).json({ error: 'Generation failed' });
+    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
+    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
+    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
+    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
+    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:0, firstMarketingBundle:0, firstCompleteCampaign:0, firstFavorite:0, firstDownload:false };
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
@@ -204,7 +232,11 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       totalGenerations: 0, favorites: 0, thisMonth: 0,
       quickCount: 0, bundleCount: 0, campaignCount: 0,
       recent: [], typeBreakdown: [],
-      bundleAssets, campaignSections, brandVoices, goals, audiencePresets
+      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
+      journey: journeySafe,
+      goalLabels,
+      builderGoal: user.builder_goal || ''
     });
   }
 });
