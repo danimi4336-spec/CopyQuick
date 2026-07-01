@@ -27,7 +27,7 @@ router.post('/signup', async (req, res) => {
       .run(email, passwordHash, name);
     
     req.session.userId = result.lastInsertRowid;
-    res.redirect('/dashboard');
+    res.redirect('/welcome');
   } catch (err) {
     console.error(err);
     res.render('signup', { title: 'Sign Up - CopyQuick', error: 'Email already exists or invalid data.', currentPage: 'signup' });
@@ -47,7 +47,9 @@ router.post('/login', async (req, res) => {
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
     if (user && await bcrypt.compare(password, user.password_hash)) {
       req.session.userId = user.id;
-      res.redirect('/dashboard');
+      const db2 = getDb();
+      const hasGoal = db2.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
+      res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
     } else {
       res.render('login', { title: 'Login - CopyQuick', error: 'Invalid email or password.', currentPage: 'login' });
     }
@@ -92,8 +94,10 @@ router.get('/auth/google/callback',
           return res.status(500).send('Session error. Please try again.');
         }
         req.session.userId = user.id;
-        console.log('✅ Session set for user:', user.id);
-        return res.redirect('/dashboard');
+        const dbCb = getDb();
+        const hasGoal = dbCb.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
+        console.log('✅ Session set for user:', user.id, 'redirect:', hasGoal?.builder_goal ? '/dashboard' : '/welcome');
+        return res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
       });
     })(req, res, next);
   }

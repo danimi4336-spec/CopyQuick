@@ -1702,6 +1702,32 @@ p {
     }
 }
 
+/* ====== Sidebar Navigation ====== */
+.sidebar-toggle { display:none; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--dark); margin-right:0.5rem; }
+.nav-right { display:flex; align-items:center; gap:1.25rem; }
+.nav-link { font-size:0.85rem; color:var(--secondary); text-decoration:none; font-weight:500; transition:color 0.2s; background:none; border:none; cursor:pointer; padding:0; font-family:inherit; }
+.nav-link:hover { color:var(--primary); }
+.sidebar { position:fixed; top:4rem; left:0; width:220px; height:calc(100vh - 4rem); background:var(--white); border-right:1px solid var(--border); padding:1.5rem 0.75rem; overflow-y:auto; z-index:40; transition:transform 0.25s ease-out; }
+.sidebar-nav { display:flex; flex-direction:column; gap:0.15rem; }
+.sidebar-link { display:flex; align-items:center; gap:0.6rem; padding:0.6rem 0.75rem; border-radius:0.6rem; font-size:0.85rem; font-weight:500; color:var(--secondary); text-decoration:none; transition:all 0.15s; }
+.sidebar-link:hover { background:var(--light); color:var(--dark); }
+.sidebar-link.active { background:var(--primary-light); color:var(--primary); font-weight:600; }
+.sidebar-icon { font-size:1.1rem; flex-shrink:0; }
+.sidebar-divider { height:1px; background:var(--border); margin:0.5rem 0.75rem; }
+.sidebar-overlay { display:none; position:fixed; inset:0; z-index:39; background:rgba(0,0,0,0.2); }
+.sidebar-overlay.visible { display:block; }
+.main-content { min-height:calc(100vh - 4rem); }
+.main-content.has-sidebar { margin-left:220px; }
+
+@media (max-width: 768px) {
+    .sidebar { transform:translateX(-100%); }
+    .sidebar.open { transform:translateX(0); }
+    .sidebar-toggle { display:block; }
+    .main-content.has-sidebar { margin-left:0; }
+    .nav-right .nav-link:not(.btn) { display:none; }
+    .nav-right .btn { font-size:0.8rem; padding:0.35rem 0.75rem; }
+}
+
 /* ====== Legal Pages (Privacy, Terms, Cookies, Refunds) ====== */
 .legal-page {
     padding: 4rem 0 5rem;

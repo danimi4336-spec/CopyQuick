@@ -45,6 +45,23 @@ function initDb() {
       data TEXT NOT NULL,
       expires_at DATETIME NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS brand_brain (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      business_name TEXT DEFAULT '',
+      industry TEXT DEFAULT '',
+      target_audience TEXT DEFAULT '',
+      brand_voice TEXT DEFAULT 'professional',
+      brand_voice_custom TEXT DEFAULT '',
+      unique_value TEXT DEFAULT '',
+      competitors TEXT DEFAULT '',
+      goals TEXT DEFAULT '',
+      tone TEXT DEFAULT 'professional',
+      key_messages TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Add new columns to existing table if they don't exist (for older databases)
@@ -73,12 +90,22 @@ function initDb() {
   });
 
   // Add OAuth columns to users table
-  const userCols = ['password_hash TEXT', 'google_id TEXT', 'avatar_url TEXT'];
+  const userCols = ['password_hash TEXT', 'google_id TEXT', 'avatar_url TEXT', 'builder_goal TEXT DEFAULT \'\''];
   userCols.forEach(col => {
     try {
       db.exec(`ALTER TABLE users ADD COLUMN ${col}`);
     } catch (e) {
       // Column already exists
+    }
+  });
+
+  // Add brand_brain columns (migration)
+  const brainCols = ['brand_voice_custom TEXT DEFAULT \'\''];
+  brainCols.forEach(col => {
+    try {
+      db.exec(`ALTER TABLE brand_brain ADD COLUMN ${col}`);
+    } catch (e) {
+      // Already exists
     }
   });
 

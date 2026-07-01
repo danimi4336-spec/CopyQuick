@@ -2,267 +2,289 @@
     <header class="dashboard-header fade-in">
         <div>
             <h1><span id="greeting"></span>, <%= user.name || 'there' %> 👋</h1>
-            <p class="text-secondary">Here's your CopyQuick activity overview.</p>
+            <p class="text-secondary">Let's build something great today.</p>
         </div>
         <div class="dashboard-plan">
             <span class="badge badge-<%= user.plan_tier %>"><%= user.plan_tier.charAt(0).toUpperCase() + user.plan_tier.slice(1) %></span>
             <div class="usage-bar-wrap">
-                <div class="usage-bar">
-                    <div class="usage-bar-fill" id="usageFill" style="width:<%= Math.min((user.generations_used / user.monthly_limit) * 100, 100) %>%"></div>
-                </div>
+                <div class="usage-bar"><div id="usageFill" class="usage-bar-fill" style="width:<%= Math.min((user.generations_used / user.monthly_limit) * 100, 100) %>%"></div></div>
                 <span class="usage-text"><%= user.generations_used %> / <%= user.monthly_limit %> Used</span>
             </div>
         </div>
     </header>
 
-    <div class="stats-grid fade-in">
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-purple">📝</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= totalGenerations %></span>
-                <span class="stat-label">Total Generations</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-purple">⚡</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= quickCount %></span>
-                <span class="stat-label">Quick</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-green">📦</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= bundleCount %></span>
-                <span class="stat-label">Bundles</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-pink">🚀</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= campaignCount %></span>
-                <span class="stat-label">Campaigns</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-amber">⭐</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= favorites %></span>
-                <span class="stat-label">Favorites</span>
-            </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon stat-icon-green">📅</div>
-            <div class="stat-info">
-                <span class="stat-value"><%= thisMonth %></span>
-                <span class="stat-label">This Month</span>
-            </div>
+    <!-- Quick Actions -->
+    <div class="quick-actions fade-in">
+        <h2 class="section-sm-title">Quick Actions</h2>
+        <div class="quick-actions-grid">
+            <a href="/campaign-studio" class="qa-card qa-campaign">
+                <span class="qa-icon">🚀</span>
+                <span class="qa-label">Create Campaign</span>
+            </a>
+            <a href="/dashboard" class="qa-card qa-quick">
+                <span class="qa-icon">⚡</span>
+                <span class="qa-label">Quick Generate</span>
+            </a>
+            <a href="/brand-brain" class="qa-card qa-brain">
+                <span class="qa-icon">🧠</span>
+                <span class="qa-label">Brand Brain</span>
+            </a>
+            <a href="/history" class="qa-card qa-history">
+                <span class="qa-icon">📜</span>
+                <span class="qa-label">My Assets</span>
+            </a>
         </div>
     </div>
 
+    <!-- Generator & Stats -->
     <div class="dashboard-grid">
         <section class="generator-tool fade-in">
-            <!-- Mode Selector -->
-            <div class="mode-selector">
-                <button class="mode-btn active" data-mode="quick" onclick="switchMode('quick')">
-                    <span class="mode-icon">⚡</span>
-                    <span class="mode-label">Quick Generate</span>
-                </button>
-                <button class="mode-btn" data-mode="bundle" onclick="switchMode('bundle')">
-                    <span class="mode-icon">📦</span>
-                    <span class="mode-label">Marketing Bundle</span>
-                </button>
-                <button class="mode-btn" data-mode="campaign" onclick="switchMode('campaign')">
-                    <span class="mode-icon">🚀</span>
-                    <span class="mode-label">Complete Campaign</span>
-                    <span class="mode-badge">⭐ Recommended</span>
-                </button>
+            <!-- Mode Tabs -->
+            <div class="mode-tabs">
+                <button class="mode-tab active" data-mode="quick">⚡ Quick Generate</button>
+                <button class="mode-tab" data-mode="bundle">📦 Marketing Bundle</button>
+                <button class="mode-tab" data-mode="campaign">🚀 Complete Campaign</button>
             </div>
 
-            <% if (typeof error !== 'undefined' && error) { %>
-                <div class="alert alert-error"><%- error %></div>
-            <% } %>
-
-            <div class="card p-4">
-                <!-- Shared Inputs -->
-                <div class="shared-inputs">
-                    <div class="form-group">
-                        <label for="productDescription">Product / Service</label>
-                        <textarea id="productDescription" name="productDescription" rows="3" placeholder="Describe your product or service in detail..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
+            <!-- ======================== QUICK GENERATE MODE ======================== -->
+            <div class="mode-panel active" id="mode-quick">
+                <div class="card p-4">
+                    <div class="mode-panel-header">
+                        <h2>⚡ Quick Generate</h2>
+                        <p class="mode-panel-desc">Generate a single piece of content in seconds.</p>
                     </div>
-                    <div class="form-grid form-grid-3">
+                    <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%- error %></div><% } %>
+                    <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="quick">
                         <div class="form-group">
-                            <label for="targetAudience">Target Audience</label>
-                            <select id="targetAudience" name="targetAudience">
-                                <% (audiencePresets || ['Custom']).forEach(function(a) { %>
-                                    <option value="<%= a %>"><%= a %></option>
-                                <% }); %>
-                            </select>
+                            <label for="quickProduct">Product / Service</label>
+                            <textarea id="quickProduct" name="productDescription" rows="2" placeholder="Describe your product..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
                         </div>
-                        <div class="form-group">
-                            <label for="brandVoice">Brand Voice</label>
-                            <select id="brandVoice" name="brandVoice">
-                                <% (brandVoices || ['Professional']).forEach(function(v) { %>
-                                    <option value="<%= v.toLowerCase() %>" <%= v === 'Professional' ? 'selected' : '' %>><%= v %></option>
-                                <% }); %>
-                            </select>
+                        <div class="form-grid form-grid-3">
+                            <div class="form-group">
+                                <label for="quickContentType">Type</label>
+                                <select id="quickContentType" name="contentType">
+                                    <option value="subject_line">Email Subject Lines</option>
+                                    <option value="social_post">Social Media Posts</option>
+                                    <option value="ad_headline">Ad Headlines</option>
+                                    <option value="product_description">Product Descriptions</option>
+                                    <option value="cta">Call-to-Actions</option>
+                                    <option value="email_campaign">Email Campaigns</option>
+                                    <option value="blog_intro">Blog Introductions</option>
+                                    <option value="sales_message">Sales Messages</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="quickTone">Tone</label>
+                                <select id="quickTone" name="tone">
+                                    <option value="professional">Professional</option>
+                                    <option value="casual">Casual</option>
+                                    <option value="urgent">Urgent</option>
+                                    <option value="humorous">Humorous</option>
+                                    <option value="inspirational">Inspirational</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="display:flex;align-items:flex-end;">
+                                <button type="submit" class="btn btn-primary btn-block gen-btn">Generate</button>
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label for="goal">Goal <span class="field-optional">(optional)</span></label>
-                            <select id="goal" name="goal">
-                                <option value="">Select a goal</option>
-                                <% (goals || []).forEach(function(g) { %>
-                                    <option value="<%= g.toLowerCase().replace(/\s+/g, '_') %>"><%= g %></option>
-                                <% }); %>
-                            </select>
-                        </div>
-                    </div>
+                    </form>
                 </div>
-
-                <!-- Mode: Quick Generate -->
-                <div id="modeQuick" class="mode-panel active">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="quickContentType">Content Type</label>
-                            <select id="quickContentType" name="contentType">
-                                <option value="subject_line">Email Subject Lines</option>
-                                <option value="social_post">Social Media Posts</option>
-                                <option value="ad_headline">Ad Headlines &amp; Copy</option>
-                                <option value="product_description">Product Descriptions</option>
-                                <option value="cta">Call-to-Actions (CTA)</option>
-                                <option value="email_campaign">Email Campaigns</option>
-                                <option value="blog_intro">Blog Post Introductions</option>
-                                <option value="sales_message">Sales Messages</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="quickTone">Tone</label>
-                            <select id="quickTone" name="tone">
-                                <option value="professional">Professional</option>
-                                <option value="casual">Casual</option>
-                                <option value="urgent">Urgent</option>
-                                <option value="humorous">Humorous</option>
-                                <option value="inspirational">Inspirational</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generate('quick')">⚡ Generate Copy</button>
+                <div class="loading-skeleton" style="display:none;">
+                    <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div></div>
+                    <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div></div>
                 </div>
-
-                <!-- Mode: Marketing Bundle -->
-                <div id="modeBundle" class="mode-panel">
-                    <p class="mode-description">Select the assets you want to generate. <span id="bundleCount">0 assets selected</span></p>
-                    <div class="bundle-grid">
-                        <% (bundleAssets || []).forEach(function(asset) { %>
-                            <label class="bundle-item <%= asset.default ? 'checked' : '' %>">
-                                <input type="checkbox" class="bundle-checkbox" value="<%= asset.id %>" <%= asset.default ? 'checked' : '' %> onchange="updateBundleCount()">
-                                <span class="bundle-icon"><%= asset.icon %></span>
-                                <span class="bundle-label"><%= asset.label %></span>
-                            </label>
-                        <% }); %>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generateBundle()">📦 Generate Bundle</button>
-                </div>
-
-                <!-- Mode: Complete Campaign -->
-                <div id="modeCampaign" class="mode-panel">
-                    <div class="campaign-card">
-                        <div class="campaign-header">
-                            <span class="campaign-badge">⭐ Recommended</span>
-                            <h3 style="margin:0.5rem 0;">Complete Campaign</h3>
-                        </div>
-                        <p class="campaign-desc">Generate a complete multi-channel marketing campaign from a single product description. Includes all assets for every channel.</p>
-                        <div class="campaign-channels">
-                            <% (campaignSections || []).forEach(function(s) { %>
-                                <div class="campaign-channel">
-                                    <span><%= s.icon %></span>
-                                    <span><%= s.label %></span>
+                <div class="results-area-quick">
+                <% if (results && typeof genMode === 'undefined') { %>
+                    <div class="results-container mt-5">
+                        <div class="results-header"><h2 class="h3">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All →</a></div>
+                        <div class="gen-success-msg">✓ Done</div>
+                        <div class="results-grid">
+                            <% results.forEach(function(r,i){ %>
+                                <div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out <%= i*0.1 %>s both;">
+                                    <div class="result-variation-label">Variation <%= i+1 %></div>
+                                    <div class="result-tone-badge"><%= r.tone %></div>
+                                    <div class="result-body"><%= r.text.replace(/\n/g,'<br>') %></div>
+                                    <div class="result-card-actions">
+                                        <button class="result-action-btn" onclick="copyText('<%= r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n') %>',this)">📋 <span>Copy</span></button>
+                                    </div>
                                 </div>
                             <% }); %>
                         </div>
-                        <div class="campaign-estimate">
-                            <span>⏱️ Estimated time: <strong>45–90 seconds</strong></span>
-                        </div>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn" onclick="generateCampaign()">🚀 Generate Complete Campaign</button>
+                <% } %>
                 </div>
-
-                <input type="hidden" name="generationType" id="generationType" value="quick">
             </div>
 
-            <!-- Loading Skeleton -->
-            <div id="loadingSkeleton" style="display:none;">
-                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
-                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
-                <div class="result-card skeleton"><div class="skeleton-line w-40"></div><div class="skeleton-line w-80"></div><div class="skeleton-line w-60"></div><div class="skeleton-line w-90"></div></div>
-            </div>
-
-            <div id="resultsArea">
-            <% if (results) { %>
-                <div class="results-container mt-5">
-                    <div class="results-header">
-                        <h2 class="h3 mb-4">Results</h2>
-                        <a href="/history" class="btn btn-outline btn-sm">View All History →</a>
+            <!-- ======================== MARKETING BUNDLE MODE ======================== -->
+            <div class="mode-panel" id="mode-bundle">
+                <div class="card p-4">
+                    <div class="mode-panel-header">
+                        <h2>📦 Marketing Bundle</h2>
+                        <p class="mode-panel-desc">Generate multiple marketing assets at once.</p>
                     </div>
-                    <div class="gen-success-msg">✓ Content generated successfully</div>
-                    <div class="results-grid">
-                        <% results.forEach(function(r, i) { %>
-                            <div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out <%= i*0.1 %>s both;">
-                                <div class="result-variation-label">Variation <%= i+1 %></div>
-                                <div class="result-tone-badge"><%= r.tone %></div>
-                                <div class="result-body"><%= r.text.replace(/\n/g, '<br>') %></div>
-                                <div class="result-card-actions">
-                                    <button class="result-action-btn" onclick="copyText('<%= r.text.replace(/'/g, "\\'").replace(/\n/g, "\\n") %>', this)" aria-label="Copy">📋 <span>Copy</span></button>
+                    <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="bundle">
+                        <div class="form-group">
+                            <label for="bundleProduct">Product / Service</label>
+                            <textarea id="bundleProduct" name="productDescription" rows="2" placeholder="Describe your product..." required></textarea>
+                        </div>
+                        <div class="form-grid form-grid-2">
+                            <div class="form-group custom-select-wrap">
+                                <label for="bundleTargetAudience">Target Audience</label>
+                                <select id="bundleTargetAudience" name="targetAudience" data-custom="bundle-audience-custom">
+                                    <% audiencePresets.forEach(function(a){ %>
+                                        <option value="<%= a %>"><%= a %></option>
+                                    <% }); %>
+                                </select>
+                                <div id="bundle-audience-custom" class="custom-field-hidden">
+                                    <textarea name="targetAudienceCustom" rows="2" placeholder="Example: Busy working mothers aged 25–45 looking for natural wellness products."></textarea>
                                 </div>
                             </div>
-                        <% }); %>
-                    </div>
+                            <div class="form-group custom-select-wrap">
+                                <label for="bundleVoice">Brand Voice</label>
+                                <select id="bundleVoice" name="tone" data-custom="bundle-voice-custom">
+                                    <% brandVoices.forEach(function(v){ %>
+                                        <option value="<%= v %>"><%= v %></option>
+                                    <% }); %>
+                                </select>
+                                <div id="bundle-voice-custom" class="custom-field-hidden">
+                                    <textarea name="toneCustom" rows="2" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Select Assets to Generate</label>
+                            <div class="bundle-assets-grid">
+                                <% bundleAssets.forEach(function(a, i){ %>
+                                    <label class="bundle-asset-chip <%= a.default ? 'selected' : '' %>">
+                                        <input type="checkbox" name="assets" value="<%= a.id %>:<%= a.label %>" <%= a.default ? 'checked' : '' %>>
+                                        <span class="chip-icon"><%= a.icon %></span>
+                                        <span class="chip-label"><%= a.label %></span>
+                                    </label>
+                                <% }); %>
+                            </div>
+                            <span class="bundle-count" id="bundleCount">5 of 10 selected</span>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn">📦 Generate Bundle</button>
+                    </form>
                 </div>
-            <% } %>
+                <div class="results-area-bundle"></div>
             </div>
 
-            <div id="emptyState" class="empty-state-sm" style="<%= results ? 'display:none' : '' %>">
-                <div class="empty-icon-sm">✨</div>
-                <h3>No content generated yet</h3>
-                <p>Choose a mode above and start by describing your product.</p>
+            <!-- ======================== COMPLETE CAMPAIGN MODE ======================== -->
+            <div class="mode-panel" id="mode-campaign">
+                <div class="campaign-workspace">
+                    <!-- Left: Campaign Form -->
+                    <div class="campaign-form-col">
+                        <div class="card p-4">
+                            <div class="mode-panel-header">
+                                <h2>🚀 Complete Campaign</h2>
+                                <p class="mode-panel-desc">Generate an entire multi-channel campaign from one idea.</p>
+                            </div>
+                            <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="campaign">
+                                <div class="form-group">
+                                    <label for="campaignProduct">Product / Service</label>
+                                    <textarea id="campaignProduct" name="productDescription" rows="2" placeholder="Describe your product or service..." required></textarea>
+                                </div>
+                                <div class="form-grid form-grid-2">
+                                    <div class="form-group custom-select-wrap">
+                                        <label for="campaignTargetAudience">Target Audience</label>
+                                        <select id="campaignTargetAudience" name="targetAudience" data-custom="campaign-audience-custom">
+                                            <% audiencePresets.forEach(function(a){ %>
+                                                <option value="<%= a %>"><%= a %></option>
+                                            <% }); %>
+                                        </select>
+                                        <div id="campaign-audience-custom" class="custom-field-hidden">
+                                            <textarea name="targetAudienceCustom" rows="2" placeholder="Example: Busy working mothers aged 25–45 looking for natural wellness products."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="form-group custom-select-wrap">
+                                        <label for="campaignVoice">Brand Voice</label>
+                                        <select id="campaignVoice" name="tone" data-custom="campaign-voice-custom">
+                                            <% brandVoices.forEach(function(v){ %>
+                                                <option value="<%= v %>"><%= v %></option>
+                                            <% }); %>
+                                        </select>
+                                        <div id="campaign-voice-custom" class="custom-field-hidden">
+                                            <textarea name="toneCustom" rows="2" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group custom-select-wrap">
+                                    <label for="campaignGoal">Campaign Goal</label>
+                                    <select id="campaignGoal" name="goal" data-custom="campaign-goal-custom">
+                                        <% goals.forEach(function(g){ %>
+                                            <option value="<%= g %>"><%= g %></option>
+                                        <% }); %>
+                                    </select>
+                                    <div id="campaign-goal-custom" class="custom-field-hidden">
+                                        <textarea name="goalCustom" rows="2" placeholder="Example: Promote our new turmeric supplement to existing customers before Black Friday."></textarea>
+                                    </div>
+                                </div>
+
+                                <!-- Campaign Sections -->
+                                <div class="campaign-sections-select">
+                                    <label>Campaign Sections</label>
+                                    <div class="campaign-section-btns">
+                                        <% campaignSections.forEach(function(s, i){ %>
+                                            <button type="button" class="campaign-sec-btn <%= i === 0 ? 'active' : '' %>" data-section="<%= s.id %>">
+                                                <%= s.icon %> <%= s.label %>
+                                            </button>
+                                        <% }); %>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn campaign-cta">🚀 Build My Campaign</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Right: Deliverables Panel -->
+                    <div class="campaign-deliverables-col">
+                        <div class="card p-4 deliverables-card">
+                            <div class="deliverables-header">
+                                <h3 id="deliverables-title">✉️ Email Marketing Includes</h3>
+                            </div>
+                            <div class="deliverables-list" id="deliverables-list">
+                                <% campaignSections[0].deliverables.forEach(function(d){ %>
+                                    <div class="deliverable-item">• <%= d %></div>
+                                <% }); %>
+                            </div>
+                            <div class="deliverables-footer">
+                                <span class="deliverables-count" id="deliverables-count"><%= campaignSections[0].deliverables.length %> assets</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="results-area-campaign"></div>
             </div>
         </section>
 
         <aside class="dashboard-sidebar">
-            <!-- Stats -->
             <div class="sidebar-card">
-                <h3 class="h4">📊 Content Breakdown</h3>
-                <% if (typeBreakdown && typeBreakdown.length > 0) { %>
-                    <div class="breakdown-list">
-                        <% typeBreakdown.forEach(function(item) { %>
-                            <div class="breakdown-item">
-                                <span class="breakdown-label"><%= item.content_type === 'cta' ? 'Call-to-Action' : item.content_type.replace(/_/g, ' ').replace(/\b\w/g, function(c){return c.toUpperCase();}) %></span>
-                                <span class="breakdown-count"><%= item.count %></span>
-                            </div>
-                        <% }); %>
-                    </div>
-                <% } else { %>
-                    <p class="sidebar-text">Generate content to see your breakdown here.</p>
-                <% } %>
+                <h3 class="h4">📊 Stats</h3>
+                <div class="breakdown-list">
+                    <div class="breakdown-item"><span class="breakdown-label">Total</span><span class="breakdown-count"><%= totalGenerations %></span></div>
+                    <div class="breakdown-item"><span class="breakdown-label">This Month</span><span class="breakdown-count"><%= thisMonth %></span></div>
+                    <div class="breakdown-item"><span class="breakdown-label">Favorites</span><span class="breakdown-count"><%= favorites %></span></div>
+                    <div class="breakdown-item"><span class="breakdown-label">Quick</span><span class="breakdown-count"><%= quickCount %></span></div>
+                    <div class="breakdown-item"><span class="breakdown-label">Bundles</span><span class="breakdown-count"><%= bundleCount %></span></div>
+                    <div class="breakdown-item"><span class="breakdown-label">Campaigns</span><span class="breakdown-count"><%= campaignCount %></span></div>
+                </div>
             </div>
-
             <div class="sidebar-card">
-                <h3 class="h4">🕐 Recent Activity</h3>
+                <h3 class="h4">🕐 Recent</h3>
                 <% if (recent && recent.length > 0) { %>
                     <div class="activity-list">
-                        <% recent.slice(0, 5).forEach(function(item) { %>
+                        <% recent.slice(0,5).forEach(function(item){ %>
                             <a href="/generation/<%= item.id %>" class="activity-item">
-                                <span class="activity-title">
-                                    <% if (item.generation_type === 'campaign') { %>🚀<% } else if (item.generation_type === 'bundle') { %>📦<% } else { %>⚡<% } %>
-                                    <%= item.title || item.input_text.substring(0, 35) %>
-                                </span>
+                                <span class="activity-title"><%= item.title || item.input_text.substring(0,30) %></span>
                                 <span class="activity-meta"><%= new Date(item.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}) %></span>
                             </a>
                         <% }); %>
                     </div>
                     <a href="/history" class="sidebar-link">View all →</a>
                 <% } else { %>
-                    <div class="empty-activity"><p style="font-size:0.85rem;color:var(--secondary);max-width:none;text-align:center;padding:0.5rem 0;">Generate your first copy ✨</p></div>
+                    <p class="sidebar-text">Generate your first content ✨</p>
                 <% } %>
             </div>
         </aside>
@@ -270,195 +292,248 @@
 </div>
 
 <style>
-.results-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;}
-.btn-sm{padding:0.4rem 0.8rem;font-size:0.85rem;}
-.gen-success-msg{background:#d1fae5;color:#065f46;padding:0.75rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-weight:600;font-size:0.9rem;animation:slideDown 0.3s ease-out;}
-@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+/* ====== Mode Tabs ====== */
+.mode-tabs{display:flex;gap:0.35rem;margin-bottom:1.25rem;background:var(--light);padding:0.35rem;border-radius:0.75rem;}
+.mode-tab{flex:1;padding:0.6rem 1rem;border:none;border-radius:0.6rem;background:transparent;font-size:0.85rem;font-weight:600;color:var(--secondary);cursor:pointer;transition:all 0.2s;font-family:inherit;white-space:nowrap;}
+.mode-tab.active{background:var(--white);color:var(--dark);box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+.mode-tab:hover:not(.active){color:var(--dark);}
+.mode-panel{display:none;}
+.mode-panel.active{display:block;animation:fadeIn 0.25s ease-out;}
+.mode-panel-header h2{font-size:1.25rem;margin-bottom:0.2rem;}
+.mode-panel-desc{font-size:0.85rem;color:var(--secondary);margin-bottom:1.25rem;}
 
-/* Mode Selector */
-.mode-selector{display:flex;gap:0.5rem;margin-bottom:1.25rem;flex-wrap:wrap;}
-.mode-btn{flex:1;min-width:180px;display:flex;align-items:center;gap:0.5rem;padding:0.85rem 1rem;border:2px solid var(--border);border-radius:1rem;background:var(--white);cursor:pointer;transition:all 0.2s;text-align:left;position:relative;}
-.mode-btn:hover{border-color:var(--primary);background:var(--primary-light);}
-.mode-btn.active{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 3px rgba(79,70,229,0.15);}
-.mode-icon{font-size:1.5rem;flex-shrink:0;}
-.mode-label{font-size:0.85rem;font-weight:700;color:var(--dark);}
-.mode-badge{position:absolute;top:-6px;right:8px;background:#f59e0b;color:white;font-size:0.6rem;font-weight:700;padding:1px 6px;border-radius:8px;}
+/* ====== Bundle Assets ====== */
+.bundle-assets-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:0.5rem;}
+.bundle-asset-chip{display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:0.6rem;cursor:pointer;transition:all 0.15s;font-size:0.8rem;background:var(--white);user-select:none;}
+.bundle-asset-chip.selected{border-color:var(--primary);background:var(--primary-light);}
+.bundle-asset-chip input{position:absolute;opacity:0;pointer-events:none;}
+.bundle-asset-chip .chip-icon{font-size:1rem;}
+.bundle-asset-chip .chip-label{font-size:0.8rem;font-weight:500;color:var(--dark);}
+.bundle-count{font-size:0.75rem;color:var(--secondary);display:block;text-align:right;}
 
-/* Mode Panels */
-.mode-panel{display:none;padding-top:1.25rem;border-top:1px solid var(--border);margin-top:1.25rem;}
-.mode-panel.active{display:block;animation:fadeSlideIn 0.25s ease-out;}
-@keyframes fadeSlideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+/* ====== Campaign Workspace ====== */
+.campaign-workspace{display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;}
+.campaign-sec-btn{display:inline-flex;align-items:center;gap:0.35rem;padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--white);font-size:0.78rem;font-weight:500;color:var(--secondary);cursor:pointer;transition:all 0.15s;font-family:inherit;}
+.campaign-sec-btn:hover{border-color:var(--primary);color:var(--dark);}
+.campaign-sec-btn.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600;}
+.campaign-section-btns{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.35rem;margin-bottom:1.25rem;}
+.campaign-cta{margin-top:1rem;font-size:1rem;padding:0.8rem;}
 
-.mode-description{font-size:0.9rem;color:var(--secondary);margin-bottom:1rem;max-width:none;}
-.mode-description span{font-weight:700;color:var(--primary);}
+/* ====== Deliverables Panel ====== */
+.deliverables-card{position:sticky;top:5rem;}
+.deliverables-header h3{font-size:1rem;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
+.deliverables-list{display:flex;flex-direction:column;gap:0.2rem;}
+.deliverable-item{font-size:0.82rem;color:var(--secondary);padding:0.25rem 0;}
+.deliverable-item:hover{color:var(--dark);}
+.deliverables-footer{border-top:1px solid var(--border);margin-top:0.75rem;padding-top:0.6rem;}
+.deliverables-count{font-size:0.75rem;font-weight:600;color:var(--primary);}
 
-/* Bundle Grid */
-.bundle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:0.75rem;margin-bottom:1.25rem;}
-.bundle-item{display:flex;align-items:center;gap:0.5rem;padding:0.7rem 0.85rem;border:1px solid var(--border);border-radius:0.75rem;cursor:pointer;transition:all 0.2s;background:var(--white);user-select:none;}
-.bundle-item:hover{border-color:var(--primary);}
-.bundle-item.checked{border-color:var(--primary);background:var(--primary-light);}
-.bundle-checkbox{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;}
-.bundle-icon{font-size:1.1rem;flex-shrink:0;}
-.bundle-label{font-size:0.82rem;font-weight:600;color:var(--dark);}
+/* ====== Custom Field Reusable ====== */
+.custom-select-wrap{display:flex;flex-direction:column;gap:0.5rem;}
+.custom-field-hidden{display:none;max-height:0;overflow:hidden;transition:all 0.3s ease;}
+.custom-field-visible{display:block;max-height:120px;}
+.custom-field-hidden textarea{width:100%;padding:0.55rem 0.7rem;border:1px solid var(--border);border-radius:0.6rem;font-size:0.82rem;font-family:inherit;transition:border-color 0.2s;resize:vertical;background:var(--white);}
+.custom-field-hidden textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
 
-/* Campaign Card */
-.campaign-card{border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1.25rem;background:linear-gradient(135deg,#f5f3ff,var(--white));}
-.campaign-header{margin-bottom:0.75rem;}
-.campaign-badge{display:inline-block;background:#f59e0b;color:white;font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:6px;}
-.campaign-desc{font-size:0.9rem;color:var(--secondary);max-width:none;margin-bottom:1rem;line-height:1.6;}
-.campaign-channels{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:0.5rem;margin-bottom:1rem;}
-.campaign-channel{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.6rem;background:var(--white);border:1px solid var(--border);border-radius:0.5rem;font-size:0.8rem;font-weight:500;color:var(--dark);}
-.campaign-estimate{padding:0.75rem;background:var(--white);border:1px solid var(--border);border-radius:0.5rem;font-size:0.85rem;color:var(--secondary);text-align:center;}
-
-/* Shared Inputs */
-.shared-inputs{margin-bottom:0.5rem;}
-.form-grid-3{grid-template-columns:1fr 1fr 1fr;}
-.field-optional{font-size:0.75rem;color:var(--secondary);font-weight:400;}
-
-/* Premium result card */
-.premium-card{border:1px solid var(--border);border-radius:1rem;padding:1.5rem;margin-bottom:1rem;background:var(--white);transition:all 0.2s;position:relative;}
+/* ====== Shared Styles ====== */
+.quick-actions{margin-bottom:1.5rem;}
+.section-sm-title{font-size:0.9rem;font-weight:700;color:var(--secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.75rem;}
+.quick-actions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;}
+.qa-card{display:flex;flex-direction:column;align-items:center;gap:0.35rem;padding:1.25rem 0.75rem;border:1px solid var(--border);border-radius:1rem;text-decoration:none;transition:all 0.2s;background:var(--white);}
+.qa-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);}
+.qa-icon{font-size:1.5rem;}
+.qa-label{font-size:0.8rem;font-weight:600;color:var(--dark);text-align:center;}
+.qa-campaign:hover{border-color:var(--primary);background:var(--primary-light);}
+.qa-quick:hover{border-color:#059669;background:#d1fae5;}
+.qa-brain:hover{border-color:#7c3aed;background:#f5f3ff;}
+.qa-history:hover{border-color:#d97706;background:#fffbeb;}
+.results-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;}
+.gen-success-msg{background:#d1fae5;color:#065f46;padding:0.5rem 1rem;border-radius:0.5rem;margin-bottom:1rem;font-weight:600;font-size:0.85rem;animation:slideDown 0.3s;}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes cardFadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.premium-card{border:1px solid var(--border);border-radius:1rem;padding:1.25rem;margin-bottom:0.75rem;background:var(--white);transition:all 0.2s;}
 .premium-card:hover{box-shadow:var(--shadow-lg);border-color:var(--primary);}
-.result-variation-label{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.5rem;}
-.result-tone-badge{display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.7rem;font-weight:700;text-transform:uppercase;padding:0.2rem 0.6rem;border-radius:4px;margin-bottom:0.75rem;}
-.result-body{font-size:0.95rem;color:var(--dark);line-height:1.7;margin-bottom:1rem;}
-.result-card-actions{display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.75rem;}
-.result-action-btn{display:flex;align-items:center;gap:0.35rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.4rem 0.8rem;font-size:0.85rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500;}
+.result-variation-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.35rem;}
+.result-tone-badge{display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:0.15rem 0.5rem;border-radius:4px;margin-bottom:0.5rem;}
+.result-body{font-size:0.9rem;color:var(--dark);line-height:1.6;margin-bottom:0.75rem;}
+.result-card-actions{display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem;}
+.result-action-btn{display:flex;align-items:center;gap:0.3rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500;font-family:inherit;}
 .result-action-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light);}
 .result-action-btn.copied{background:var(--success);color:white;border-color:var(--success);}
-
-/* Usage bar */
-.usage-bar-wrap{display:flex;flex-direction:column;gap:0.35rem;align-items:flex-end;min-width:160px;}
-.usage-bar{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
-.usage-bar-fill{height:100%;border-radius:3px;transition:width 0.5s ease-out;background:var(--success);}
-.usage-bar-fill.orange{background:#f59e0b;}
-.usage-bar-fill.red{background:#ef4444;}
-.usage-text{font-size:0.8rem;color:var(--secondary);}
-
-/* Skeleton */
-.result-card.skeleton{padding:1.5rem;}
-.skeleton-line{height:12px;background:linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;margin-bottom:0.75rem;}
-.skeleton-line:last-child{margin-bottom:0;}
-.w-40{width:40%}.w-60{width:60%}.w-80{width:80%}.w-90{width:90%}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-@keyframes cardFadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-
-/* Empty state */
-.empty-state-sm{text-align:center;padding:3rem 1rem;}
-.empty-icon-sm{font-size:3rem;margin-bottom:0.75rem;}
-.empty-state-sm h3{font-size:1.1rem;margin-bottom:0.25rem;}
-.empty-state-sm p{font-size:0.9rem;color:var(--secondary);max-width:none;}
-
-/* Toast */
-.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:var(--white);padding:0.75rem 1.5rem;border-radius:0.75rem;font-size:0.9rem;font-weight:500;z-index:9999;opacity:0;transition:all 0.3s;box-shadow:var(--shadow-xl);white-space:nowrap;}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
+.usage-bar-wrap{display:flex;flex-direction:column;gap:0.25rem;align-items:flex-end;min-width:120px;}
+.usage-bar{width:100%;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+.usage-bar-fill{height:100%;border-radius:3px;transition:width 0.5s;background:var(--success);}
+.usage-bar-fill.orange{background:#f59e0b;}.usage-bar-fill.red{background:#ef4444;}
+.usage-text{font-size:0.75rem;color:var(--secondary);}
+@media(max-width:992px){
+    .campaign-workspace{grid-template-columns:1fr;}
+    .deliverables-card{position:static;}
+}
 @media(max-width:768px){
-  .form-grid-3{grid-template-columns:1fr;}
-  .mode-btn{min-width:100%;}
-  .bundle-grid{grid-template-columns:repeat(2,1fr);}
-  .campaign-channels{grid-template-columns:repeat(2,1fr);}
+    .quick-actions-grid{grid-template-columns:repeat(2,1fr);}
+    .form-grid-3{grid-template-columns:1fr;}
+    .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
+    .mode-tab{font-size:0.75rem;padding:0.5rem 0.6rem;}
 }
 </style>
 
 <script>
-// Dynamic greeting
 (function(){
-  var h=new Date().getHours();
-  var g='Welcome back';
+  // Greeting
+  var h=new Date().getHours(),g='Welcome back';
   if(h<12)g='Good morning';else if(h<17)g='Good afternoon';else if(h<22)g='Good evening';
   document.getElementById('greeting').textContent=g;
-})();
 
-// Progress bar color
-(function(){
+  // Usage bar color
   var f=document.getElementById('usageFill');
   if(f){var p=parseFloat(f.style.width);if(p>90)f.classList.add('red');else if(p>60)f.classList.add('orange');}
-})();
 
-// Mode switching
-function switchMode(mode){
-  document.querySelectorAll('.mode-btn').forEach(function(b){b.classList.toggle('active',b.dataset.mode===mode);});
-  document.querySelectorAll('.mode-panel').forEach(function(p){p.classList.toggle('active',p.id==='mode'+mode.charAt(0).toUpperCase()+mode.slice(1));});
-  document.getElementById('generationType').value=mode;
-}
-
-// Bundle counter
-function updateBundleCount(){
-  var count=document.querySelectorAll('.bundle-checkbox:checked').length;
-  document.getElementById('bundleCount').textContent=count+' asset'+(count!==1?'s':'')+' selected';
-}
-
-// Generate Quick
-function generate(type){
-  var btn=event.target;btn.disabled=true;btn.innerHTML='⏳ Generating…';
-  var skel=document.getElementById('loadingSkeleton'),res=document.getElementById('resultsArea'),empty=document.getElementById('emptyState');
-  if(skel)skel.style.display='block';if(res)res.innerHTML='';if(empty)empty.style.display='none';
-  
-  var data=new URLSearchParams();
-  data.append('productDescription',document.getElementById('productDescription').value);
-  data.append('targetAudience',document.getElementById('targetAudience').value);
-  data.append('contentType',document.getElementById('quickContentType').value);
-  data.append('tone',document.getElementById('quickTone').value);
-  data.append('brandVoice',document.getElementById('brandVoice').value);
-  data.append('goal',document.getElementById('goal').value);
-  data.append('generationType','quick');
-
-  fetch('/dashboard/generate',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},body:data.toString()})
-  .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Failed');return d;});})
-  .then(function(d){renderResults(d);btn.disabled=false;btn.innerHTML='⚡ Generate Copy';})
-  .catch(function(e){skel.style.display='none';btn.disabled=false;btn.innerHTML='⚡ Generate Copy';res.innerHTML='<div class="alert alert-error">'+e.message+'</div>';});
-}
-
-function generateBundle(){showToast('📦 Bundle generation coming in Sprint 2');}
-function generateCampaign(){showToast('🚀 Campaign generation coming in Sprint 2');}
-
-function renderResults(data){
-  var skel=document.getElementById('loadingSkeleton'),res=document.getElementById('resultsArea');
-  if(skel)skel.style.display='none';
-  var html='<div class="results-container mt-5"><div class="results-header"><h2 class="h3 mb-4">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All History →</a></div>';
-  html+='<div class="gen-success-msg">✓ Content generated successfully</div><div class="results-grid">';
-  data.results.forEach(function(r,i){
-    html+='<div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out '+(i*0.1)+'s both;">';
-    html+='<div class="result-variation-label">Variation '+(i+1)+'</div>';
-    html+='<div class="result-tone-badge">'+r.tone+'</div>';
-    html+='<div class="result-body">'+r.text.replace(/\n/g,'<br>')+'</div>';
-    html+='<div class="result-card-actions">';
-    html+='<button class="result-action-btn" onclick="copyText(\''+r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n')+'\',this)" aria-label="Copy">📋 <span>Copy</span></button>';
-    html+='</div></div>';
+  // ====== Mode Tabs ======
+  var tabs=document.querySelectorAll('.mode-tab');
+  tabs.forEach(function(t){
+    t.addEventListener('click',function(){
+      tabs.forEach(function(t2){t2.classList.remove('active');});
+      t.classList.add('active');
+      document.querySelectorAll('.mode-panel').forEach(function(p){p.classList.remove('active');});
+      var panel=document.getElementById('mode-'+t.getAttribute('data-mode'));
+      if(panel)panel.classList.add('active');
+    });
   });
-  html+='</div></div>';
-  res.innerHTML=html;
 
-  // Update stats
-  var el=document.getElementById('totalGens');if(el)el.textContent=data.totalGenerations;
-  document.querySelectorAll('.stat-value').forEach(function(s){if(s.textContent==='0'||parseInt(s.textContent)>=0){}});
-  
-  // Update usage bar
-  var fill=document.getElementById('usageFill'),p=Math.min((data.generationsUsed/data.monthlyLimit)*100,100);
-  if(fill){fill.style.width=p+'%';fill.classList.remove('orange','red');if(p>90)fill.classList.add('red');else if(p>60)fill.classList.add('orange');}
-  var ut=document.querySelector('.usage-text');if(ut)ut.textContent=data.generationsUsed+' / '+data.monthlyLimit+' Used';
-
-  setTimeout(function(){var msg=document.querySelector('.gen-success-msg');if(msg){msg.style.opacity='0';msg.style.transition='opacity 0.5s';}},2000);
-}
-
-function copyText(text,btn){
-  navigator.clipboard.writeText(text).then(function(){
-    btn.classList.add('copied');btn.innerHTML='✅ <span>Copied!</span>';
-    setTimeout(function(){btn.classList.remove('copied');btn.innerHTML='📋 <span>Copy</span>';},2000);
+  // ====== Custom Dropdowns ======
+  document.querySelectorAll('[data-custom]').forEach(function(select){
+    var wrapId=select.getAttribute('data-custom');
+    var wrap=document.getElementById(wrapId);
+    if(!wrap)return;
+    function toggle(){
+      if(select.value.toLowerCase()==='custom'){wrap.classList.add('custom-field-visible');}
+      else{wrap.classList.remove('custom-field-visible');}
+    }
+    select.addEventListener('change',toggle);
+    toggle();
   });
-}
 
-function showToast(msg){
-  var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);
-  setTimeout(function(){t.classList.add('show');},10);
-  setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove();},300);},2500);
-}
+  // ====== Campaign Section Buttons ======
+  var sections = <%= JSON.stringify(campaignSections) %>;
+  var secBtns=document.querySelectorAll('.campaign-sec-btn');
+  var titleEl=document.getElementById('deliverables-title');
+  var listEl=document.getElementById('deliverables-list');
+  var countEl=document.getElementById('deliverables-count');
+  secBtns.forEach(function(btn){
+    btn.addEventListener('click',function(){
+      secBtns.forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active');
+      var id=btn.getAttribute('data-section');
+      var sec=sections.find(function(s){return s.id===id;});
+      if(sec){
+        titleEl.textContent=sec.icon+' '+sec.label+' Includes';
+        listEl.innerHTML=sec.deliverables.map(function(d){return '<div class="deliverable-item">• '+d+'</div>';}).join('');
+        countEl.textContent=sec.deliverables.length+' assets';
+      }
+    });
+  });
 
-// Bundle init
-updateBundleCount();
+  // ====== Bundle Asset Selection ======
+  var chips=document.querySelectorAll('.bundle-asset-chip');
+  var countEls=document.getElementById('bundleCount');
+  function updateBundleCount(){
+    var c=document.querySelectorAll('.bundle-asset-chip.selected').length;
+    if(countEls)countEls.textContent=c+' of '+chips.length+' selected';
+  }
+  chips.forEach(function(chip){
+    chip.addEventListener('click',function(e){
+      var inp=chip.querySelector('input[type="checkbox"]');
+      if(e.target===inp)return;
+      inp.checked=!inp.checked;
+      chip.classList.toggle('selected',inp.checked);
+      updateBundleCount();
+    });
+    var inp=chip.querySelector('input');
+    inp.addEventListener('change',function(){chip.classList.toggle('selected',inp.checked);updateBundleCount();});
+  });
+  updateBundleCount();
 
-// IntersectionObserver
-(function(){
+  // ====== Form Submission (AJAX) ======
+  document.querySelectorAll('.gen-form').forEach(function(form){
+    form.addEventListener('submit',function(e){
+      e.preventDefault();
+      var mode=form.getAttribute('data-mode');
+      var btn=form.querySelector('.gen-btn');
+      var skel=mode==='quick'?form.closest('.mode-panel').querySelector('.loading-skeleton'):null;
+      var resArea=mode==='quick'?form.closest('.mode-panel').querySelector('.results-area-quick'):
+                   mode==='bundle'?form.closest('.mode-panel').querySelector('.results-area-bundle'):
+                   form.closest('.mode-panel').querySelector('.results-area-campaign');
+      btn.disabled=true;btn.textContent='⏳';
+      if(skel)skel.style.display='block';
+      if(resArea)resArea.innerHTML='';
+
+      var d=new URLSearchParams();
+      if(mode==='quick'){
+        d.append('productDescription',document.getElementById('quickProduct').value);
+        d.append('contentType',document.getElementById('quickContentType').value);
+        d.append('tone',document.getElementById('quickTone').value);
+        d.append('generationType','quick');
+      } else if(mode==='bundle'){
+        d.append('productDescription',document.getElementById('bundleProduct').value);
+        var aud=document.getElementById('bundleTargetAudience');
+        d.append('targetAudience',aud.value==='Custom'?document.querySelector('#bundle-audience-custom textarea').value:aud.value);
+        var tone=document.getElementById('bundleVoice');
+        d.append('tone',tone.value==='Custom'?document.querySelector('#bundle-voice-custom textarea').value:tone.value);
+        var checked=[];
+        document.querySelectorAll('#mode-bundle input[name="assets"]:checked').forEach(function(cb){checked.push(cb.value);});
+        d.append('assets',checked.join(','));
+        d.append('generationType','bundle');
+      } else if(mode==='campaign'){
+        d.append('productDescription',document.getElementById('campaignProduct').value);
+        var aud=document.getElementById('campaignTargetAudience');
+        d.append('targetAudience',aud.value==='Custom'?document.querySelector('#campaign-audience-custom textarea').value:aud.value);
+        var tone=document.getElementById('campaignVoice');
+        d.append('tone',tone.value==='Custom'?document.querySelector('#campaign-voice-custom textarea').value:tone.value);
+        var goal=document.getElementById('campaignGoal');
+        d.append('goal',goal.value==='Custom'?document.querySelector('#campaign-goal-custom textarea').value:goal.value);
+        var activeSec=document.querySelector('.campaign-sec-btn.active');
+        d.append('campaignSections',activeSec?activeSec.getAttribute('data-section'):'email');
+        d.append('generationType','campaign');
+      }
+
+      fetch('/dashboard/generate',{
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        body:d.toString()
+      })
+      .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Failed');return d;});})
+      .then(function(d){
+        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
+        if(skel)skel.style.display='none';
+        var h='<div class="results-container mt-5"><div class="results-header"><h2 class="h3">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All →</a></div><div class="gen-success-msg">✓ Done</div><div class="results-grid">';
+        d.results.forEach(function(r,i){
+          h+='<div class="premium-card" style="animation:cardFadeIn 0.3s ease-out '+(i*0.1)+'s both;"><div class="result-variation-label">Variation '+(i+1)+'</div><div class="result-tone-badge">'+r.tone+'</div><div class="result-body">'+r.text.replace(/\n/g,'<br>')+'</div><div class="result-card-actions"><button class="result-action-btn" onclick="copyText(\''+r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n')+'\',this)">📋 <span>Copy</span></button></div></div>';
+        });
+        h+='</div></div>';
+        if(resArea)resArea.innerHTML=h;
+        // Update usage bar
+        var fill=document.getElementById('usageFill');
+        var pt=Math.min((d.generationsUsed/d.monthlyLimit)*100,100);
+        if(fill){fill.style.width=pt+'%';fill.classList.remove('orange','red');if(pt>90)fill.classList.add('red');else if(pt>60)fill.classList.add('orange');}
+        setTimeout(function(){var m=document.querySelector('.gen-success-msg');if(m){m.style.opacity='0';m.style.transition='opacity 0.5s';}},2000);
+      })
+      .catch(function(e){
+        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
+        if(skel)skel.style.display='none';
+        if(resArea)resArea.innerHTML='<div class="alert alert-error">'+e.message+'</div>';
+      });
+    });
+  });
+
+  // Copy function
+  window.copyText=function(t,b){
+    navigator.clipboard.writeText(t).then(function(){
+      b.classList.add('copied');b.innerHTML='✅ <span>Copied!</span>';
+      setTimeout(function(){b.classList.remove('copied');b.innerHTML='📋 <span>Copy</span>';},2000);
+    });
+  };
+
+  // Fade-in
   var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
   document.querySelectorAll('.fade-in').forEach(function(e){o.observe(e);});
 })();

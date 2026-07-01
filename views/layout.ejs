@@ -11,109 +11,67 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✍️</text></svg>">
 </head>
 <body>
+    <!-- Top Nav -->
     <nav class="navbar">
         <div class="container">
+            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
             <a href="/" class="logo">CopyQuick</a>
-            <button class="hamburger" id="hamburger" aria-label="Open menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-            <% if (!locals.user) { %>
-                <a href="/signup" class="btn btn-primary mobile-cta">Get Started</a>
-            <% } %>
+            <div class="nav-right">
+                <% if (locals.user) { %>
+                    <a href="/dashboard" class="nav-link">Dashboard</a>
+                    <a href="/profile" class="nav-link"><%= user.name || 'Profile' %></a>
+                    <form action="/logout" method="POST" style="display:inline;">
+                        <button type="submit" class="btn-link nav-link">Logout</button>
+                    </form>
+                <% } else { %>
+                    <a href="/login" class="nav-link">Login</a>
+                    <a href="/signup" class="btn btn-primary" style="padding:0.45rem 1rem;font-size:0.85rem;">Get Started</a>
+                <% } %>
+            </div>
         </div>
     </nav>
 
-    <!-- Full-screen mobile overlay -->
-    <div class="mobile-overlay" id="mobileOverlay">
-        <div class="mobile-overlay-header">
-            <a href="/" class="logo">CopyQuick</a>
-            <button class="mobile-overlay-close" id="menuClose" aria-label="Close menu">✕</button>
-        </div>
-        <nav class="mobile-overlay-nav">
-            <ul>
-                <li><a href="/#features" class="mobile-nav-link">Features</a></li>
-                <li><a href="/#campaign-studio" class="mobile-nav-link">Campaign Studio™</a></li>
-                <li><a href="/#pricing" class="mobile-nav-link">Pricing</a></li>
-                <li><a href="/about" class="mobile-nav-link">About</a></li>
-                <li><a href="/blog" class="mobile-nav-link">Blog</a></li>
-                <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
-                <% if (locals.user) { %>
-                    <li><a href="/dashboard" class="mobile-nav-link">Dashboard</a></li>
-                    <li><a href="/profile" class="mobile-nav-link">Profile</a></li>
-                    <li class="nav-divider"></li>
-                    <li>
-                        <form action="/logout" method="POST">
-                            <button type="submit" class="mobile-nav-link logout-btn">Logout</button>
-                        </form>
-                    </li>
-                <% } else { %>
-                    <li><a href="/login" class="mobile-nav-link">Login</a></li>
-                    <li class="nav-divider"></li>
-                    <li>
-                        <a href="/signup" class="mobile-nav-cta-btn">
-                            <span>Get Started Free</span>
-                            <span class="arrow">→</span>
-                        </a>
-                    </li>
-                <% } %>
-            </ul>
+    <!-- Sidebar -->
+    <% if (locals.user) { %>
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <a href="/dashboard" class="sidebar-link <%= currentPage === 'dashboard' ? 'active' : '' %>">
+                <span class="sidebar-icon">📊</span> Dashboard
+            </a>
+            <a href="/brand-brain" class="sidebar-link <%= currentPage === 'brand-brain' ? 'active' : '' %>">
+                <span class="sidebar-icon">🧠</span> Brand Brain™
+            </a>
+            <a href="/campaign-studio" class="sidebar-link <%= currentPage === 'campaign-studio' ? 'active' : '' %>">
+                <span class="sidebar-icon">🚀</span> Campaign Studio™
+            </a>
+            <a href="/history" class="sidebar-link <%= currentPage === 'history' ? 'active' : '' %>">
+                <span class="sidebar-icon">📜</span> History
+            </a>
+            <a href="/favorites" class="sidebar-link <%= currentPage === 'favorites' ? 'active' : '' %>">
+                <span class="sidebar-icon">⭐</span> Favorites
+            </a>
+            <div class="sidebar-divider"></div>
+            <a href="/profile" class="sidebar-link <%= currentPage === 'profile' ? 'active' : '' %>">
+                <span class="sidebar-icon">⚙️</span> Settings
+            </a>
         </nav>
-    </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <% } %>
 
-    <div class="overlay-backdrop" id="overlayBackdrop"></div>
-
-    <script>
-        (function() {
-            var hamburger = document.getElementById('hamburger');
-            var overlay = document.getElementById('mobileOverlay');
-            var backdrop = document.getElementById('overlayBackdrop');
-            var closeBtn = document.getElementById('menuClose');
-
-            function openMenu() {
-                overlay.classList.add('open');
-                backdrop.classList.add('visible');
-                document.body.classList.add('no-scroll');
-            }
-
-            function closeMenu() {
-                overlay.classList.remove('open');
-                backdrop.classList.remove('visible');
-                document.body.classList.remove('no-scroll');
-            }
-
-            if (hamburger) hamburger.addEventListener('click', openMenu);
-            if (closeBtn) closeBtn.addEventListener('click', closeMenu);
-            if (backdrop) backdrop.addEventListener('click', closeMenu);
-
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && overlay && overlay.classList.contains('open')) {
-                    closeMenu();
-                }
-            });
-
-            // Close menu when a link is clicked
-            if (overlay) {
-                overlay.querySelectorAll('a, button[type="submit"]').forEach(function(el) {
-                    el.addEventListener('click', function() {
-                        closeMenu();
-                    });
-                });
-            }
-        })();
-    </script>
-
-    <main>
+    <!-- Main Content -->
+    <main class="main-content <%= locals.user ? 'has-sidebar' : '' %>">
         <%- body %>
     </main>
 
+    <!-- Footer (only for public pages) -->
+    <% if (!locals.user) { %>
     <footer class="footer">
         <div class="container">
             <div class="footer-grid">
                 <div class="footer-brand">
                     <h3>CopyQuick</h3>
-                    <p>AI-powered marketing copy in seconds. Generate high-converting content for your business instantly.</p>
+                    <p>AI-powered marketing platform. Generate content and campaigns for your business instantly.</p>
                 </div>
                 <div class="footer-col">
                     <h4>Product</h4>
@@ -145,12 +103,32 @@
             <div class="footer-bottom">
                 <p>&copy; 2026 CopyQuick. All rights reserved.</p>
                 <div class="footer-social">
-                    <a href="#" aria-label="Twitter" target="_blank" rel="noopener">𝕏</a>
-                    <a href="#" aria-label="LinkedIn" target="_blank" rel="noopener">in</a>
-                    <a href="#" aria-label="GitHub" target="_blank" rel="noopener">⌂</a>
+                    <a href="#" aria-label="Twitter">𝕏</a>
+                    <a href="#" aria-label="LinkedIn">in</a>
+                    <a href="#" aria-label="GitHub">⌂</a>
                 </div>
             </div>
         </div>
     </footer>
+    <% } %>
+
+    <script>
+    // Sidebar toggle
+    (function(){
+        var toggle = document.getElementById('sidebarToggle');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', function() {
+                sidebar.classList.toggle('open');
+                if (overlay) overlay.classList.toggle('visible');
+            });
+            if (overlay) overlay.addEventListener('click', function() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('visible');
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

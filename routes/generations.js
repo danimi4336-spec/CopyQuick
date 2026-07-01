@@ -36,10 +36,11 @@ router.get('/dashboard', requireAuth, (req, res) => {
 
 // ====== Generate Copy ======
 router.post('/dashboard/generate', requireAuth, (req, res) => {
-  const { productDescription, targetAudience, contentType, tone } = req.body;
+  const { productDescription, targetAudience, contentType, tone, generationType, assets, goal, campaignSections } = req.body;
   const db = getDb();
   const user = res.locals.user;
   const isAjax = req.xhr || req.headers.accept?.includes('json');
+  const genType = generationType || 'quick';
 
   if (user.generations_used >= user.monthly_limit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
@@ -59,16 +60,55 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   }
 
   try {
-    const results = generateCopy({ productDescription, targetAudience, contentType, tone });
-    const resultsJson = JSON.stringify(results);
-    const wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
-    const title = productDescription.length > 60 ? productDescription.substring(0, 60) + '...' : productDescription;
+    let results = [];
+    let wordCount = 0;
+    let title = productDescription ? (productDescription.length > 60 ? productDescription.substring(0, 60) + '...' : productDescription) : '';
 
+    if (genType === 'quick') {
+      results = generateCopy({ productDescription, targetAudience, contentType, tone });
+      wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+    } else if (genType === 'bundle') {
+      // Generate for each selected asset
+      const selectedAssets = assets ? assets.split(',') : [];
+      selectedAssets.forEach(asset => {
+        const [typeId, label] = asset.split(':');
+        const assetResults = generateCopy({ productDescription, targetAudience, contentType: typeId, tone });
+        results.push(...assetResults.map(r => ({ ...r, assetLabel: label, assetType: typeId })));
+      });
+      wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+      if (results.length === 0) {
+        // Generate a default set if no assets selected
+        results = generateCopy({ productDescription, targetAudience, contentType: 'sales_message', tone });
+        wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+      }
+    } else if (genType === 'campaign') {
+      // Generate campaign content based on selected sections
+      const activeSections = campaignSections || 'email';
+      const sectionList = activeSections.split(',');
+      sectionList.forEach(sectionId => {
+        const section = campaignSections.find(s => s.id === sectionId);
+        if (section) {
+          section.deliverables.forEach((deliverable, idx) => {
+            results.push({
+              text: `[${section.label}] ${deliverable}\n\nBased on your product "${productDescription}"${targetAudience ? ' targeting ' + targetAudience : ''} with goal: ${goal || 'Increase Sales'}.\n\nThis ${deliverable.toLowerCase()} for the ${section.label.toLowerCase()} channel will be generated in Build #3 when the full AI campaign engine goes live. Your Brand Brain data and campaign settings have been saved for a seamless transition.`,
+              tone: tone || 'Professional',
+              assetLabel: deliverable,
+              assetType: sectionId
+            });
+          });
+        }
+      });
+      wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
+    }
+
+    const resultsJson = JSON.stringify(results);
+    const contentTypeVal = genType === 'quick' ? (contentType || 'sales_message') : genType;
+    
     const stmt = db.prepare(`
-      INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(user.id, title, productDescription, contentType, tone, resultsJson, wordCount);
+    const result = stmt.run(user.id, title, productDescription, contentTypeVal, tone || 'Professional', resultsJson, wordCount, goal || '', genType);
     const genId = result.lastInsertRowid;
 
     db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
@@ -104,7 +144,8 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       recent, typeBreakdown,
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
       input: { productDescription, targetAudience, contentType, tone },
-      genId
+      genId,
+      genMode: genType
     });
   } catch (err) {
     console.error(err);
