@@ -85,6 +85,61 @@
         </div>
     </section>
 
+    <!-- ===== BUILDER GOALS (persistent welcome cards) ===== -->
+    <section class="bc-goals fade-in">
+        <h2 class="bc-section-title"><%= builderGoal ? '🎯 Your Goal: ' + goalLabels[builderGoal] : '👋 What would you like to build today?' %></h2>
+        <% if (builderGoal) { %><p class="bc-goals-sub">You can update your goal anytime — it helps CopyQuick personalize your recommendations.</p><% } %>
+        <form action="/dashboard/update-goal" method="POST" class="bc-goals-form">
+            <div class="builder-goals-grid">
+                <label class="builder-goal-card <%= builderGoal === 'launch_product' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="launch_product" class="goal-radio" <%= builderGoal === 'launch_product' ? 'checked' : '' %>>
+                    <span class="goal-icon">🚀</span>
+                    <span class="goal-title">Launch a New Product</span>
+                    <span class="goal-desc">Generate copy for your product launch across all channels</span>
+                </label>
+                <label class="builder-goal-card <%= builderGoal === 'grow_business' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="grow_business" class="goal-radio" <%= builderGoal === 'grow_business' ? 'checked' : '' %>>
+                    <span class="goal-icon">📈</span>
+                    <span class="goal-title">Grow My Existing Business</span>
+                    <span class="goal-desc">Create marketing content to attract more customers</span>
+                </label>
+                <label class="builder-goal-card <%= builderGoal === 'start_store' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="start_store" class="goal-radio" <%= builderGoal === 'start_store' ? 'checked' : '' %>>
+                    <span class="goal-icon">🛒</span>
+                    <span class="goal-title">Start an Online Store</span>
+                    <span class="goal-desc">Build product descriptions, ads, and email campaigns</span>
+                </label>
+                <label class="builder-goal-card <%= builderGoal === 'promote_service' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="promote_service" class="goal-radio" <%= builderGoal === 'promote_service' ? 'checked' : '' %>>
+                    <span class="goal-icon">💼</span>
+                    <span class="goal-title">Promote My Service</span>
+                    <span class="goal-desc">Create compelling copy for your service-based business</span>
+                </label>
+                <label class="builder-goal-card <%= builderGoal === 'build_brand' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="build_brand" class="goal-radio" <%= builderGoal === 'build_brand' ? 'checked' : '' %>>
+                    <span class="goal-icon">✨</span>
+                    <span class="goal-title">Build My Brand</span>
+                    <span class="goal-desc">Establish your brand voice across all marketing touchpoints</span>
+                </label>
+                <label class="builder-goal-card <%= builderGoal === 'campaigns' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="campaigns" class="goal-radio" <%= builderGoal === 'campaigns' ? 'checked' : '' %>>
+                    <span class="goal-icon">📢</span>
+                    <span class="goal-title">Generate Marketing Campaigns</span>
+                    <span class="goal-desc">Create complete multi-channel campaigns from one idea</span>
+                </label>
+                <label class="builder-goal-card builder-goal-card-wide <%= builderGoal === 'other' ? 'selected' : '' %>">
+                    <input type="radio" name="goal" value="other" class="goal-radio" <%= builderGoal === 'other' ? 'checked' : '' %>>
+                    <span class="goal-icon">💡</span>
+                    <span class="goal-title">Something Else</span>
+                    <span class="goal-desc">I'll figure it out as I go</span>
+                </label>
+            </div>
+            <div class="bc-goals-action">
+                <button type="submit" class="btn btn-primary btn-lg">Let's Get Started →</button>
+            </div>
+        </form>
+    </section>
+
     <!-- ===== SECTION 4: Builder Journey Progress ===== -->
     <section class="bc-journey fade-in">
         <h2 class="bc-section-title">Your Builder Journey</h2>
@@ -370,6 +425,22 @@
 .bc-usage-fill{height:100%;border-radius:2px;transition:width 0.5s;background:var(--success);}
 .bc-usage-text{font-size:0.7rem;color:var(--secondary);display:block;text-align:right;}
 
+/* ===== Builder Goals ===== */
+.bc-goals{margin-bottom:2.5rem;}
+.bc-goals-sub{font-size:0.8rem;color:var(--secondary);margin:-0.5rem 0 1rem;}
+.builder-goals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;max-width:750px;}
+.builder-goal-card{display:flex;flex-direction:column;gap:0.2rem;padding:1.25rem 1rem;border:2px solid var(--border);border-radius:1rem;cursor:pointer;transition:all 0.2s;background:var(--white);}
+.builder-goal-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(79,70,229,0.1);}
+.builder-goal-card.selected{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 3px rgba(79,70,229,0.15);}
+.goal-radio{position:absolute;opacity:0;pointer-events:none;}
+.goal-icon{font-size:1.5rem;margin-bottom:0.15rem;}
+.goal-title{font-size:0.85rem;font-weight:700;color:var(--dark);}
+.goal-desc{font-size:0.72rem;color:var(--secondary);max-width:none;line-height:1.35;}
+.builder-goal-card-wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:0.6rem;padding:0.75rem 1rem;}
+.builder-goal-card-wide .goal-icon{font-size:1.2rem;margin-bottom:0;}
+.builder-goal-card-wide .goal-desc{flex:1;}
+.bc-goals-action{margin-top:1rem;}
+
 /* ===== Recommendation ===== */
 .bc-recommendation{margin-bottom:2.5rem;}
 .bc-rec-card{display:flex;align-items:center;gap:1rem;padding:0.9rem 1.25rem;background:var(--primary-light);border:1px solid rgba(79,70,229,0.15);border-radius:0.9rem;transition:all 0.2s;}
@@ -472,6 +543,7 @@
     .bc-welcome{flex-direction:column;align-items:flex-start;gap:1rem;}
     .bc-welcome-right{width:100%;}
     .bc-modes-grid{grid-template-columns:1fr;}
+    .builder-goals-grid{grid-template-columns:1fr;max-width:400px;}
     .form-grid-3,.form-grid-2{grid-template-columns:1fr;}
     .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
     .bc-journey-track{gap:0.35rem;}

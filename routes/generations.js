@@ -5,6 +5,16 @@ const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 
+const goalLabels = {
+  launch_product: 'Launch a New Product',
+  grow_business: 'Grow My Existing Business',
+  start_store: 'Start an Online Store',
+  promote_service: 'Promote My Service',
+  build_brand: 'Build My Brand',
+  campaigns: 'Generate Marketing Campaigns',
+  other: 'Something Else'
+};
+
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
   const db = getDb();
@@ -54,9 +64,20 @@ router.get('/dashboard', requireAuth, (req, res) => {
     bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
     brain, brainPct, brainFilled,
     journey,
+    goalLabels,
     builderGoal: user.builder_goal || '',
     currentPage: 'dashboard'
   });
+});
+
+// ====== Update Builder Goal ======
+router.post('/dashboard/update-goal', requireAuth, (req, res) => {
+  const { goal } = req.body;
+  if (goal) {
+    const db = getDb();
+    db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
+  }
+  res.redirect('/dashboard');
 });
 
 // ====== Generate Copy ======
