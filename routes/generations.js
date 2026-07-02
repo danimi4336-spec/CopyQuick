@@ -4,7 +4,7 @@ const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
-const { getGroupsWithJourneys, getJourney } = require('../lib/businessJourneys');
+const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -110,6 +110,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
                    firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
         goalLabels: goalLabels,
         journeyGroupsData: getGroupsWithJourneys(),
+        journeysData: JSON.stringify(getAllJourneys()),
         builderGoal: '',
         currentPage: 'dashboard'
       });
@@ -164,6 +165,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       journey: journeySafe,
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
+      journeysData: JSON.stringify(getAllJourneys()),
       builderGoal: user.builder_goal || '',
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
@@ -263,6 +265,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       journey: journeySafe,
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
+      journeysData: JSON.stringify(getAllJourneys()),
       builderGoal: updatedUser.builder_goal || '',
       input: { productDescription, targetAudience, contentType, tone },
       genId,
@@ -289,6 +292,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       journey: journeySafe,
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
+      journeysData: JSON.stringify(getAllJourneys()),
       builderGoal: user.builder_goal || ''
     });
   }
