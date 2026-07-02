@@ -4,6 +4,7 @@ const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
+const { getGroupsWithJourneys, getJourney } = require('../lib/businessJourneys');
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -86,6 +87,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
       brain: brain, brainPct: brainPct, brainFilled: brainFilled,
       journey: journey,
       goalLabels: goalLabels,
+      journeyGroupsData: getGroupsWithJourneys(),
       builderGoal: safeVal(user.builder_goal, '') || '',
       currentPage: 'dashboard'
     });
@@ -107,6 +109,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
                    firstQuickGenerate:false, firstMarketingBundle:false,
                    firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
         goalLabels: goalLabels,
+        journeyGroupsData: getGroupsWithJourneys(),
         builderGoal: '',
         currentPage: 'dashboard'
       });
@@ -160,6 +163,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       journey: journeySafe,
       goalLabels,
+      journeyGroupsData: getGroupsWithJourneys(),
       builderGoal: user.builder_goal || '',
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
@@ -258,6 +262,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       journey: journeySafe,
       goalLabels,
+      journeyGroupsData: getGroupsWithJourneys(),
       builderGoal: updatedUser.builder_goal || '',
       input: { productDescription, targetAudience, contentType, tone },
       genId,
@@ -283,6 +288,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       journey: journeySafe,
       goalLabels,
+      journeyGroupsData: getGroupsWithJourneys(),
       builderGoal: user.builder_goal || ''
     });
   }
