@@ -60,31 +60,6 @@
         </div>
     </section>
 
-    <!-- ===== SECTION 3: Three Builder Mode Cards ===== -->
-    <section class="bc-modes fade-in">
-        <h2 class="bc-section-title">What would you like to build today?</h2>
-        <div class="bc-modes-grid">
-            <div class="bc-mode-card mode-trigger" data-mode="quick" id="mode-quick-trigger">
-                <div class="bc-mode-bg">⚡</div>
-                <h3 class="bc-mode-title">Quick Generate</h3>
-                <p class="bc-mode-desc">Generate a single piece of copy in seconds. Subject lines, social posts, ads, and more.</p>
-                <span class="bc-mode-action">Generate Now →</span>
-            </div>
-            <div class="bc-mode-card mode-trigger" data-mode="bundle" id="mode-bundle-trigger">
-                <div class="bc-mode-bg">📦</div>
-                <h3 class="bc-mode-title">Marketing Bundle</h3>
-                <p class="bc-mode-desc">Generate multiple marketing assets at once — emails, ads, listings, and more.</p>
-                <span class="bc-mode-action">Build Bundle →</span>
-            </div>
-            <div class="bc-mode-card mode-trigger" data-mode="campaign" id="mode-campaign-trigger">
-                <div class="bc-mode-bg">🚀</div>
-                <h3 class="bc-mode-title">Complete Campaign</h3>
-                <p class="bc-mode-desc">Create an entire multi-channel campaign. Email, social, ads, landing pages, and more.</p>
-                <span class="bc-mode-action">Build My Campaign →</span>
-            </div>
-        </div>
-    </section>
-
     <!-- ===== BUSINESS JOURNEYS (Left Panel) ===== -->
     <section class="bj-section fade-in">
         <div class="bj-layout">
@@ -119,60 +94,12 @@
             </div>
         </div>
         <div class="bj-cta-row">
-            <a href="/brand-brain" class="btn btn-primary btn-lg" id="bjCtaBtn">🚀 Let's Get Started →</a>
+            <a href="<%= brainPct >= 100 ? '/campaign-studio' : '/brand-brain' %>" class="btn btn-primary btn-lg" id="bjCtaBtn">🚀 Start Building →</a>
         </div>
     </section>
 
-    <!-- ===== SECTION 4: Builder Journey Progress ===== -->
-    <section class="bc-journey fade-in">
-        <h2 class="bc-section-title">Your Builder Journey</h2>
-        <div class="bc-journey-track">
-            <div class="bc-journey-step done"><span class="step-icon">✅</span><span class="step-label">Account Created</span></div>
-            <div class="bc-journey-step done"><span class="step-icon">✅</span><span class="step-label">Logged In</span></div>
-            <div class="bc-journey-step <%= journey.brandBrainStarted ? 'done' : 'current' %>">
-                <span class="step-icon"><%= journey.brandBrainStarted ? '✅' : '🟡' %></span>
-                <span class="step-label">Brand Brain Started</span>
-            </div>
-            <div class="bc-journey-step <%= journey.firstQuickGenerate ? 'done' : '' %>">
-                <span class="step-icon"><%= journey.firstQuickGenerate ? '✅' : '⬜' %></span>
-                <span class="step-label">First Quick Generate</span>
-            </div>
-            <div class="bc-journey-step <%= journey.firstMarketingBundle ? 'done' : '' %>">
-                <span class="step-icon"><%= journey.firstMarketingBundle ? '✅' : '⬜' %></span>
-                <span class="step-label">First Marketing Bundle</span>
-            </div>
-            <div class="bc-journey-step <%= journey.firstCompleteCampaign ? 'done' : '' %>">
-                <span class="step-icon"><%= journey.firstCompleteCampaign ? '✅' : '⬜' %></span>
-                <span class="step-label">First Complete Campaign</span>
-            </div>
-            <div class="bc-journey-step <%= journey.firstFavorite ? 'done' : '' %>">
-                <span class="step-icon"><%= journey.firstFavorite ? '✅' : '⬜' %></span>
-                <span class="step-label">First Favorite</span>
-            </div>
-            <div class="bc-journey-step <%= journey.firstDownload ? 'done' : '' %>">
-                <span class="step-icon"><%= journey.firstDownload ? '✅' : '⬜' %></span>
-                <span class="step-label">First Download</span>
-            </div>
-        </div>
-    </section>
-
-    <!-- ===== SECTION 5: Quick Actions ===== -->
-    <section class="bc-quick-actions fade-in">
-        <h2 class="bc-section-title">Quick Actions</h2>
-        <div class="bc-qa-grid">
-            <a href="#mode-campaign-trigger" class="bc-qa-card mode-trigger" data-mode="campaign">🚀 Build My Campaign</a>
-            <a href="/brand-brain" class="bc-qa-card">🧠 Brand Brain™</a>
-            <a href="#mode-bundle-trigger" class="bc-qa-card mode-trigger" data-mode="bundle">📦 Marketing Bundle</a>
-            <a href="#mode-quick-trigger" class="bc-qa-card mode-trigger" data-mode="quick">⚡ Quick Generate</a>
-            <a href="/dashboard" class="bc-qa-card">🖼️ Product Images</a>
-            <a href="/dashboard" class="bc-qa-card">🎥 Video Scripts</a>
-            <a href="/dashboard" class="bc-qa-card">📄 Landing Pages</a>
-            <a href="/dashboard" class="bc-qa-card">📧 Email Campaigns</a>
-        </div>
-    </section>
-
-    <!-- ===== SECTION 6: Generator Tools (hidden until a mode is selected) ===== -->
-    <div id="bc-tools" class="bc-tools-hidden">
+    <!-- ===== Generator Tools (hidden, accessible via sidebar) ===== -->
+    <div id="bc-tools" class="bc-tools-hidden" style="display:none;">
         <div class="bc-tools-header">
             <button class="bc-back-btn" id="bcBackBtn">← Back</button>
             <h2 id="bcToolTitle">⚡ Quick Generate</h2>
@@ -408,27 +335,6 @@
 .bc-usage-fill{height:100%;border-radius:2px;transition:width 0.5s;background:var(--success);}
 .bc-usage-text{font-size:0.7rem;color:var(--secondary);display:block;text-align:right;}
 
-/* ===== Builder Goals ===== */
-.bc-goals{margin-bottom:2.5rem;}
-.bc-goals-sub{font-size:0.8rem;color:var(--secondary);margin:-0.5rem 0 1rem;}
-.builder-goals-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.75rem;max-width:750px;}
-.builder-goal-card{display:flex;flex-direction:column;gap:0.2rem;padding:1.25rem 1rem;border:2px solid var(--border);border-radius:1rem;cursor:pointer;transition:all 0.2s;background:var(--white);}
-.builder-goal-card:hover{border-color:var(--primary);box-shadow:0 2px 8px rgba(79,70,229,0.1);}
-.builder-goal-card.selected{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 3px rgba(79,70,229,0.15);}
-.goal-radio{position:absolute;opacity:0;pointer-events:none;}
-.goal-icon{font-size:1.5rem;margin-bottom:0.15rem;}
-.goal-title{font-size:0.85rem;font-weight:700;color:var(--dark);}
-.goal-desc{font-size:0.72rem;color:var(--secondary);max-width:none;line-height:1.35;}
-.builder-goal-card-wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:0.6rem;padding:0.75rem 1rem;}
-.builder-goal-card-wide .goal-icon{font-size:1.2rem;margin-bottom:0;}
-.builder-goal-card-wide .goal-desc{flex:1;}
-.bc-goals-action{margin-top:1rem;}
-.other-custom-wrap{display:none;max-height:0;overflow:hidden;transition:all 0.3s ease;margin-top:0.75rem;max-width:400px;}
-.other-custom-wrap.visible{display:block;max-height:150px;}
-.other-custom-wrap label{font-size:0.85rem;font-weight:600;margin-bottom:0.35rem;display:block;}
-.other-custom-wrap textarea{width:100%;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:0.75rem;font-size:0.85rem;font-family:inherit;transition:border-color 0.2s;resize:vertical;}
-.other-custom-wrap textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
-
 /* ===== Business Journey Groups ===== */
 .bj-section{margin-bottom:2.5rem;}
 .bj-heading{font-size:1.1rem;font-weight:700;color:var(--dark);margin-bottom:1.25rem;}
@@ -460,31 +366,6 @@
 .bc-rec-label{display:block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--primary);margin-bottom:0.15rem;}
 .bc-rec-text{font-size:0.85rem;color:var(--dark);}
 .bc-rec-btn{flex-shrink:0;padding:0.4rem 0.9rem;font-size:0.8rem;border-radius:0.5rem;}
-
-/* ===== Three Builder Mode Cards ===== */
-.bc-modes{margin-bottom:2.5rem;}
-.bc-modes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
-.bc-mode-card{position:relative;overflow:hidden;padding:1.75rem 1.5rem;border:1px solid var(--border);border-radius:1.25rem;background:var(--white);cursor:pointer;transition:all 0.25s;display:flex;flex-direction:column;gap:0.4rem;}
-.bc-mode-card:hover{transform:translateY(-4px);box-shadow:0 8px 25px rgba(0,0,0,0.08);border-color:var(--primary);}
-.bc-mode-bg{font-size:3rem;position:absolute;top:0.5rem;right:0.75rem;opacity:0.08;pointer-events:none;}
-.bc-mode-title{font-size:1.15rem;font-weight:700;color:var(--dark);margin:0;position:relative;z-index:1;}
-.bc-mode-desc{font-size:0.8rem;color:var(--secondary);line-height:1.45;max-width:none;position:relative;z-index:1;}
-.bc-mode-action{font-size:0.8rem;font-weight:600;color:var(--primary);margin-top:auto;position:relative;z-index:1;}
-
-/* ===== Builder Journey ===== */
-.bc-journey{margin-bottom:2.5rem;}
-.bc-journey-track{display:flex;gap:0.5rem;flex-wrap:wrap;}
-.bc-journey-step{display:flex;align-items:center;gap:0.35rem;padding:0.45rem 0.8rem;border:1px solid var(--border);border-radius:1.5rem;font-size:0.78rem;background:var(--white);}
-.bc-journey-step.done{border-color:var(--success);background:#d1fae5;}
-.bc-journey-step.current{border-color:var(--primary);background:var(--primary-light);}
-.step-icon{font-size:0.85rem;}
-.step-label{font-weight:500;color:var(--dark);white-space:nowrap;}
-
-/* ===== Quick Actions ===== */
-.bc-quick-actions{margin-bottom:2.5rem;}
-.bc-qa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0.65rem;}
-.bc-qa-card{display:flex;align-items:center;gap:0.5rem;padding:0.7rem 0.9rem;border:1px solid var(--border);border-radius:0.75rem;background:var(--white);text-decoration:none;font-size:0.82rem;font-weight:600;color:var(--dark);transition:all 0.15s;}
-.bc-qa-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:var(--primary);}
 
 /* ===== Tools Section (hidden by default) ===== */
 .bc-tools-hidden{display:none;}
@@ -548,19 +429,14 @@
 @media(max-width:992px){
     .campaign-workspace{grid-template-columns:1fr;}
     .deliverables-card{position:static;}
-    .bc-qa-grid{grid-template-columns:repeat(2,1fr);}
     .bj-layout{grid-template-columns:1fr;}
     .bj-right{position:static;}
 }
 @media(max-width:768px){
     .bc-welcome{flex-direction:column;align-items:flex-start;gap:1rem;}
     .bc-welcome-right{width:100%;}
-    .bc-modes-grid{grid-template-columns:1fr;}
-    .builder-goals-grid{grid-template-columns:1fr;max-width:400px;}
     .form-grid-3,.form-grid-2{grid-template-columns:1fr;}
     .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
-    .bc-journey-track{gap:0.35rem;}
-    .bc-qa-grid{grid-template-columns:repeat(2,1fr);}
 }
 </style>
 
@@ -569,45 +445,6 @@
   var h=new Date().getHours(),g='Welcome back';
   if(h<12)g='Good morning';else if(h<17)g='Good afternoon';else if(h<22)g='Good evening';
   document.getElementById('greeting').textContent=g;
-
-  // ===== Mode Card Triggers =====
-  var tools=document.getElementById('bc-tools');
-  var toolTitle=document.getElementById('bcToolTitle');
-  var modePanels={
-    quick:document.getElementById('mode-quick'),
-    bundle:document.getElementById('mode-bundle'),
-    campaign:document.getElementById('mode-campaign')
-  };
-  var modeNames={quick:'⚡ Quick Generate',bundle:'📦 Marketing Bundle',campaign:'🚀 Complete Campaign'};
-  var activeMode='quick';
-
-  function showMode(mode){
-    activeMode=mode;
-    Object.keys(modePanels).forEach(function(k){
-      if(modePanels[k])modePanels[k].classList.toggle('active',k===mode);
-    });
-    toolTitle.textContent=modeNames[mode]||'';
-    tools.classList.add('bc-tools-visible');
-    tools.classList.remove('bc-tools-hidden');
-    window.scrollTo({top:tools.offsetTop-20,behavior:'smooth'});
-  }
-
-  document.querySelectorAll('.mode-trigger').forEach(function(el){
-    el.addEventListener('click',function(e){
-      e.preventDefault();
-      showMode(el.getAttribute('data-mode'));
-    });
-  });
-
-  // Back button
-  var backBtn=document.getElementById('bcBackBtn');
-  if(backBtn){
-    backBtn.addEventListener('click',function(){
-      tools.classList.remove('bc-tools-visible');
-      tools.classList.add('bc-tools-hidden');
-      window.scrollTo({top:0,behavior:'smooth'});
-    });
-  }
 
   // ===== Custom Dropdowns =====
   document.querySelectorAll('[data-custom]').forEach(function(select){
