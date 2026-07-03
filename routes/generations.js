@@ -88,6 +88,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
       journey: journey,
       goalLabels: goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
+      journeysData: JSON.stringify(getAllJourneys()),
       builderGoal: safeVal(user.builder_goal, '') || '',
       currentPage: 'dashboard'
     });
