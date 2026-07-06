@@ -137,15 +137,24 @@ router.post('/dashboard/update-goal', requireAuth, (req, res) => {
 
 // ====== Generate Copy ======
 router.post('/dashboard/generate', requireAuth, (req, res) => {
-  const { productDescription, targetAudience, contentType, tone, generationType, assets, goal, campaignSections } = req.body;
+  const { productDescription, targetAudience, contentType, tone, generationType, assets, goal, campaignSections: requestedCampaignSections } = req.body;
   const db = getDb();
   const user = res.locals.user;
   const isAjax = req.xhr || req.headers.accept?.includes('json');
   const genType = generationType || 'quick';
+  const getDashboardCounts = function(currentUserId) {
+    return {
+      favorites: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(currentUserId)?.count || 0,
+      quickCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(currentUserId)?.count || 0,
+      bundleCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(currentUserId)?.count || 0,
+      campaignCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(currentUserId)?.count || 0
+    };
+  };
 
   if (user.generations_used >= user.monthly_limit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
     // Fetch brain + journey for safe render
+    const { favorites, quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
     const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
     const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
@@ -196,7 +205,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       }
     } else if (genType === 'campaign') {
       // Generate campaign content based on selected sections
-      const activeSections = campaignSections || 'email';
+      const activeSections = requestedCampaignSections || 'email';
       const sectionList = activeSections.split(',');
       sectionList.forEach(sectionId => {
         const section = campaignSections.find(s => s.id === sectionId);
@@ -242,6 +251,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     res.locals.user = updatedUser;
+    const { quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
     const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
     const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
     const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count;
