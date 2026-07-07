@@ -62,6 +62,49 @@ function initDb() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      stripe_customer_id TEXT NOT NULL,
+      stripe_subscription_id TEXT UNIQUE NOT NULL,
+      status TEXT NOT NULL,
+      plan_tier TEXT NOT NULL,
+      price_id TEXT,
+      current_period_start DATETIME NOT NULL,
+      current_period_end DATETIME NOT NULL,
+      cancel_at_period_end INTEGER DEFAULT 0,
+      canceled_at DATETIME,
+      ended_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS usage_periods (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      subscription_id INTEGER REFERENCES subscriptions(id),
+      period_start DATETIME NOT NULL,
+      period_end DATETIME NOT NULL,
+      plan_tier TEXT NOT NULL,
+      monthly_limit INTEGER NOT NULL,
+      usage_count INTEGER NOT NULL DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, period_start, period_end)
+    );
+
+    CREATE TABLE IF NOT EXISTS usage_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      usage_period_id INTEGER REFERENCES usage_periods(id),
+      generation_id INTEGER REFERENCES generations(id),
+      event_type TEXT NOT NULL,
+      units INTEGER NOT NULL DEFAULT 1,
+      source_route TEXT DEFAULT '',
+      metadata TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   // Add new columns to existing table if they don't exist (for older databases)
@@ -90,7 +133,16 @@ function initDb() {
   });
 
   // Add OAuth columns to users table
-  const userCols = ['password_hash TEXT', 'google_id TEXT', 'avatar_url TEXT', 'builder_goal TEXT DEFAULT \'\''];
+  const userCols = [
+    'password_hash TEXT',
+    'google_id TEXT',
+    'avatar_url TEXT',
+    'builder_goal TEXT DEFAULT \'\'',
+    'current_usage_period_id INTEGER REFERENCES usage_periods(id)',
+    'current_period_used INTEGER DEFAULT 0',
+    'usage_tracking_version TEXT DEFAULT \'legacy\'',
+    'quota_enforcement_mode TEXT DEFAULT \'legacy\''
+  ];
   userCols.forEach(col => {
     try {
       db.exec(`ALTER TABLE users ADD COLUMN ${col}`);
@@ -116,6 +168,14 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_deleted ON generations(user_id, is_deleted)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_type ON generations(user_id, content_type)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_created ON generations(user_id, created_at DESC)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id, status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_id ON subscriptions(stripe_customer_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_periods_user_period_end ON usage_periods(user_id, period_end)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_periods_subscription_id ON usage_periods(subscription_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_user_created ON usage_events(user_id, created_at)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_period_id ON usage_events(usage_period_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_generation_id ON usage_events(generation_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_user_type ON usage_events(user_id, event_type)`);
   } catch (e) {
     // Index already exists
   }
