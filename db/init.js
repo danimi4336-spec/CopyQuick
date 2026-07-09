@@ -100,6 +100,7 @@ function initDb() {
       usage_period_id INTEGER REFERENCES usage_periods(id),
       generation_id INTEGER REFERENCES generations(id),
       event_type TEXT NOT NULL,
+      credits_used INTEGER NOT NULL DEFAULT 1,
       units INTEGER NOT NULL DEFAULT 1,
       source_route TEXT DEFAULT '',
       metadata TEXT DEFAULT '',
@@ -158,6 +159,18 @@ function initDb() {
       db.exec(`ALTER TABLE brand_brain ADD COLUMN ${col}`);
     } catch (e) {
       // Already exists
+    }
+  });
+
+  // Add usage_events columns for newer tracking versions
+  const usageEventCols = [
+    'credits_used INTEGER NOT NULL DEFAULT 1'
+  ];
+  usageEventCols.forEach(col => {
+    try {
+      db.exec(`ALTER TABLE usage_events ADD COLUMN ${col}`);
+    } catch (e) {
+      // Column already exists
     }
   });
 

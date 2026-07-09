@@ -5,6 +5,7 @@ const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
+const { recordUsageEvent } = require('../lib/subscriptions');
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -15,6 +16,8 @@ const goalLabels = {
   campaigns: 'Generate Marketing Campaigns',
   other: 'Something Else'
 };
+
+const GENERATION_CREDITS = 1;
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
@@ -226,14 +229,50 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     const resultsJson = JSON.stringify(results);
     const contentTypeVal = genType === 'quick' ? (contentType || 'sales_message') : genType;
     
-    const stmt = db.prepare(`
-      INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(user.id, title, productDescription, contentTypeVal, tone || 'Professional', resultsJson, wordCount, goal || '', genType);
-    const genId = result.lastInsertRowid;
+    const createGeneration = db.transaction((params) => {
+      const stmt = db.prepare(`
+        INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const result = stmt.run(
+        params.userId,
+        params.title,
+        params.productDescription,
+        params.contentTypeVal,
+        params.tone,
+        params.resultsJson,
+        params.wordCount,
+        params.goal,
+        params.genType
+      );
+      const generationId = result.lastInsertRowid;
 
-    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
+      db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(params.userId);
+      recordUsageEvent(db, {
+        userId: params.userId,
+        generationId,
+        eventType: 'generate',
+        creditsUsed: GENERATION_CREDITS,
+        sourceRoute: '/dashboard/generate',
+        metadata: {
+          generationType: params.genType,
+          contentType: params.contentTypeVal
+        }
+      });
+
+      return generationId;
+    });
+    const genId = createGeneration({
+      userId: user.id,
+      title,
+      productDescription,
+      contentTypeVal,
+      tone: tone || 'Professional',
+      resultsJson,
+      wordCount,
+      goal: goal || '',
+      genType
+    });
 
     if (isAjax) {
       const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
@@ -484,8 +523,27 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
     const newJson = JSON.stringify(newResults);
     const wordCount = newResults.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
 
-    db.prepare("UPDATE generations SET results = ?, word_count = ?, updated_at = datetime('now') WHERE id = ?").run(newJson, wordCount, genId);
-    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(userId);
+    const regenerateGeneration = db.transaction((params) => {
+      db.prepare("UPDATE generations SET results = ?, word_count = ?, updated_at = datetime('now') WHERE id = ?").run(params.resultsJson, params.wordCount, params.generationId);
+      db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(params.userId);
+      recordUsageEvent(db, {
+        userId: params.userId,
+        generationId: params.generationId,
+        eventType: 'regenerate',
+        creditsUsed: GENERATION_CREDITS,
+        sourceRoute: `/generation/${params.generationId}/regenerate`,
+        metadata: {
+          contentType: params.contentType
+        }
+      });
+    });
+    regenerateGeneration({
+      userId,
+      generationId: genId,
+      resultsJson: newJson,
+      wordCount,
+      contentType: gen.content_type
+    });
 
     res.json({ results: newResults });
   } catch (err) {
