@@ -1,3 +1,18 @@
+<%
+    var credits = typeof aiCredits !== 'undefined' && aiCredits ? aiCredits : {
+        label: 'AI Credits',
+        planName: user.plan_tier || 'Free',
+        monthlyAllocation: user.monthly_limit || 10,
+        used: 0,
+        remaining: user.monthly_limit || 10,
+        usedPercentage: 0,
+        remainingPercentage: 100,
+        periodEnd: null,
+        manageUrl: user.plan_tier === 'free' ? '/pricing' : '/manage',
+        manageLabel: user.plan_tier === 'free' ? 'Upgrade Plan' : 'Manage Plan'
+    };
+    var creditsRenewal = credits.periodEnd ? new Date(credits.periodEnd).toLocaleDateString() : 'Current monthly period';
+%>
 <div class="container builder-center">
     <!-- ===== SECTION 1: Welcome + Brand Brain Progress ===== -->
     <section class="bc-welcome fade-in">
@@ -23,12 +38,61 @@
                 </div>
                 <a href="/brand-brain" class="bc-brain-arrow">→</a>
             </div>
-            <div class="bc-usage-mini">
-                <div class="bc-usage-bar"><div class="bc-usage-fill" style="width:<%= Math.min((user.generations_used / user.monthly_limit) * 100, 100) %>%"></div></div>
-                <span class="bc-usage-text"><%= user.generations_used %> / <%= user.monthly_limit %> used</span>
-            </div>
+            <button class="bc-ai-credits" type="button" id="aiCreditsOpen" aria-haspopup="dialog" aria-controls="aiCreditsDialog">
+                <div class="bc-ai-top">
+                    <strong><%= credits.label %></strong>
+                    <span><%= credits.usedPercentage %>% Used</span>
+                </div>
+                <div class="bc-usage-bar" aria-hidden="true"><div class="bc-usage-fill" style="width:<%= credits.usedPercentage %>%"></div></div>
+                <span class="bc-usage-text"><%= credits.remaining %> of <%= credits.monthlyAllocation %> remaining</span>
+            </button>
         </div>
     </section>
+
+    <div class="ai-credits-modal" id="aiCreditsDialog" role="dialog" aria-modal="true" aria-labelledby="aiCreditsTitle" aria-hidden="true">
+        <div class="ai-credits-backdrop" data-ai-credits-close></div>
+        <div class="ai-credits-card">
+            <button class="ai-credits-close" type="button" aria-label="Close AI Credits" data-ai-credits-close>×</button>
+            <div class="ai-credits-heading">
+                <span class="ai-credits-kicker">Billing Period</span>
+                <h2 id="aiCreditsTitle">AI Credits</h2>
+                <p><%= credits.planName %> plan</p>
+            </div>
+            <div class="ai-credits-meter">
+                <div class="bc-usage-bar"><div class="bc-usage-fill" style="width:<%= credits.usedPercentage %>%"></div></div>
+                <span><%= credits.remainingPercentage %>% remaining</span>
+            </div>
+            <div class="ai-credits-grid">
+                <div>
+                    <span>Monthly Allocation</span>
+                    <strong><%= credits.monthlyAllocation %></strong>
+                </div>
+                <div>
+                    <span>Used This Period</span>
+                    <strong><%= credits.used %></strong>
+                </div>
+                <div>
+                    <span>Remaining</span>
+                    <strong><%= credits.remaining %></strong>
+                </div>
+                <div>
+                    <span>Renews</span>
+                    <strong><%= creditsRenewal %></strong>
+                </div>
+            </div>
+            <div class="copycredit-bank-note">
+                <strong>CopyCredit Bank</strong>
+                <p>Banked credits are coming later. For now, this shows the credits available in your current billing period.</p>
+            </div>
+            <% if (credits.manageUrl === '/manage') { %>
+                <form action="/manage" method="POST">
+                    <button type="submit" class="btn btn-primary btn-block"><%= credits.manageLabel %></button>
+                </form>
+            <% } else { %>
+                <a href="<%= credits.manageUrl %>" class="btn btn-primary btn-block"><%= credits.manageLabel %></a>
+            <% } %>
+        </div>
+    </div>
 
     <!-- ===== SECTION 2: Next Recommended Action ===== -->
     <section class="bc-recommendation fade-in">
@@ -350,10 +414,33 @@
 .bc-brain-info strong{font-size:0.8rem;}
 .bc-brain-info span{font-size:0.7rem;color:var(--secondary);}
 .bc-brain-arrow{color:var(--primary);font-weight:700;font-size:1.1rem;text-decoration:none;margin-left:auto;}
-.bc-usage-mini{width:100%;}
+.bc-ai-credits{width:100%;border:1px solid var(--border);background:var(--white);border-radius:0.5rem;padding:0.65rem 0.8rem;cursor:pointer;font-family:inherit;text-align:left;transition:all 0.2s;}
+.bc-ai-credits:hover{border-color:var(--primary);box-shadow:0 3px 10px rgba(15,23,42,0.08);}
+.bc-ai-top{display:flex;justify-content:space-between;align-items:center;gap:0.75rem;margin-bottom:0.35rem;}
+.bc-ai-top strong{font-size:0.8rem;color:var(--dark);}
+.bc-ai-top span{font-size:0.72rem;font-weight:700;color:var(--primary);white-space:nowrap;}
 .bc-usage-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:0.2rem;}
 .bc-usage-fill{height:100%;border-radius:2px;transition:width 0.5s;background:var(--success);}
 .bc-usage-text{font-size:0.7rem;color:var(--secondary);display:block;text-align:right;}
+.ai-credits-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:1rem;}
+.ai-credits-modal.open{display:flex;}
+.ai-credits-backdrop{position:absolute;inset:0;background:rgba(15,23,42,0.48);}
+.ai-credits-card{position:relative;width:min(100%,440px);background:var(--white);border:1px solid var(--border);border-radius:0.5rem;box-shadow:var(--shadow-lg);padding:1.25rem;z-index:1;}
+.ai-credits-close{position:absolute;top:0.7rem;right:0.7rem;width:2rem;height:2rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--white);font-size:1.2rem;line-height:1;cursor:pointer;color:var(--secondary);}
+.ai-credits-close:hover{color:var(--dark);border-color:var(--primary);}
+.ai-credits-heading{padding-right:2rem;margin-bottom:1rem;}
+.ai-credits-kicker{display:block;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary);margin-bottom:0.2rem;}
+.ai-credits-heading h2{font-size:1.35rem;margin:0 0 0.15rem;color:var(--dark);}
+.ai-credits-heading p{font-size:0.85rem;color:var(--secondary);margin:0;}
+.ai-credits-meter{margin-bottom:1rem;}
+.ai-credits-meter span{display:block;text-align:right;font-size:0.75rem;font-weight:700;color:var(--primary);}
+.ai-credits-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;margin-bottom:1rem;}
+.ai-credits-grid div{border:1px solid var(--border);border-radius:0.5rem;padding:0.7rem;background:var(--light);}
+.ai-credits-grid span{display:block;font-size:0.68rem;color:var(--secondary);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.2rem;}
+.ai-credits-grid strong{font-size:1rem;color:var(--dark);}
+.copycredit-bank-note{border:1px dashed var(--border);border-radius:0.6rem;padding:0.8rem;margin-bottom:1rem;background:var(--light);}
+.copycredit-bank-note strong{font-size:0.85rem;color:var(--dark);}
+.copycredit-bank-note p{font-size:0.78rem;color:var(--secondary);line-height:1.45;margin:0.25rem 0 0;max-width:none;}
 
 /* ===== Business Journey Groups ===== */
 .bj-section{margin-bottom:2.5rem;}
@@ -478,6 +565,8 @@
     .bc-welcome-right{width:100%;}
     .form-grid-3,.form-grid-2{grid-template-columns:1fr;}
     .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
+    .ai-credits-grid{grid-template-columns:1fr;}
+    .ai-credits-card{padding:1rem;}
 }
 </style>
 
@@ -486,6 +575,49 @@
   var h=new Date().getHours(),g='Welcome back';
   if(h<12)g='Good morning';else if(h<17)g='Good afternoon';else if(h<22)g='Good evening';
   document.getElementById('greeting').textContent=g;
+
+  var aiCreditsDialog=document.getElementById('aiCreditsDialog');
+  var aiCreditsOpen=document.getElementById('aiCreditsOpen');
+  var aiCreditsLastFocus=null;
+  function getAiCreditsFocusable(){
+    if(!aiCreditsDialog)return[];
+    return Array.prototype.slice.call(aiCreditsDialog.querySelectorAll('a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])'));
+  }
+  function setAiCreditsOpen(open){
+    if(!aiCreditsDialog)return;
+    aiCreditsDialog.classList.toggle('open',open);
+    aiCreditsDialog.setAttribute('aria-hidden',open?'false':'true');
+    document.body.style.overflow=open?'hidden':'';
+    if(open){
+      aiCreditsLastFocus=document.activeElement;
+      var focusable=getAiCreditsFocusable();
+      if(focusable.length)focusable[0].focus();
+    }else if(aiCreditsLastFocus&&typeof aiCreditsLastFocus.focus==='function'){
+      aiCreditsLastFocus.focus();
+      aiCreditsLastFocus=null;
+    }
+  }
+  if(aiCreditsOpen)aiCreditsOpen.addEventListener('click',function(){setAiCreditsOpen(true);});
+  document.querySelectorAll('[data-ai-credits-close]').forEach(function(el){
+    el.addEventListener('click',function(){setAiCreditsOpen(false);});
+  });
+  document.addEventListener('keydown',function(e){
+    if(!aiCreditsDialog||!aiCreditsDialog.classList.contains('open'))return;
+    if(e.key==='Escape')setAiCreditsOpen(false);
+    if(e.key==='Tab'){
+      var focusable=getAiCreditsFocusable();
+      if(!focusable.length){e.preventDefault();return;}
+      var first=focusable[0];
+      var last=focusable[focusable.length-1];
+      if(e.shiftKey&&document.activeElement===first){
+        e.preventDefault();
+        last.focus();
+      }else if(!e.shiftKey&&document.activeElement===last){
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  });
 
   // ===== Custom Dropdowns =====
   document.querySelectorAll('[data-custom]').forEach(function(select){

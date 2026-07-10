@@ -1,3 +1,13 @@
+<%
+    var credits = typeof aiCredits !== 'undefined' && aiCredits ? aiCredits : {
+        label: 'AI Credits',
+        monthlyAllocation: user.monthly_limit || 10,
+        used: 0,
+        remaining: user.monthly_limit || 10,
+        usedPercentage: 0,
+        remainingPercentage: 100
+    };
+%>
 <div class="container dashboard">
     <header class="dashboard-header">
         <h1>My Profile</h1>
@@ -33,11 +43,12 @@
             </div>
             
             <div class="info-group">
-                <label>Usage This Month</label>
-                <p><%= user.generations_used %> / <%= user.monthly_limit %> generations</p>
+                <label>AI Credits</label>
+                <p><%= credits.remaining %> of <%= credits.monthlyAllocation %> remaining</p>
                 <div class="progress-bar">
-                    <div class="progress" style="width: <%= (user.generations_used / user.monthly_limit) * 100 %>%"></div>
+                    <div class="progress" style="width: <%= credits.usedPercentage %>%"></div>
                 </div>
+                <span class="usage-note"><%= credits.used %> used this billing period · <%= credits.remainingPercentage %>% remaining</span>
             </div>
             
             <div class="info-group" style="margin-top: 2rem;">
@@ -57,4 +68,5 @@
     .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
     .progress-bar { width: 100%; height: 0.5rem; background: #e2e8f0; border-radius: 1rem; margin-top: 0.5rem; overflow: hidden; }
     .progress { height: 100%; background: var(--primary); border-radius: 1rem; }
+    .usage-note { display: block; margin-top: 0.4rem; font-size: 0.8rem; color: var(--secondary); }
 </style>
