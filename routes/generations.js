@@ -17,6 +17,37 @@ const goalLabels = {
   other: 'Something Else'
 };
 
+function formatPlanName(planTier) {
+  if (!planTier) return 'Free';
+  return planTier.charAt(0).toUpperCase() + planTier.slice(1);
+}
+
+function formatAiCredits(snapshot, user) {
+  const monthlyLimit = snapshot?.monthlyLimit || user.monthly_limit || 10;
+  const used = snapshot?.used || 0;
+  const remaining = Math.max(monthlyLimit - used, 0);
+  const usedPercentage = monthlyLimit > 0 ? Math.min(Math.round((used / monthlyLimit) * 100), 100) : 0;
+  const remainingPercentage = monthlyLimit > 0 ? Math.max(100 - usedPercentage, 0) : 0;
+  const periodEnd = snapshot?.usagePeriod?.period_end || null;
+
+  return {
+    label: 'AI Credits',
+    planName: formatPlanName(user.plan_tier),
+    monthlyAllocation: monthlyLimit,
+    used,
+    remaining,
+    usedPercentage,
+    remainingPercentage,
+    periodEnd,
+    manageUrl: user.plan_tier === 'free' ? '/pricing' : '/manage',
+    manageLabel: user.plan_tier === 'free' ? 'Upgrade Plan' : 'Manage Plan'
+  };
+}
+
+function getAiCredits(db, user) {
+  return formatAiCredits(getCurrentUsageSnapshot(db, user), user);
+}
+
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
   console.log('📊 Dashboard route called, user.id:', res.locals.user?.id);
@@ -42,6 +73,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
     const recent = safeVal(db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId), []);
     const typeBreakdown = safeVal(db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId), []);
     const history = safeVal(db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId), []);
+    const aiCredits = getAiCredits(db, user);
 
     // Brand Brain data for progress
     let brain = {};
@@ -90,6 +122,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
       goalLabels: goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
       journeysData: JSON.stringify(getAllJourneys()),
+      aiCredits: aiCredits,
       builderGoal: safeVal(user.builder_goal, '') || '',
       currentPage: 'dashboard'
     });
@@ -113,6 +146,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
         goalLabels: goalLabels,
         journeyGroupsData: getGroupsWithJourneys(),
         journeysData: JSON.stringify(getAllJourneys()),
+        aiCredits: null,
         builderGoal: '',
         currentPage: 'dashboard'
       });
@@ -178,6 +212,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
       journeysData: JSON.stringify(getAllJourneys()),
+      aiCredits: formatAiCredits(usageSnapshot, user),
       builderGoal: user.builder_goal || '',
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
@@ -261,6 +296,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     res.locals.user = updatedUser;
+    const updatedUsageSnapshot = getCurrentUsageSnapshot(db, updatedUser);
     const { quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
     const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
     const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
@@ -287,6 +323,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
       journeysData: JSON.stringify(getAllJourneys()),
+      aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser),
       builderGoal: updatedUser.builder_goal || '',
       input: { productDescription, targetAudience, contentType, tone },
       genId,
@@ -314,6 +351,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       goalLabels,
       journeyGroupsData: getGroupsWithJourneys(),
       journeysData: JSON.stringify(getAllJourneys()),
+      aiCredits: null,
       builderGoal: user.builder_goal || ''
     });
   }
@@ -562,7 +600,13 @@ router.get('/api/search', requireAuth, (req, res) => {
 
 // ====== Profile ======
 router.get('/profile', requireAuth, (req, res) => {
-  res.render('profile', { title: 'My Profile - CopyQuick', currentPage: 'profile' });
+  const db = getDb();
+  const user = res.locals.user;
+  res.render('profile', {
+    title: 'My Profile - CopyQuick',
+    currentPage: 'profile',
+    aiCredits: getAiCredits(db, user)
+  });
 });
 
 module.exports = router;
