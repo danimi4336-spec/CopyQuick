@@ -5,6 +5,7 @@ const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
+const { getCurrentUsageSnapshot, recordUsageEvent } = require('../lib/subscriptions');
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -151,7 +152,8 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     };
   };
 
-  if (user.generations_used >= user.monthly_limit) {
+  const usageSnapshot = getCurrentUsageSnapshot(db, user);
+  if (usageSnapshot.isOverLimit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
     // Fetch brain + journey for safe render
     const { favorites, quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
@@ -234,6 +236,14 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     const genId = result.lastInsertRowid;
 
     db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
+    recordUsageEvent(db, {
+      userId: user.id,
+      usagePeriodId: usageSnapshot.usagePeriod.id,
+      generationId: genId,
+      eventType: 'generation',
+      sourceRoute: 'POST /dashboard/generate',
+      metadata: { generationType: genType, contentType: contentTypeVal }
+    });
 
     if (isAjax) {
       const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
@@ -469,7 +479,8 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
   if (!gen) return res.status(404).json({ error: 'Not found' });
 
   const user = res.locals.user;
-  if (user.generations_used >= user.monthly_limit) {
+  const usageSnapshot = getCurrentUsageSnapshot(db, user);
+  if (usageSnapshot.isOverLimit) {
     return res.status(403).json({ error: 'Monthly limit reached' });
   }
 
@@ -486,6 +497,14 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
 
     db.prepare("UPDATE generations SET results = ?, word_count = ?, updated_at = datetime('now') WHERE id = ?").run(newJson, wordCount, genId);
     db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(userId);
+    recordUsageEvent(db, {
+      userId,
+      usagePeriodId: usageSnapshot.usagePeriod.id,
+      generationId: genId,
+      eventType: 'regeneration',
+      sourceRoute: 'POST /generation/:id/regenerate',
+      metadata: { contentType: gen.content_type }
+    });
 
     res.json({ results: newResults });
   } catch (err) {
