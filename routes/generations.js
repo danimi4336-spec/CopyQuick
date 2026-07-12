@@ -460,11 +460,11 @@ router.post('/generation/:id/favorite', requireAuth, (req, res) => {
   const userId = res.locals.user.id;
   const genId = req.params.id;
 
-  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(genId, userId);
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
   if (!gen) return res.status(404).json({ error: 'Not found' });
 
   const newVal = gen.favorite ? 0 : 1;
-  db.prepare('UPDATE generations SET favorite = ? WHERE id = ?').run(newVal, genId);
+  db.prepare('UPDATE generations SET favorite = ? WHERE id = ? AND user_id = ? AND is_deleted = 0').run(newVal, genId, userId);
 
   res.json({ favorite: newVal === 1 });
 });
@@ -474,7 +474,7 @@ router.post('/generation/:id/delete', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
 
-  db.prepare("UPDATE generations SET is_deleted = 1, deleted_at = datetime('now') WHERE id = ? AND user_id = ?").run(req.params.id, userId);
+  db.prepare("UPDATE generations SET is_deleted = 1, deleted_at = datetime('now') WHERE id = ? AND user_id = ? AND is_deleted = 0").run(req.params.id, userId);
   res.json({ success: true });
 });
 
@@ -493,7 +493,8 @@ router.post('/generation/:id/tags', requireAuth, (req, res) => {
   const userId = res.locals.user.id;
   const { tags } = req.body;
 
-  db.prepare('UPDATE generations SET tags = ? WHERE id = ? AND user_id = ?').run(tags || '', req.params.id, userId);
+  const result = db.prepare('UPDATE generations SET tags = ? WHERE id = ? AND user_id = ? AND is_deleted = 0').run(tags || '', req.params.id, userId);
+  if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
@@ -503,7 +504,8 @@ router.post('/generation/:id/title', requireAuth, (req, res) => {
   const userId = res.locals.user.id;
   const { title } = req.body;
 
-  db.prepare("UPDATE generations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?").run(title || '', req.params.id, userId);
+  const result = db.prepare("UPDATE generations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ? AND is_deleted = 0").run(title || '', req.params.id, userId);
+  if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true, title });
 });
 
@@ -513,7 +515,7 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
   const userId = res.locals.user.id;
   const genId = req.params.id;
 
-  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(genId, userId);
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
   if (!gen) return res.status(404).json({ error: 'Not found' });
 
   const user = res.locals.user;
@@ -533,7 +535,13 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
     const newJson = JSON.stringify(newResults);
     const wordCount = newResults.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
 
-    db.prepare("UPDATE generations SET results = ?, word_count = ?, updated_at = datetime('now') WHERE id = ?").run(newJson, wordCount, genId);
+    const updateResult = db.prepare(`
+      UPDATE generations
+      SET results = ?, word_count = ?, updated_at = datetime('now')
+      WHERE id = ? AND user_id = ? AND is_deleted = 0
+    `).run(newJson, wordCount, genId, userId);
+    if (updateResult.changes === 0) return res.status(404).json({ error: 'Not found' });
+
     db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(userId);
     recordUsageEvent(db, {
       userId,
@@ -557,7 +565,7 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
   const userId = res.locals.user.id;
   const format = req.query.format || 'txt';
 
-  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ?').get(req.params.id, userId);
+  const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(req.params.id, userId);
   if (!gen) return res.status(404).send('Not found');
 
   const results = JSON.parse(gen.results);
