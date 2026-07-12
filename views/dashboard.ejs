@@ -246,9 +246,9 @@
                             <div class="result-card premium-card" style="animation:cardFadeIn 0.3s ease-out <%= i*0.1 %>s both;">
                                 <div class="result-variation-label">Variation <%= i+1 %></div>
                                 <div class="result-tone-badge"><%= r.tone %></div>
-                                <div class="result-body"><%= r.text.replace(/\n/g,'<br>') %></div>
+                                <div class="result-body"><%= r.text %></div>
                                 <div class="result-card-actions">
-                                    <button class="result-action-btn" onclick="copyText('<%= r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n') %>',this)">📋 <span>Copy</span></button>
+                                    <button class="result-action-btn server-copy-btn" data-copy-text="<%= r.text %>" type="button">📋 <span>Copy</span></button>
                                 </div>
                             </div>
                         <% }); %>
@@ -546,7 +546,7 @@
 .premium-card:hover{box-shadow:var(--shadow-lg);border-color:var(--primary);}
 .result-variation-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.35rem;}
 .result-tone-badge{display:inline-block;background:var(--primary-light);color:var(--primary);font-size:0.65rem;font-weight:700;text-transform:uppercase;padding:0.15rem 0.5rem;border-radius:4px;margin-bottom:0.5rem;}
-.result-body{font-size:0.9rem;color:var(--dark);line-height:1.6;margin-bottom:0.75rem;}
+.result-body{font-size:0.9rem;color:var(--dark);line-height:1.6;margin-bottom:0.75rem;white-space:pre-wrap;}
 .result-card-actions{display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:0.5rem;}
 .result-action-btn{display:flex;align-items:center;gap:0.3rem;background:none;border:1px solid var(--border);border-radius:0.5rem;padding:0.3rem 0.7rem;font-size:0.8rem;cursor:pointer;transition:all 0.2s;color:var(--secondary);font-weight:500;font-family:inherit;}
 .result-action-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light);}
@@ -570,6 +570,7 @@
 }
 </style>
 
+<script src="/js/dashboardResults.js"></script>
 <script>
 (function(){
   var h=new Date().getHours(),g='Welcome back';
@@ -725,16 +726,11 @@
       .then(function(d){
         btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
         if(skel)skel.style.display='none';
-        var h='<div class="results-container mt-5"><div class="results-header"><h2 class="h3">Results</h2><a href="/history" class="btn btn-outline btn-sm">View All →</a></div><div class="gen-success-msg">✓ Done</div><div class="results-grid">';
-        d.results.forEach(function(r,i){
-          h+='<div class="premium-card" style="animation:cardFadeIn 0.3s ease-out '+(i*0.1)+'s both;"><div class="result-variation-label">Variation '+(i+1)+'</div><div class="result-tone-badge">'+r.tone+'</div><div class="result-body">'+r.text.replace(/\n/g,'<br>')+'</div><div class="result-card-actions"><button class="result-action-btn" onclick="copyText(\''+r.text.replace(/'/g,"\\'").replace(/\n/g,'\\n')+'\',this)">📋 <span>Copy</span></button></div></div>';
-        });
-        h+='</div></div>';
-        if(resArea)resArea.innerHTML=h;
+        window.CopyQuickDashboardResults.renderGenerationResults(resArea,d.results);
       }).catch(function(e){
         btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
         if(skel)skel.style.display='none';
-        if(resArea)resArea.innerHTML='<div class="alert alert-error">'+e.message+'</div>';
+        window.CopyQuickDashboardResults.renderError(resArea,e.message);
       });
     });
   });
@@ -746,6 +742,12 @@
       setTimeout(function(){b.classList.remove('copied');b.innerHTML='📋 <span>Copy</span>';},2000);
     });
   };
+
+  document.querySelectorAll('.server-copy-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      window.copyText(btn.getAttribute('data-copy-text') || '',btn);
+    });
+  });
 
   // ===== Business Journey Card Selection =====
   var journeyCards = document.querySelectorAll('.bj-card');
