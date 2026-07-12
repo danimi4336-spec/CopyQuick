@@ -19,6 +19,7 @@ const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
 const { getAuthenticatedUserById } = require('./lib/authUser');
 const { createGlobalErrorHandler } = require('./lib/errorHandler');
+const { createCsrfProtection } = require('./lib/csrf');
 
 // Startup auth config check
 console.log('🔐 Auth Configuration:');
@@ -30,7 +31,8 @@ console.log(`  SESSION_SECRET:       ${process.env.SESSION_SECRET ? '✅ present
 // Initialize database
 initDb();
 
-// Webhook route must be before express.json() to get raw body
+// Stripe webhooks are intentionally mounted before body parsing, sessions, and
+// CSRF protection because Stripe authenticates them with a signed raw body.
 app.use('/', webhookRoutes);
 
 // View engine setup
@@ -55,6 +57,9 @@ app.use(session({
 // Passport initialization
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Central CSRF protection for browser-originated state changes.
+app.use(createCsrfProtection());
 
 // Provide user to all templates
 app.use((req, res, next) => {

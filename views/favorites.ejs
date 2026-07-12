@@ -44,7 +44,7 @@
 
 <script>
 function unfavorite(id, btn) {
-    fetch('/generation/' + id + '/favorite', { method: 'POST' })
+    fetch('/generation/' + id + '/favorite', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json()).then(function() {
             var card = btn.closest('.gen-card');
             card.style.opacity = '0';
