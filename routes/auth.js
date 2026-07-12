@@ -61,6 +61,10 @@ router.post('/login', async (req, res) => {
 
 // Google OAuth
 router.get('/auth/google', (req, res, next) => {
+  if (!passport.isGoogleOAuthConfigured()) {
+    return res.status(503).send('Google login is currently unavailable. Please log in with email and password.');
+  }
+
   const configuredURL = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/auth/google/callback`;
   console.log(`🔀 Google OAuth initiating...`);
   console.log(`🔀 Configured callbackURL: "${process.env.GOOGLE_CALLBACK_URL}"`);
@@ -76,6 +80,10 @@ router.get('/auth/google', (req, res, next) => {
 
 router.get('/auth/google/callback',
   (req, res, next) => {
+    if (!passport.isGoogleOAuthConfigured()) {
+      return res.redirect('/login');
+    }
+
     passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }, (err, user, info) => {
       if (err) {
         console.error('❌ Google OAuth callback error:', err);
