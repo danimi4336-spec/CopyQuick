@@ -17,6 +17,7 @@ const webhookRoutes = require('./routes/webhook');
 const builderRoutes = require('./routes/builder');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
+const { getAuthenticatedUserById } = require('./lib/authUser');
 
 // Startup auth config check
 console.log('🔐 Auth Configuration:');
@@ -59,7 +60,7 @@ app.use((req, res, next) => {
   const userId = req.session?.userId || req.session?.passport?.user || req.user?.id;
   if (userId) {
     const db = getDb();
-    const user = db.prepare('SELECT id, email, name, plan_tier, avatar_url, generations_used, monthly_limit, created_at FROM users WHERE id = ?').get(userId);
+    const user = getAuthenticatedUserById(db, userId);
     res.locals.user = user;
   } else {
     res.locals.user = null;
