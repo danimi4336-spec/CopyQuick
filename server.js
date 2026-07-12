@@ -18,6 +18,7 @@ const builderRoutes = require('./routes/builder');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
 const { getAuthenticatedUserById } = require('./lib/authUser');
+const { createGlobalErrorHandler } = require('./lib/errorHandler');
 
 // Startup auth config check
 console.log('🔐 Auth Configuration:');
@@ -145,14 +146,8 @@ app.get('/refunds', (req, res) => {
   res.render('refunds', { title: 'Refund Policy - CopyQuick', currentPage: 'refunds' });
 });
 
-// Global error handler — logs ALL errors and returns a clear message
-app.use((err, req, res, next) => {
-  console.error('❌ SERVER ERROR:', err.message || err);
-  console.error('   Stack:', err.stack ? err.stack.split('\n').slice(0,3).join('\n   ') : 'N/A');
-  console.error('   URL:', req.method, req.originalUrl);
-  if (res.headersSent) return next(err);
-  res.status(500).send(`<html><body style="font-family:system-ui;padding:2rem;max-width:600px"><h2>Something went wrong</h2><p style="color:#666">${err.message || 'Internal server error'}</p><hr><pre style="font-size:0.8rem;color:#999;overflow:auto">${err.stack ? err.stack.split('\n').slice(0,5).join('\n') : ''}</pre></body></html>`);
-});
+// Global error handler — logs full errors, but hides internals from production users.
+app.use(createGlobalErrorHandler());
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
