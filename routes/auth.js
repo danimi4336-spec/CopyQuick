@@ -65,13 +65,9 @@ router.get('/auth/google', (req, res, next) => {
     return res.status(503).send('Google login is currently unavailable. Please log in with email and password.');
   }
 
-  const configuredURL = process.env.GOOGLE_CALLBACK_URL || `${req.protocol}://${req.get('host')}/auth/google/callback`;
+  const hasGoogleCallbackUrl = Boolean(String(process.env.GOOGLE_CALLBACK_URL || '').trim());
   console.log(`🔀 Google OAuth initiating...`);
-  console.log(`🔀 Configured callbackURL: "${process.env.GOOGLE_CALLBACK_URL}"`);
-  console.log(`🔀 Request host:           "${req.get('host')}"`);
-  console.log(`🔀 Request protocol:       "${req.protocol}"`);
-  console.log(`🔀 Computed redirect:      "${req.protocol}://${req.get('host')}/auth/google/callback"`);
-  console.log(`🔀 Env var callbackURL:    "${process.env.GOOGLE_CALLBACK_URL}"`);
+  console.log(`🔀 GOOGLE_CALLBACK_URL: ${hasGoogleCallbackUrl ? 'present' : 'missing'}`);
   if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
     console.error(`❌ GOOGLE_CALLBACK_URL does NOT start with https:// — Google will reject this!`);
   }
