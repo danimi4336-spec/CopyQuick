@@ -23,10 +23,14 @@ const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
 
 // Startup auth config check
+const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
+const hasGoogleClientSecret = Boolean(String(process.env.GOOGLE_CLIENT_SECRET || '').trim());
+const hasGoogleCallbackUrl = Boolean(String(process.env.GOOGLE_CALLBACK_URL || '').trim());
 console.log('🔐 Auth Configuration:');
-console.log(`  GOOGLE_CLIENT_ID:     ${process.env.GOOGLE_CLIENT_ID ? '✅ present (' + process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...)' : '❌ MISSING'}`);
-console.log(`  GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? '✅ present (' + process.env.GOOGLE_CLIENT_SECRET.substring(0, 8) + '...)' : '❌ MISSING'}`);
-console.log(`  GOOGLE_CALLBACK_URL:  ${process.env.GOOGLE_CALLBACK_URL ? '✅ ' + process.env.GOOGLE_CALLBACK_URL : '❌ MISSING'}`);
+console.log(`  GOOGLE_CLIENT_ID:     ${hasGoogleClientId ? 'present' : 'missing'}`);
+console.log(`  GOOGLE_CLIENT_SECRET: ${hasGoogleClientSecret ? 'present' : 'missing'}`);
+console.log(`  GOOGLE_CALLBACK_URL:  ${hasGoogleCallbackUrl ? 'present' : 'missing'}`);
+console.log(`  Google OAuth:         ${hasGoogleClientId && hasGoogleClientSecret ? 'configured' : 'disabled'}`);
 console.log(`  SESSION_SECRET:       ${getSessionSecretStatus(process.env)}`);
 
 // Initialize database
