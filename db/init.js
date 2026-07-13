@@ -76,8 +76,18 @@ function initDb() {
       cancel_at_period_end INTEGER DEFAULT 0,
       canceled_at DATETIME,
       ended_at DATETIME,
+      latest_stripe_event_created INTEGER DEFAULT 0,
+      latest_stripe_event_id TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS stripe_webhook_events (
+      event_id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      stripe_created INTEGER DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'processed',
+      processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
     CREATE TABLE IF NOT EXISTS usage_periods (
@@ -161,6 +171,19 @@ function initDb() {
     }
   });
 
+  // Add subscription ordering columns (migration)
+  const subscriptionCols = [
+    'latest_stripe_event_created INTEGER DEFAULT 0',
+    'latest_stripe_event_id TEXT'
+  ];
+  subscriptionCols.forEach(col => {
+    try {
+      db.exec(`ALTER TABLE subscriptions ADD COLUMN ${col}`);
+    } catch (e) {
+      // Already exists
+    }
+  });
+
   // Create indexes for performance
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_user_id ON generations(user_id)`);
@@ -170,6 +193,8 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_created ON generations(user_id, created_at DESC)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id, status)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_id ON subscriptions(stripe_customer_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_type ON stripe_webhook_events(event_type)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_created ON stripe_webhook_events(stripe_created)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_periods_user_period_end ON usage_periods(user_id, period_end)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_periods_subscription_id ON usage_periods(subscription_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_user_created ON usage_events(user_id, created_at)`);
