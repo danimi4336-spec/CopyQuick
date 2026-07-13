@@ -5,7 +5,11 @@ const { requireAuth } = require('./auth');
 const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
-const { getCurrentUsageSnapshot, recordUsageEvent } = require('../lib/subscriptions');
+const {
+  getCurrentUsageSnapshot,
+  persistGenerationUsageTransaction,
+  UsageLimitExceededError
+} = require('../lib/subscriptions');
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -262,23 +266,23 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
 
     const resultsJson = JSON.stringify(results);
     const contentTypeVal = genType === 'quick' ? (contentType || 'sales_message') : genType;
-    
-    const stmt = db.prepare(`
-      INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(user.id, title, productDescription, contentTypeVal, tone || 'Professional', resultsJson, wordCount, goal || '', genType);
-    const genId = result.lastInsertRowid;
 
-    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(user.id);
-    recordUsageEvent(db, {
+    const persisted = persistGenerationUsageTransaction(db, {
       userId: user.id,
       usagePeriodId: usageSnapshot.usagePeriod.id,
-      generationId: genId,
       eventType: 'generation',
       sourceRoute: 'POST /dashboard/generate',
-      metadata: { generationType: genType, contentType: contentTypeVal }
+      metadata: { generationType: genType, contentType: contentTypeVal },
+      persistGeneration: (txDb) => {
+        const stmt = txDb.prepare(`
+          INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        const result = stmt.run(user.id, title, productDescription, contentTypeVal, tone || 'Professional', resultsJson, wordCount, goal || '', genType);
+        return result.lastInsertRowid;
+      }
     });
+    const genId = persisted.generationId;
 
     if (isAjax) {
       const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
@@ -331,6 +335,38 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    if (err instanceof UsageLimitExceededError) {
+      if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
+
+      const latestUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) || user;
+      const latestUsageSnapshot = getCurrentUsageSnapshot(db, latestUser);
+      const { favorites, quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
+      const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
+      const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
+      const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
+      const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
+      const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
+      return res.status(403).render('dashboard', {
+        title: 'Dashboard - CopyQuick',
+        contentTypes: getContentTypes(),
+        tones: getTones(),
+        history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+        results: null,
+        error: 'Monthly generation limit reached. <a href=\"/pricing\">Upgrade your plan</a> to continue.',
+        totalGenerations: 0, favorites: 0, thisMonth: 0,
+        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        recent: [], typeBreakdown: [],
+        bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+        brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
+        journey: journeySafe,
+        goalLabels,
+        journeyGroupsData: getGroupsWithJourneys(),
+        journeysData: JSON.stringify(getAllJourneys()),
+        aiCredits: formatAiCredits(latestUsageSnapshot, latestUser),
+        builderGoal: latestUser.builder_goal || '',
+        input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
+      });
+    }
     if (isAjax) return res.status(500).json({ error: 'Generation failed' });
     const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
@@ -535,26 +571,36 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
     const newJson = JSON.stringify(newResults);
     const wordCount = newResults.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
 
-    const updateResult = db.prepare(`
-      UPDATE generations
-      SET results = ?, word_count = ?, updated_at = datetime('now')
-      WHERE id = ? AND user_id = ? AND is_deleted = 0
-    `).run(newJson, wordCount, genId, userId);
-    if (updateResult.changes === 0) return res.status(404).json({ error: 'Not found' });
-
-    db.prepare('UPDATE users SET generations_used = generations_used + 1 WHERE id = ?').run(userId);
-    recordUsageEvent(db, {
+    persistGenerationUsageTransaction(db, {
       userId,
       usagePeriodId: usageSnapshot.usagePeriod.id,
-      generationId: genId,
       eventType: 'regeneration',
       sourceRoute: 'POST /generation/:id/regenerate',
-      metadata: { contentType: gen.content_type }
+      metadata: { contentType: gen.content_type },
+      persistGeneration: (txDb) => {
+        const updateResult = txDb.prepare(`
+          UPDATE generations
+          SET results = ?, word_count = ?, updated_at = datetime('now')
+          WHERE id = ? AND user_id = ? AND is_deleted = 0
+        `).run(newJson, wordCount, genId, userId);
+        if (updateResult.changes === 0) {
+          const notFoundError = new Error('Generation not found during regeneration persistence');
+          notFoundError.code = 'GENERATION_NOT_FOUND';
+          throw notFoundError;
+        }
+        return genId;
+      }
     });
 
     res.json({ results: newResults });
   } catch (err) {
     console.error(err);
+    if (err instanceof UsageLimitExceededError) {
+      return res.status(403).json({ error: 'Monthly limit reached' });
+    }
+    if (err.code === 'GENERATION_NOT_FOUND') {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.status(500).json({ error: 'Generation failed' });
   }
 });
