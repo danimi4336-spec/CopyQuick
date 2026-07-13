@@ -20,13 +20,14 @@ const { contentTypes } = require('./lib/contentTypes');
 const { getAuthenticatedUserById } = require('./lib/authUser');
 const { createGlobalErrorHandler } = require('./lib/errorHandler');
 const { createCsrfProtection } = require('./lib/csrf');
+const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
 
 // Startup auth config check
 console.log('🔐 Auth Configuration:');
 console.log(`  GOOGLE_CLIENT_ID:     ${process.env.GOOGLE_CLIENT_ID ? '✅ present (' + process.env.GOOGLE_CLIENT_ID.substring(0, 20) + '...)' : '❌ MISSING'}`);
 console.log(`  GOOGLE_CLIENT_SECRET: ${process.env.GOOGLE_CLIENT_SECRET ? '✅ present (' + process.env.GOOGLE_CLIENT_SECRET.substring(0, 8) + '...)' : '❌ MISSING'}`);
 console.log(`  GOOGLE_CALLBACK_URL:  ${process.env.GOOGLE_CALLBACK_URL ? '✅ ' + process.env.GOOGLE_CALLBACK_URL : '❌ MISSING'}`);
-console.log(`  SESSION_SECRET:       ${process.env.SESSION_SECRET ? '✅ present' : '⚠️ using default'}`);
+console.log(`  SESSION_SECRET:       ${getSessionSecretStatus(process.env)}`);
 
 // Initialize database
 initDb();
@@ -43,16 +44,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(session({
-  store: new SQLiteStore(),
-  secret: process.env.SESSION_SECRET || 'copyquick-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: false,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
-}));
+app.use(session(createSessionConfig({ store: new SQLiteStore() })));
 
 // Passport initialization
 app.use(passport.initialize());
