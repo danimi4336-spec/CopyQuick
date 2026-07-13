@@ -12,12 +12,24 @@ if (!fs.existsSync(dbDir)) {
 
 let db;
 
+function isSqlDebugEnabled(env = process.env) {
+  return env.NODE_ENV !== 'production' && env.SQL_DEBUG === 'true';
+}
+
+function createDatabaseOptions(env = process.env) {
+  if (!isSqlDebugEnabled(env)) {
+    return {};
+  }
+
+  return { verbose: console.log };
+}
+
 function getDb() {
   if (!db) {
-    db = new Database(dbPath, { verbose: console.log });
+    db = new Database(dbPath, createDatabaseOptions());
     db.pragma('foreign_keys = ON');
   }
   return db;
 }
 
-module.exports = { getDb };
+module.exports = { createDatabaseOptions, getDb, isSqlDebugEnabled };
