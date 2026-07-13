@@ -27,6 +27,28 @@ const calls = {
   listLineItems: 0,
   retrieve: 0
 };
+const subscriptionStates = new Map();
+
+function makeStripeSubscription({
+  id,
+  customer,
+  status = 'active',
+  price = process.env.STRIPE_PRO_PRICE,
+  currentPeriodStart = 1767225600,
+  currentPeriodEnd = 1769904000
+}) {
+  return {
+    id,
+    customer,
+    status,
+    items: { data: [{ price: { id: price } }] },
+    current_period_start: currentPeriodStart,
+    current_period_end: currentPeriodEnd,
+    cancel_at_period_end: false,
+    canceled_at: status === 'canceled' ? 1767225600 : null,
+    ended_at: status === 'canceled' ? 1767225600 : null
+  };
+}
 
 require.cache[stripeModuleId] = {
   id: stripeModuleId,
@@ -57,15 +79,18 @@ require.cache[stripeModuleId] = {
       subscriptions: {
         retrieve: async (subscriptionId) => {
           calls.retrieve += 1;
-          return {
-            id: subscriptionId,
-            status: 'active',
-            current_period_start: 1767225600,
-            current_period_end: 1769904000,
-            cancel_at_period_end: false,
-            canceled_at: null,
-            ended_at: null
-          };
+          if (subscriptionStates.has(subscriptionId)) {
+            const state = subscriptionStates.get(subscriptionId);
+            if (state === null) {
+              const err = new Error('No such subscription');
+              err.statusCode = 404;
+              err.code = 'resource_missing';
+              throw err;
+            }
+            return state;
+          }
+
+          return makeStripeSubscription({ id: subscriptionId, customer: `cus_${subscriptionId}` });
         }
       }
     }
@@ -123,6 +148,19 @@ function unsupportedEvent(id) {
   };
 }
 
+function malformedLifecycleEvent(id, created) {
+  const event = subscriptionEvent({
+    id,
+    created,
+    customer: 'cus_fail',
+    subscription: 'sub_fail'
+  });
+  if (created === undefined) {
+    delete event.created;
+  }
+  return event;
+}
+
 function request(server, event, signature = 'valid-signature') {
   if (event) events.push(event);
 
@@ -177,6 +215,8 @@ async function run() {
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('fail@example.com', 'Fail User', 'cus_fail');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('stale@example.com', 'Stale User', 'cus_stale');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('other@example.com', 'Other User', 'cus_other');
+  db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('same@example.com', 'Same Second User', 'cus_same');
+  db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('null-order@example.com', 'Null Order User', 'cus_null');
 
   const app = express();
   app.use('/', webhookRoutes);
@@ -292,6 +332,108 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(getUser(db, 'other@example.com').plan_tier, 'pro');
     assert.strictEqual(db.prepare('SELECT latest_stripe_event_id FROM subscriptions WHERE stripe_subscription_id = ?').get('sub_other').latest_stripe_event_id, 'evt_other_independent');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_same_initial',
+      created: 650,
+      customer: 'cus_same',
+      subscription: 'sub_same',
+      status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'same@example.com').plan_tier, 'pro');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_a_same_deleted',
+      type: 'customer.subscription.deleted',
+      created: 700,
+      customer: 'cus_same',
+      subscription: 'sub_same',
+      status: 'canceled'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'same@example.com').plan_tier, 'free');
+
+    subscriptionStates.set('sub_same', null);
+    response = await request(server, subscriptionEvent({
+      id: 'evt_z_same_update',
+      created: 700,
+      customer: 'cus_same',
+      subscription: 'sub_same',
+      status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'same@example.com').plan_tier, 'free', 'same-second stale update must not restore access when Stripe says the subscription is deleted');
+    assert.strictEqual(db.prepare('SELECT status FROM stripe_webhook_events WHERE event_id = ?').get('evt_z_same_update').status, 'processed');
+
+    subscriptionStates.set('sub_same', makeStripeSubscription({
+      id: 'sub_same',
+      customer: 'cus_same',
+      status: 'active'
+    }));
+    response = await request(server, subscriptionEvent({
+      id: 'evt_0_same_reactivate',
+      created: 700,
+      customer: 'cus_same',
+      subscription: 'sub_same',
+      status: 'canceled'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'same@example.com').plan_tier, 'pro', 'same-second reactivation must apply current Stripe state even when the event ID sorts lower');
+    assert.strictEqual(db.prepare('SELECT latest_stripe_event_id FROM subscriptions WHERE stripe_subscription_id = ?').get('sub_same').latest_stripe_event_id, 'evt_0_same_reactivate');
+
+    const nullOrderUser = getUser(db, 'null-order@example.com');
+    db.prepare(`
+      INSERT INTO subscriptions (
+        user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier, price_id,
+        current_period_start, current_period_end, latest_stripe_event_created, latest_stripe_event_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+    `).run(
+      nullOrderUser.id,
+      'cus_null',
+      'sub_null_order',
+      'active',
+      'free',
+      process.env.STRIPE_PRO_PRICE,
+      '2026-01-01T00:00:00.000Z',
+      '2026-02-01T00:00:00.000Z'
+    );
+    response = await request(server, subscriptionEvent({
+      id: 'evt_null_order_first',
+      created: 800,
+      customer: 'cus_null',
+      subscription: 'sub_null_order',
+      status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'null-order@example.com').plan_tier, 'pro');
+
+    for (const [id, created] of [
+      ['evt_missing_created', undefined],
+      ['evt_malformed_created', '800'],
+      ['evt_negative_created', -1],
+      ['evt_non_finite_created', Infinity]
+    ]) {
+      response = await request(server, malformedLifecycleEvent(id, created));
+      assert.strictEqual(response.res.statusCode, 500, `${id} should fail retryably`);
+      assert.strictEqual(eventCount(db, id), 0, `${id} should not be recorded as processed`);
+    }
+
+    const beforeConcurrentClaim = getUser(db, 'same@example.com');
+    db.prepare(`
+      INSERT INTO stripe_webhook_events (event_id, event_type, stripe_created, status)
+      VALUES (?, ?, ?, ?)
+    `).run('evt_concurrent_claim', 'customer.subscription.updated', 900, 'processing');
+    response = await request(server, subscriptionEvent({
+      id: 'evt_concurrent_claim',
+      created: 900,
+      customer: 'cus_same',
+      subscription: 'sub_same',
+      status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.deepStrictEqual(getUser(db, 'same@example.com'), beforeConcurrentClaim);
+    assert.strictEqual(eventCount(db, 'evt_concurrent_claim'), 1);
 
     const beforeUnsupported = getUser(db, 'other@example.com');
     response = await request(server, unsupportedEvent('evt_unsupported'));
