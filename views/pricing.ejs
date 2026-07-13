@@ -38,6 +38,7 @@
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>
             <% } else { %>
                 <form action="/subscribe" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="price" value="pro">
                     <button type="submit" class="btn btn-primary btn-block">Upgrade to Pro</button>
                 </form>
@@ -58,6 +59,7 @@
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>
             <% } else { %>
                 <form action="/subscribe" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="price" value="unlimited">
                     <button type="submit" class="btn btn-primary btn-block">Go Unlimited</button>
                 </form>

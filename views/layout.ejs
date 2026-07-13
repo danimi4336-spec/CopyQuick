@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><%= title %></title>
+    <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
+    <meta name="csrf-token" content="<%= csrfToken %>">
+    <% } %>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,6 +24,7 @@
                     <a href="/dashboard" class="nav-link">Dashboard</a>
                     <a href="/profile" class="nav-link"><%= user.name || 'Profile' %></a>
                     <form action="/logout" method="POST" style="display:inline;">
+                        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                         <button type="submit" class="btn-link nav-link">Logout</button>
                     </form>
                 <% } else { %>
@@ -113,6 +117,20 @@
     <% } %>
 
     <script>
+    window.CopyQuickCsrf = (function(){
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        var token = meta ? meta.getAttribute('content') : '';
+        return {
+            token: token,
+            headers: function(headers) {
+                var merged = {};
+                Object.keys(headers || {}).forEach(function(key) { merged[key] = headers[key]; });
+                if (token) merged['X-CSRF-Token'] = token;
+                return merged;
+            }
+        };
+    })();
+
     // Sidebar toggle
     (function(){
         var toggle = document.getElementById('sidebarToggle');

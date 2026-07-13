@@ -88,7 +88,7 @@
 
 <script>
 function toggleFavorite(id, btn) {
-    fetch('/generation/' + id + '/favorite', { method: 'POST' })
+    fetch('/generation/' + id + '/favorite', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json())
         .then(data => {
             if (data.favorite) {
@@ -103,7 +103,7 @@ function toggleFavorite(id, btn) {
 
 function deleteGen(id, btn) {
     if (!confirm('Move this generation to trash? You can restore it within 30 days.')) return;
-    fetch('/generation/' + id + '/delete', { method: 'POST' })
+    fetch('/generation/' + id + '/delete', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json())
         .then(function() {
             var card = btn.closest('.gen-card');

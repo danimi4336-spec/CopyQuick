@@ -11,6 +11,7 @@
     </div>
     <div class="brain-progress-bar fade-in"><div class="brain-progress-fill" style="width:<%= pct %>%"></div></div>
     <form action="/brand-brain" method="POST" class="brain-form fade-in">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="brain-grid">
             <div class="form-group">
                 <label for="business_name">What should CopyQuick call your business? <span class="brain-helper">Your business name makes everything personal.</span></label>

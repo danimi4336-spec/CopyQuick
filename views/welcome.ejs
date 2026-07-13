@@ -5,6 +5,7 @@
             <p class="welcome-sub">Let's build something extraordinary together. What would you like to build today?</p>
         </div>
         <form action="/welcome" method="POST" class="welcome-form fade-in">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div class="welcome-grid">
                 <label class="welcome-card">
                     <input type="radio" name="goal" value="launch_product" class="welcome-radio" required>

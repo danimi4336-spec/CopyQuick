@@ -80,7 +80,7 @@
 var genId = <%= gen.id %>;
 
 function toggleFav() {
-    fetch('/generation/' + genId + '/favorite', { method: 'POST' })
+    fetch('/generation/' + genId + '/favorite', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json()).then(d => {
             var btn = document.getElementById('favBtn');
             btn.classList.toggle('active', d.favorite);
@@ -90,7 +90,7 @@ function toggleFav() {
 
 function deleteGen() {
     if (!confirm('Move to trash? You can restore within 30 days.')) return;
-    fetch('/generation/' + genId + '/delete', { method: 'POST' })
+    fetch('/generation/' + genId + '/delete', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json()).then(function() {
             showToast('Deleted');
             setTimeout(function() { window.location.href = '/history'; }, 1000);
@@ -98,7 +98,7 @@ function deleteGen() {
 }
 
 function regenerate() {
-    fetch('/generation/' + genId + '/regenerate', { method: 'POST' })
+    fetch('/generation/' + genId + '/regenerate', { method: 'POST', headers: window.CopyQuickCsrf.headers({ 'Accept': 'application/json' }) })
         .then(r => r.json()).then(function(d) {
             if (d.error) { showToast('Error: ' + d.error); return; }
             showToast('Regenerated!');
@@ -130,7 +130,7 @@ function saveTags() {
     var tags = document.getElementById('tagInput').value;
     fetch('/generation/' + genId + '/tags', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: window.CopyQuickCsrf.headers({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ tags: tags })
     }).then(r => r.json()).then(function() { showToast('Tags saved ✅'); });
 }

@@ -86,6 +86,7 @@
             </div>
             <% if (credits.manageUrl === '/manage') { %>
                 <form action="/manage" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <button type="submit" class="btn btn-primary btn-block"><%= credits.manageLabel %></button>
                 </form>
             <% } else { %>
@@ -198,6 +199,7 @@
                 </div>
                 <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%- error %></div><% } %>
                 <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="quick">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <div class="form-group">
                         <label for="quickProduct">Product / Service</label>
                         <textarea id="quickProduct" name="productDescription" rows="2" placeholder="Describe your product..." required><%= typeof input !== 'undefined' ? input.productDescription : '' %></textarea>
@@ -266,6 +268,7 @@
                     <p class="mode-panel-desc">Generate multiple marketing assets at once.</p>
                 </div>
                 <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="bundle">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <div class="form-group">
                         <label for="bundleProduct">Product / Service</label>
                         <textarea id="bundleProduct" name="productDescription" rows="2" placeholder="Describe your product..." required></textarea>
@@ -323,6 +326,7 @@
                             <p class="mode-panel-desc">Generate an entire multi-channel campaign from one idea.</p>
                         </div>
                         <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="campaign">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                             <div class="form-group">
                                 <label for="campaignProduct">Product / Service</label>
                                 <textarea id="campaignProduct" name="productDescription" rows="2" placeholder="Describe your product or service..." required></textarea>
@@ -719,7 +723,7 @@
 
       fetch('/dashboard/generate',{
         method:'POST',
-        headers:{'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        headers:window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}),
         body:d.toString()
       })
       .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Failed');return d;});})
@@ -822,7 +826,7 @@
     if(selectedJourneyId){
       fetch('/dashboard/update-goal', {
         method: 'POST',
-        headers: {'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'},
+        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}),
         body: 'goal=' + encodeURIComponent(selectedJourneyId)
       }).catch(function(err){ console.warn('Goal save:', err); });
     }

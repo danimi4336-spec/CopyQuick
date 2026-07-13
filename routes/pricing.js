@@ -10,34 +10,9 @@ router.get('/pricing', (req, res) => {
   });
 });
 
-// GET /subscribe?price=...
-router.get('/subscribe', requireAuth, async (req, res) => {
-  const { price } = req.query;
-  const user = res.locals.user;
-  
-  let priceId;
-  if (price === 'pro' || price === 'pro_price') {
-    priceId = process.env.STRIPE_PRO_PRICE;
-  } else if (price === 'unlimited' || price === 'unlimited_price') {
-    priceId = process.env.STRIPE_UNLIMITED_PRICE;
-  }
-
-  if (!priceId) {
-    return res.redirect('/pricing');
-  }
-
-  try {
-    const session = await createCheckoutSession(
-      user.email, 
-      priceId, 
-      `${req.protocol}://${req.get('host')}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      `${req.protocol}://${req.get('host')}/pricing`
-    );
-    res.redirect(session.url);
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('Error creating checkout session.');
-  }
+// Legacy GET links are non-mutating; checkout creation happens only via POST.
+router.get('/subscribe', requireAuth, (req, res) => {
+  res.redirect('/pricing');
 });
 
 // POST /subscribe (alternate version if using form)
