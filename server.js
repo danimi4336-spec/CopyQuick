@@ -21,6 +21,7 @@ const { getAuthenticatedUserById } = require('./lib/authUser');
 const { createGlobalErrorHandler } = require('./lib/errorHandler');
 const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
+const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -102,30 +103,7 @@ app.get('/contact', (req, res) => {
   res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, error: null });
 });
 
-app.post('/contact', async (req, res) => {
-  const { name, email, subject, message } = req.body;
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'N/A';
-  const userAgent = req.headers['user-agent'] || 'N/A';
-
-  if (!name || !email || !subject || !message) {
-    return res.render('contact', { 
-      title: 'Contact - CopyQuick', currentPage: 'contact', sent: false,
-      error: 'Please fill in all fields.' 
-    });
-  }
-
-  try {
-    const { ticketNumber } = await sendContactFormEmails({ name, email, subject, message, ip, userAgent });
-    console.log(`Contact form processed: ticket ${ticketNumber} from ${email}`);
-    res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: true, error: null });
-  } catch (err) {
-    console.error('Contact form error:', err);
-    res.render('contact', { 
-      title: 'Contact - CopyQuick', currentPage: 'contact', sent: false,
-      error: 'Sorry, your message could not be sent. Please try again later.' 
-    });
-  }
-});
+app.post('/contact', createContactRateLimiter(), createContactHandler({ sendContactFormEmails }));
 
 app.get('/blog', (req, res) => {
   res.render('blog', { title: 'Blog - CopyQuick', currentPage: 'blog' });
