@@ -9,6 +9,8 @@ const {
   createSignupRateLimiter
 } = require('../lib/authProtection');
 
+const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
+
 // Middleware to check if user is logged in
 function requireAuth(req, res, next) {
   if (req.session && (req.session.userId || req.session.passport?.user)) {
@@ -57,7 +59,10 @@ function createAuthRouter(options = {}) {
 
     try {
       const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-      if (user && await bcryptApi.compare(password, user.password_hash)) {
+      const passwordHash = user?.password_hash || DUMMY_PASSWORD_HASH;
+      const passwordMatches = await bcryptApi.compare(password, passwordHash);
+
+      if (user && passwordMatches) {
         loginLimiter.recordSuccess(req);
         req.session.userId = user.id;
         const db2 = getDatabase();

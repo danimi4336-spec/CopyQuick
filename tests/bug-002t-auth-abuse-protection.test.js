@@ -32,6 +32,8 @@ const {
 } = require('../lib/authProtection');
 const { createAuthRouter } = require('../routes/auth');
 
+const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
+
 function request(agent, method, url, options = {}) {
   return new Promise((resolve, reject) => {
     let payload = '';
@@ -96,11 +98,17 @@ async function createTestAgent(options = {}) {
 
   const calls = {
     compare: 0,
-    hash: 0
+    compareHashes: [],
+    hash: 0,
+    userLookups: 0
   };
   const bcryptMock = {
     compare: async (password, hash) => {
       calls.compare += 1;
+      calls.compareHashes.push(hash);
+      if (options.compareDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.compareDelayMs));
+      }
       return hash === `hash:${password}`;
     },
     hash: async (password) => {
@@ -129,7 +137,14 @@ async function createTestAgent(options = {}) {
   app.get('/csrf-token', (req, res) => res.json({ csrfToken: req.csrfToken() }));
   app.use(createAuthRouter({
     bcrypt: bcryptMock,
-    getDb,
+    getDb: () => ({
+      prepare: (sql) => {
+        if (/SELECT \* FROM users WHERE email = \?/i.test(sql)) {
+          calls.userLookups += 1;
+        }
+        return getDb().prepare(sql);
+      }
+    }),
     loginLimiter,
     signupLimiter
   }));
@@ -176,6 +191,10 @@ function countUsers(db) {
   return db.prepare('SELECT COUNT(*) AS count FROM users').get().count;
 }
 
+function countStatus(responses, statusCode) {
+  return responses.filter((response) => response.res.statusCode === statusCode).length;
+}
+
 async function run() {
   initDb();
   const db = getDb();
@@ -207,6 +226,9 @@ async function run() {
     assert.strictEqual(missingAccount.res.statusCode, 200);
     assert(wrongPassword.body.includes(LOGIN_FAILURE_ERROR));
     assert.strictEqual(wrongPassword.body, missingAccount.body);
+    assert.strictEqual(failure.calls.compare, 2);
+    assert.strictEqual(failure.calls.compareHashes[0], 'hash:correct-password');
+    assert.strictEqual(failure.calls.compareHashes[1], DUMMY_PASSWORD_HASH);
     failure.close();
 
     const ipLimited = await createTestAgent({ maxIpFailures: 2, maxEmailFailures: 10 });
@@ -218,6 +240,7 @@ async function run() {
     assert.strictEqual(ipBlocked.res.statusCode, 429);
     assert(ipBlocked.body.includes(AUTH_LIMIT_ERROR));
     assert.strictEqual(ipLimited.calls.compare, beforeIpBlockedCompare);
+    assert.strictEqual(ipLimited.calls.userLookups, 2);
     ipLimited.close();
 
     const emailLimited = await createTestAgent({ maxIpFailures: 10, maxEmailFailures: 2 });
@@ -228,11 +251,46 @@ async function run() {
     const emailBlocked = await postLogin(emailLimited.agent, emailToken, { password: 'bad-three' }, { 'X-Forwarded-For': '203.0.113.12' });
     assert.strictEqual(emailBlocked.res.statusCode, 429);
     assert.strictEqual(emailLimited.calls.compare, beforeEmailBlockedCompare);
+    assert.strictEqual(emailLimited.calls.userLookups, 2);
     const otherAccount = await postLogin(emailLimited.agent, emailToken, { email: 'other@example.com', password: 'bad' }, { 'X-Forwarded-For': '203.0.113.13' });
     assert.strictEqual(otherAccount.res.statusCode, 200);
     emailLimited.close();
 
-    const reset = await createTestAgent({ maxIpFailures: 10, maxEmailFailures: 2 });
+    const concurrentIp = await createTestAgent({ maxIpFailures: 2, maxEmailFailures: 10, compareDelayMs: 60 });
+    const concurrentIpToken = await getToken(concurrentIp.agent);
+    const concurrentIpResponses = await Promise.all([
+      postLogin(concurrentIp.agent, concurrentIpToken, { email: 'founder@example.com', password: 'bad-1' }),
+      postLogin(concurrentIp.agent, concurrentIpToken, { email: 'other@example.com', password: 'bad-2' }),
+      postLogin(concurrentIp.agent, concurrentIpToken, { email: 'missing-one@example.com', password: 'bad-3' }),
+      postLogin(concurrentIp.agent, concurrentIpToken, { email: 'missing-two@example.com', password: 'bad-4' })
+    ]);
+    assert.strictEqual(countStatus(concurrentIpResponses, 200), 2);
+    assert.strictEqual(countStatus(concurrentIpResponses, 429), 2);
+    assert.strictEqual(concurrentIp.calls.compare, 2);
+    assert.strictEqual(concurrentIp.calls.userLookups, 2);
+    const afterConcurrentIp = await postLogin(concurrentIp.agent, concurrentIpToken, { email: 'another@example.com', password: 'bad-5' });
+    assert.strictEqual(afterConcurrentIp.res.statusCode, 429);
+    assert.strictEqual(concurrentIp.calls.compare, 2);
+    concurrentIp.close();
+
+    const concurrentEmail = await createTestAgent({ maxIpFailures: 10, maxEmailFailures: 2, compareDelayMs: 60 });
+    const concurrentEmailToken = await getToken(concurrentEmail.agent);
+    const concurrentEmailResponses = await Promise.all([
+      postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-1' }, { 'X-Forwarded-For': '203.0.113.21' }),
+      postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-2' }, { 'X-Forwarded-For': '203.0.113.22' }),
+      postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-3' }, { 'X-Forwarded-For': '203.0.113.23' }),
+      postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-4' }, { 'X-Forwarded-For': '203.0.113.24' })
+    ]);
+    assert.strictEqual(countStatus(concurrentEmailResponses, 200), 2);
+    assert.strictEqual(countStatus(concurrentEmailResponses, 429), 2);
+    assert.strictEqual(concurrentEmail.calls.compare, 2);
+    assert.strictEqual(concurrentEmail.calls.userLookups, 2);
+    const afterConcurrentEmail = await postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-5' }, { 'X-Forwarded-For': '203.0.113.25' });
+    assert.strictEqual(afterConcurrentEmail.res.statusCode, 429);
+    assert.strictEqual(concurrentEmail.calls.compare, 2);
+    concurrentEmail.close();
+
+    const reset = await createTestAgent({ maxIpFailures: 4, maxEmailFailures: 2 });
     const resetToken = await getToken(reset.agent);
     await postLogin(reset.agent, resetToken, { password: 'bad-one' });
     const resetSuccess = await postLogin(reset.agent, resetToken);
@@ -240,6 +298,8 @@ async function run() {
     await postLogin(reset.agent, resetToken, { password: 'bad-two' });
     const afterResetAttempt = await postLogin(reset.agent, resetToken, { password: 'bad-three' });
     assert.strictEqual(afterResetAttempt.res.statusCode, 200);
+    const ipStillCounts = await postLogin(reset.agent, resetToken, { email: 'third@example.com', password: 'bad-four' });
+    assert.strictEqual(ipStillCounts.res.statusCode, 429);
     reset.close();
 
     const csrf = await createTestAgent({ maxIpFailures: 1, maxEmailFailures: 1 });
@@ -307,6 +367,22 @@ async function run() {
     assert.strictEqual(jsonBlocked.res.statusCode, 429);
     assert.deepStrictEqual(JSON.parse(jsonBlocked.body), { error: AUTH_LIMIT_ERROR });
     json.close();
+
+    const signupJson = await createTestAgent({ maxSignupAttempts: 1 });
+    const signupJsonToken = await getToken(signupJson.agent);
+    await request(signupJson.agent, 'POST', '/signup', {
+      contentType: 'application/json',
+      headers: { Accept: 'application/json' },
+      body: { _csrf: signupJsonToken, name: 'Json User', email: 'json-one@example.com', password: 'signup-password' }
+    });
+    const signupJsonBlocked = await request(signupJson.agent, 'POST', '/signup', {
+      contentType: 'application/json',
+      headers: { Accept: 'application/json' },
+      body: { _csrf: signupJsonToken, name: 'Json User', email: 'json-two@example.com', password: 'signup-password' }
+    });
+    assert.strictEqual(signupJsonBlocked.res.statusCode, 429);
+    assert.deepStrictEqual(JSON.parse(signupJsonBlocked.body), { error: AUTH_LIMIT_ERROR });
+    signupJson.close();
 
     const oversized = await createTestAgent();
     const oversizedToken = await getToken(oversized.agent);
