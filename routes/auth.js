@@ -1,8 +1,15 @@
 const express = require('express');
-const router = express.Router();
 const bcrypt = require('bcrypt');
 const passport = require('../lib/passport');
 const { getDb } = require('../db/database');
+const {
+  LOGIN_FAILURE_ERROR,
+  SIGNUP_FAILURE_ERROR,
+  createLoginRateLimiter,
+  createSignupRateLimiter
+} = require('../lib/authProtection');
+
+const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
 
 // Middleware to check if user is logged in
 function requireAuth(req, res, next) {
@@ -12,52 +19,69 @@ function requireAuth(req, res, next) {
   res.redirect('/login');
 }
 
-// Signup
-router.get('/signup', (req, res) => {
-  res.render('signup', { title: 'Sign Up - CopyQuick', error: null, currentPage: 'signup' });
-});
+function createAuthRouter(options = {}) {
+  const authRouter = express.Router();
+  const loginLimiter = options.loginLimiter || createLoginRateLimiter(options.loginLimiterOptions);
+  const signupLimiter = options.signupLimiter || createSignupRateLimiter(options.signupLimiterOptions);
+  const bcryptApi = options.bcrypt || bcrypt;
+  const getDatabase = options.getDb || getDb;
 
-router.post('/signup', async (req, res) => {
-  const { email, password, name } = req.body;
-  const db = getDb();
+  // Signup
+  authRouter.get('/signup', (req, res) => {
+    res.render('signup', { title: 'Sign Up - CopyQuick', error: null, currentPage: 'signup' });
+  });
 
-  try {
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = db.prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)')
-      .run(email, passwordHash, name);
-    
-    req.session.userId = result.lastInsertRowid;
-    res.redirect('/welcome');
-  } catch (err) {
-    console.error(err);
-    res.render('signup', { title: 'Sign Up - CopyQuick', error: 'Email already exists or invalid data.', currentPage: 'signup' });
-  }
-});
+  authRouter.post('/signup', signupLimiter, async (req, res) => {
+    const { email, password, name } = req.authSignup;
+    const db = getDatabase();
 
-// Login
-router.get('/login', (req, res) => {
-  res.render('login', { title: 'Login - CopyQuick', error: null, currentPage: 'login' });
-});
+    try {
+      const passwordHash = await bcryptApi.hash(password, 10);
+      const result = db.prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)')
+        .run(email, passwordHash, name);
 
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  const db = getDb();
-
-  try {
-    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (user && await bcrypt.compare(password, user.password_hash)) {
-      req.session.userId = user.id;
-      const db2 = getDb();
-      const hasGoal = db2.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
-      res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
-    } else {
-      res.render('login', { title: 'Login - CopyQuick', error: 'Invalid email or password.', currentPage: 'login' });
+      req.session.userId = result.lastInsertRowid;
+      res.redirect('/welcome');
+    } catch (err) {
+      console.error(err);
+      res.render('signup', { title: 'Sign Up - CopyQuick', error: SIGNUP_FAILURE_ERROR, currentPage: 'signup' });
     }
-  } catch (err) {
-    console.error(err);
-    res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
-  }
-});
+  });
+
+  // Login
+  authRouter.get('/login', (req, res) => {
+    res.render('login', { title: 'Login - CopyQuick', error: null, currentPage: 'login' });
+  });
+
+  authRouter.post('/login', loginLimiter.middleware, async (req, res) => {
+    const { email, password } = req.authLogin;
+    const db = getDatabase();
+
+    try {
+      const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+      const passwordHash = user?.password_hash || DUMMY_PASSWORD_HASH;
+      const passwordMatches = await bcryptApi.compare(password, passwordHash);
+
+      if (user && passwordMatches) {
+        loginLimiter.recordSuccess(req);
+        req.session.userId = user.id;
+        const db2 = getDatabase();
+        const hasGoal = db2.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
+        res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
+      } else {
+        loginLimiter.recordFailure(req);
+        res.render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login' });
+      }
+    } catch (err) {
+      console.error(err);
+      res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
+    }
+  });
+
+  return authRouter;
+}
+
+const router = createAuthRouter();
 
 // Google OAuth
 router.get('/auth/google', (req, res, next) => {
@@ -113,4 +137,4 @@ router.post('/logout', (req, res) => {
   res.redirect('/');
 });
 
-module.exports = { router, requireAuth };
+module.exports = { createAuthRouter, router, requireAuth };
