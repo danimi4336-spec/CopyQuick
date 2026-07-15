@@ -383,7 +383,7 @@ async function run() {
       body: { id: 'evt_missing_signature' }
     });
     assert.strictEqual(webhook.res.statusCode, 400);
-    assert.match(webhook.body, /Webhook Error/);
+    assert.match(webhook.body, /Webhook signature verification failed/);
     assert.strictEqual(mocks.webhookConstructCalls.length, 1);
 
     token = await getToken(agent);

@@ -196,7 +196,7 @@ function applyAuthoritativeSubscriptionState(db, event, {
   const user = findUserForSubscription(db, effectiveCustomerId, stripeSubscriptionId);
 
   if (!user) {
-    console.warn(`${context} received for unknown user:`, stripeSubscriptionId);
+    console.warn(`${context} received for unknown user.`);
     return;
   }
 
@@ -222,8 +222,8 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    console.error('Webhook signature verification failed.');
+    return res.status(400).send('Webhook signature verification failed');
   }
 
   const db = getDb();
@@ -331,7 +331,7 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
           const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
 
           if (!user) {
-            console.warn('Subscription update received for unknown user:', stripeSubscriptionId);
+            console.warn('Subscription update received for unknown user.');
             return { status: 'processed' };
           }
 
@@ -373,7 +373,7 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
           const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
 
           if (!user) {
-            console.warn('Subscription deletion received for unknown user:', stripeSubscriptionId);
+            console.warn('Subscription deletion received for unknown user.');
             return { status: 'processed' };
           }
 
@@ -392,7 +392,7 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
       }
     }
   } catch (err) {
-    console.error('Stripe webhook processing failed:', err);
+    console.error('Stripe webhook processing failed.');
     return res.status(500).send('Webhook processing failed');
   }
 
