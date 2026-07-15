@@ -23,9 +23,9 @@
                 <% if (brainPct === 0) { %>
                     <a href="/brand-brain" class="btn btn-primary btn-lg">🧠 Start Your Brand Brain →</a>
                 <% } else if (campaignCount === 0) { %>
-                    <a href="#mode-campaign-trigger" class="btn btn-primary btn-lg campaign-trigger">🚀 Launch Your First Campaign →</a>
+                    <a href="#mode-campaign" class="btn btn-primary btn-lg mode-trigger" data-mode-trigger="campaign">🚀 Launch Your First Campaign →</a>
                 <% } else { %>
-                    <a href="#mode-campaign-trigger" class="btn btn-primary btn-lg campaign-trigger">🚀 Continue Building →</a>
+                    <a href="#mode-quick" class="btn btn-primary btn-lg mode-trigger" data-mode-trigger="quick">⚡ Generate New Copy →</a>
                 <% } %>
             </div>
         </div>
@@ -119,8 +119,33 @@
                     <% } %>
                 </span>
             </div>
-            <a href="<%= brainPct === 0 || brainPct < 100 ? '/brand-brain' : quickCount === 0 ? '#mode-quick-trigger' : bundleCount === 0 ? '#mode-bundle-trigger' : '#mode-campaign-trigger' %>" class="btn btn-primary bc-rec-btn">
+            <a href="<%= brainPct === 0 || brainPct < 100 ? '/brand-brain' : quickCount === 0 ? '#mode-quick' : bundleCount === 0 ? '#mode-bundle' : '#mode-campaign' %>" class="btn btn-primary bc-rec-btn <%= brainPct >= 100 ? 'mode-trigger' : '' %>" <%= brainPct >= 100 ? 'data-mode-trigger="' + (quickCount === 0 ? 'quick' : bundleCount === 0 ? 'bundle' : 'campaign') + '"' : '' %>>
                 <% if (brainPct === 0) { %>Set Up Now<% } else if (brainPct < 100) { %>Continue<% } else if (quickCount === 0) { %>Try Now<% } else if (bundleCount === 0) { %>Try Bundle<% } else if (campaignCount === 0) { %>Build Campaign<% } else { %>Keep Going<% } %> →
+            </a>
+        </div>
+    </section>
+
+    <!-- ===== GENERATION MODES ===== -->
+    <section class="mode-launcher-section fade-in" aria-labelledby="modeLauncherTitle">
+        <div class="mode-launcher-header">
+            <span class="bc-rec-label">Generation Modes</span>
+            <h2 id="modeLauncherTitle">Choose how you want to create</h2>
+        </div>
+        <div class="mode-launcher-grid">
+            <a href="#mode-quick" class="mode-launch-card mode-trigger" id="mode-quick-trigger" data-mode-trigger="quick">
+                <span class="mode-launch-icon">⚡</span>
+                <strong>Quick Generate</strong>
+                <span>Generate one individual marketing asset quickly.</span>
+            </a>
+            <a href="#mode-bundle" class="mode-launch-card mode-trigger" id="mode-bundle-trigger" data-mode-trigger="bundle">
+                <span class="mode-launch-icon">📦</span>
+                <strong>Marketing Bundle</strong>
+                <span>Generate a coordinated bundle of related assets.</span>
+            </a>
+            <a href="#mode-campaign" class="mode-launch-card mode-trigger" id="mode-campaign-trigger" data-mode-trigger="campaign">
+                <span class="mode-launch-icon">🚀</span>
+                <strong>Complete Campaign</strong>
+                <span>Generate a complete multi-channel campaign.</span>
             </a>
         </div>
     </section>
@@ -179,7 +204,7 @@
             </div>
         </div>
         <div class="bj-cta-row">
-            <a href="<%= brainPct >= 100 ? '/campaign-studio' : '/brand-brain' %>" class="btn btn-primary btn-lg" id="bjCtaBtn">🚀 Start Building →</a>
+            <a href="<%= brainPct >= 100 ? '#mode-campaign' : '/brand-brain' %>" class="btn btn-primary btn-lg <%= brainPct >= 100 ? 'mode-trigger' : '' %>" id="bjCtaBtn" <%= brainPct >= 100 ? 'data-mode-trigger="campaign"' : '' %>>🚀 Start Building →</a>
         </div>
     </section>
 
@@ -499,6 +524,17 @@
 .bc-rec-text{font-size:0.85rem;color:var(--dark);}
 .bc-rec-btn{flex-shrink:0;padding:0.4rem 0.9rem;font-size:0.8rem;border-radius:0.5rem;}
 
+/* ===== Generation Mode Launcher ===== */
+.mode-launcher-section{margin-bottom:1.75rem;}
+.mode-launcher-header{margin-bottom:0.85rem;}
+.mode-launcher-header h2{font-size:1.25rem;margin:0.15rem 0 0;}
+.mode-launcher-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.85rem;}
+.mode-launch-card{display:flex;flex-direction:column;gap:0.35rem;padding:1rem;border:1px solid var(--border);border-radius:0.5rem;background:white;color:var(--dark);text-decoration:none;box-shadow:var(--shadow-sm);transition:transform 0.15s ease,box-shadow 0.15s ease,border-color 0.15s ease;}
+.mode-launch-card:hover,.mode-launch-card:focus{transform:translateY(-1px);box-shadow:var(--shadow-md);border-color:var(--primary);outline:none;}
+.mode-launch-icon{font-size:1.35rem;line-height:1;}
+.mode-launch-card strong{font-size:0.95rem;}
+.mode-launch-card span:last-child{font-size:0.78rem;color:var(--secondary);line-height:1.35;}
+
 /* ===== Tools Section (hidden by default) ===== */
 .bc-tools-hidden{display:none;}
 .bc-tools-visible{display:block;animation:fadeIn 0.3s ease-out;}
@@ -567,6 +603,7 @@
 @media(max-width:768px){
     .bc-welcome{flex-direction:column;align-items:flex-start;gap:1rem;}
     .bc-welcome-right{width:100%;}
+    .mode-launcher-grid{grid-template-columns:1fr;}
     .form-grid-3,.form-grid-2{grid-template-columns:1fr;}
     .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
     .ai-credits-grid{grid-template-columns:1fr;}
@@ -675,10 +712,63 @@
     });
     var inp=chip.querySelector('input');
     inp.addEventListener('change',function(){chip.classList.toggle('selected',inp.checked);updateBundleCount();});
-  });
-  updateBundleCount();
+	  });
+	  updateBundleCount();
 
-  // ===== Form Submission (AJAX) =====
+	  // ===== Generation Mode Launcher =====
+	  var toolsSection=document.getElementById('bc-tools');
+	  var modePanels=document.querySelectorAll('.mode-panel');
+	  var toolTitle=document.getElementById('bcToolTitle');
+	  var backBtn=document.getElementById('bcBackBtn');
+	  var modeTitles={
+	    quick:'⚡ Quick Generate',
+	    bundle:'📦 Marketing Bundle',
+	    campaign:'🚀 Complete Campaign'
+	  };
+	  function showMode(mode){
+	    if(!toolsSection||!modeTitles[mode])return;
+	    toolsSection.style.display='block';
+	    toolsSection.classList.remove('bc-tools-hidden');
+	    toolsSection.classList.add('bc-tools-visible');
+	    modePanels.forEach(function(panel){
+	      panel.classList.toggle('active',panel.id==='mode-'+mode);
+	    });
+	    if(toolTitle)toolTitle.textContent=modeTitles[mode];
+	    var target=document.getElementById('mode-'+mode);
+	    if(target&&target.querySelector('textarea')){
+	      setTimeout(function(){target.querySelector('textarea').focus();},0);
+	    }
+	    toolsSection.scrollIntoView({behavior:'smooth',block:'start'});
+	  }
+	  function hideModes(){
+	    if(!toolsSection)return;
+	    toolsSection.classList.remove('bc-tools-visible');
+	    toolsSection.classList.add('bc-tools-hidden');
+	    toolsSection.style.display='none';
+	    modePanels.forEach(function(panel){panel.classList.remove('active');});
+	    var launcher=document.querySelector('.mode-launcher-section');
+	    if(launcher)launcher.scrollIntoView({behavior:'smooth',block:'start'});
+	  }
+	  document.querySelectorAll('[data-mode-trigger]').forEach(function(trigger){
+	    trigger.addEventListener('click',function(e){
+	      var mode=trigger.getAttribute('data-mode-trigger');
+	      if(modeTitles[mode]){
+	        e.preventDefault();
+	        showMode(mode);
+	      }
+	    });
+	  });
+	  if(backBtn){
+	    backBtn.addEventListener('click',function(e){
+	      e.preventDefault();
+	      hideModes();
+	    });
+	  }
+	  if(location.hash==='#mode-quick'||location.hash==='#mode-quick-trigger')showMode('quick');
+	  if(location.hash==='#mode-bundle'||location.hash==='#mode-bundle-trigger')showMode('bundle');
+	  if(location.hash==='#mode-campaign'||location.hash==='#mode-campaign-trigger')showMode('campaign');
+
+	  // ===== Form Submission (AJAX) =====
   document.querySelectorAll('.gen-form').forEach(function(form){
     form.addEventListener('submit',function(e){
       e.preventDefault();
@@ -754,13 +844,25 @@
   });
 
   // ===== Business Journey Card Selection =====
-  var journeyCards = document.querySelectorAll('.bj-card');
-  var bjCtaBtn = document.getElementById('bjCtaBtn');
-  var selectedJourneyId = null;
+	  var journeyCards = document.querySelectorAll('.bj-card');
+	  var bjCtaBtn = document.getElementById('bjCtaBtn');
+	  var selectedJourneyId = null;
+	  function getJourneyMode(id){
+	    if(id==='individual_assets')return'quick';
+	    if(id==='build_brand'||id==='promote_service'||id==='expand_marketplaces'||id==='scale_product')return'bundle';
+	    return'campaign';
+	  }
+	  function getJourneyCtaLabel(mode){
+	    if(brainPct<100)return'Continue to Brand Brain';
+	    if(mode==='quick')return'⚡ Generate Individual Asset';
+	    if(mode==='bundle')return'📦 Generate Marketing Bundle';
+	    return'🚀 Build Complete Campaign';
+	  }
 
-  function renderBlueprint(id) {
-    var journey = __journeys.find(function(j){ return j.id === id; });
-    if (!journey) return;
+	  function renderBlueprint(id) {
+	    var journey = __journeys.find(function(j){ return j.id === id; });
+	    if (!journey) return;
+	    var journeyMode=getJourneyMode(id);
 
     // Toggle placeholder vs content
     document.getElementById('bpPlaceholder').style.display = 'none';
@@ -806,9 +908,18 @@
     // Outcome
     document.getElementById('bpOutcome').textContent = 'Everything needed to ' + journey.title.toLowerCase() + '.';
 
-    // CTA text
-    bjCtaBtn.textContent = brainPct >= 100 ? 'Build My Campaign' : 'Continue to Brand Brain';
-  }
+	    // CTA text
+	    bjCtaBtn.textContent=getJourneyCtaLabel(journeyMode);
+	    if(brainPct>=100){
+	      bjCtaBtn.setAttribute('href','#mode-'+journeyMode);
+	      bjCtaBtn.setAttribute('data-mode-trigger',journeyMode);
+	      bjCtaBtn.classList.add('mode-trigger');
+	    }else{
+	      bjCtaBtn.setAttribute('href','/brand-brain');
+	      bjCtaBtn.removeAttribute('data-mode-trigger');
+	      bjCtaBtn.classList.remove('mode-trigger');
+	    }
+	  }
 
   journeyCards.forEach(function(card){
     card.addEventListener('click', function(e){
@@ -821,16 +932,21 @@
     });
   });
 
-  // CTA click saves selection then navigates
-  bjCtaBtn.addEventListener('click', function(e){
-    if(selectedJourneyId){
-      fetch('/dashboard/update-goal', {
-        method: 'POST',
-        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}),
-        body: 'goal=' + encodeURIComponent(selectedJourneyId)
-      }).catch(function(err){ console.warn('Goal save:', err); });
-    }
-  });
+	  // CTA click saves selection then navigates
+	  bjCtaBtn.addEventListener('click', function(e){
+	    if(selectedJourneyId){
+	      fetch('/dashboard/update-goal', {
+	        method: 'POST',
+	        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}),
+	        body: 'goal=' + encodeURIComponent(selectedJourneyId)
+	      }).catch(function(err){ console.warn('Goal save:', err); });
+	    }
+	    var mode=bjCtaBtn.getAttribute('data-mode-trigger');
+	    if(mode&&modeTitles[mode]){
+	      e.preventDefault();
+	      showMode(mode);
+	    }
+	  });
 
   // Fade-in
   var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});
