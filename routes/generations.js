@@ -7,6 +7,7 @@ const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = 
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 const {
   getCurrentUsageSnapshot,
+  getCurrentUsageSnapshotReadOnly,
   persistGenerationUsageTransaction,
   UsageLimitExceededError
 } = require('../lib/subscriptions');
@@ -49,7 +50,7 @@ function formatAiCredits(snapshot, user) {
 }
 
 function getAiCredits(db, user) {
-  return formatAiCredits(getCurrentUsageSnapshot(db, user), user);
+  return formatAiCredits(getCurrentUsageSnapshotReadOnly(db, user), user);
 }
 
 // ====== Dashboard ======
