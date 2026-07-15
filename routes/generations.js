@@ -54,7 +54,7 @@ function getAiCredits(db, user) {
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
-  console.log('📊 Dashboard route called, user.id:', res.locals.user?.id);
+  console.log('📊 Dashboard route called.');
   try {
     const db = getDb();
     const user = res.locals.user;
@@ -91,7 +91,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
         brainFilled = brainFields.filter(function(f){ return brainRow[f] && brainRow[f].trim(); }).length;
         brainPct = Math.round((brainFilled / brainFields.length) * 100);
       } else {
-        console.log('ℹ️ No brand_brain row for user', userId);
+        console.log('ℹ️ No brand_brain row for dashboard user.');
       }
     } catch(e) {
       console.warn('Brand Brain query failed:', e.message);
@@ -334,7 +334,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       genMode: genType
     });
   } catch (err) {
-    console.error(err);
+    console.error('Dashboard generation failed.');
     if (err instanceof UsageLimitExceededError) {
       if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
 
@@ -594,7 +594,7 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
 
     res.json({ results: newResults });
   } catch (err) {
-    console.error(err);
+    console.error('Generation regeneration failed.');
     if (err instanceof UsageLimitExceededError) {
       return res.status(403).json({ error: 'Monthly limit reached' });
     }

@@ -43,7 +43,7 @@ function createAuthRouter(options = {}) {
       req.session.userId = result.lastInsertRowid;
       res.redirect('/welcome');
     } catch (err) {
-      console.error(err);
+      console.error('Signup failed.');
       res.render('signup', { title: 'Sign Up - CopyQuick', error: SIGNUP_FAILURE_ERROR, currentPage: 'signup' });
     }
   });
@@ -73,7 +73,7 @@ function createAuthRouter(options = {}) {
         res.render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login' });
       }
     } catch (err) {
-      console.error(err);
+      console.error('Login failed.');
       res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
     }
   });
@@ -106,25 +106,23 @@ router.get('/auth/google/callback',
 
     passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }, (err, user, info) => {
       if (err) {
-        console.error('❌ Google OAuth callback error:', err);
-        console.error('❌ Stack:', err.stack);
+        console.error('❌ Google OAuth callback error.');
         return res.status(500).send('Authentication error. Please try again.');
       }
       if (!user) {
-        console.error('❌ Google OAuth callback: no user returned. Info:', JSON.stringify(info));
+        console.error('❌ Google OAuth callback: no user returned.');
         return res.redirect('/login');
       }
-      console.log('✅ Google OAuth success for user:', user.id, user.email);
+      console.log('✅ Google OAuth success.');
       req.logIn(user, (loginErr) => {
         if (loginErr) {
-          console.error('❌ Passport login error:', loginErr);
-          console.error('❌ Stack:', loginErr.stack);
+          console.error('❌ Passport login error.');
           return res.status(500).send('Session error. Please try again.');
         }
         req.session.userId = user.id;
         const dbCb = getDb();
         const hasGoal = dbCb.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
-        console.log('✅ Session set for user:', user.id, 'redirect:', hasGoal?.builder_goal ? '/dashboard' : '/welcome');
+        console.log('✅ Session set after Google OAuth.');
         return res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
       });
     })(req, res, next);

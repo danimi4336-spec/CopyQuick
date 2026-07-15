@@ -40,7 +40,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
     );
     res.redirect(session.url);
   } catch (err) {
-    console.error(err);
+    console.error('Checkout session creation failed.');
     res.status(500).send('Error creating checkout session.');
   }
 });
@@ -60,7 +60,7 @@ router.post('/manage', requireAuth, async (req, res) => {
     );
     res.redirect(session.url);
   } catch (err) {
-    console.error(err);
+    console.error('Customer portal session creation failed.');
     res.status(500).send('Error creating portal session.');
   }
 });
