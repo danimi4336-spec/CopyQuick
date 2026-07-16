@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
-const { generateCopy, getContentTypes, getTones } = require('../lib/generator');
+const generator = require('../lib/generator');
+const { generateCopy, getContentTypes, getTones } = generator;
+const { isValidContentType } = require('../lib/contentTypes');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 const {
@@ -21,6 +23,96 @@ const goalLabels = {
   campaigns: 'Generate Marketing Campaigns',
   other: 'Something Else'
 };
+
+class GenerationValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'GenerationValidationError';
+    this.statusCode = 400;
+  }
+}
+
+const bundleAssetContentTypeByLabel = {
+  'Email Campaign': 'email_campaign',
+  'Facebook Post': 'social_post',
+  'Facebook Ad': 'ad_headline',
+  'Google Search Ad': 'ad_headline',
+  'Product Description': 'product_description',
+  'Amazon Listing': 'product_description',
+  'SEO Package': 'blog_intro',
+  'Blog Article': 'blog_intro',
+  'Landing Page': 'cta',
+  'Video Package': 'sales_message'
+};
+
+const bundleAssetContentTypeById = {
+  email_campaign: 'email_campaign',
+  facebook_post: 'social_post',
+  social_post: 'social_post',
+  facebook_ad: 'ad_headline',
+  google_search_ad: 'ad_headline',
+  ad_headline: 'ad_headline',
+  subject_line: 'subject_line',
+  product_description: 'product_description',
+  amazon_listing: 'product_description',
+  seo_package: 'blog_intro',
+  blog_intro: 'blog_intro',
+  blog_article: 'blog_intro',
+  landing_page: 'cta',
+  cta: 'cta',
+  video_package: 'sales_message',
+  sales_message: 'sales_message'
+};
+
+function normalizeField(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function normalizeGenerationContentType(contentType) {
+  if (typeof generator.normalizeContentType === 'function') {
+    return generator.normalizeContentType(contentType);
+  }
+  return normalizeField(contentType).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+}
+
+function parseBundleAssets(rawAssets) {
+  const rawList = Array.isArray(rawAssets) ? rawAssets : [rawAssets || ''];
+  const values = rawList
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  const seen = new Set();
+  const parsed = values.map((value) => {
+    const separatorIndex = value.indexOf(':');
+    const rawId = separatorIndex === -1 ? value : value.slice(0, separatorIndex);
+    const rawLabel = separatorIndex === -1 ? '' : value.slice(separatorIndex + 1);
+    const assetId = normalizeField(rawId);
+    const label = normalizeField(rawLabel);
+    const contentType = bundleAssetContentTypeByLabel[label] || bundleAssetContentTypeById[assetId];
+
+    if (!assetId || !contentType) {
+      throw new GenerationValidationError('Unsupported bundle asset');
+    }
+
+    const dedupeKey = `${assetId}:${label || contentType}`;
+    if (seen.has(dedupeKey)) return null;
+    seen.add(dedupeKey);
+
+    return {
+      assetId,
+      label: label || assetId.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
+      contentType
+    };
+  }).filter(Boolean);
+
+  if (parsed.length > 5) {
+    throw new GenerationValidationError('Too many bundle assets selected');
+  }
+
+  return parsed;
+}
 
 function formatPlanName(planTier) {
   if (!planTier) return 'Free';
@@ -191,6 +283,60 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     };
   };
 
+  let cleanProductDescription;
+  let cleanTargetAudience;
+  let cleanContentType;
+  let cleanTone;
+  let selectedBundleAssets = [];
+  try {
+    cleanProductDescription = normalizeField(productDescription);
+    cleanTargetAudience = normalizeField(targetAudience);
+    cleanContentType = normalizeGenerationContentType(contentType || 'sales_message');
+    cleanTone = normalizeField(tone || 'professional');
+
+    if (!cleanProductDescription) {
+      throw new GenerationValidationError('Product description is required');
+    }
+    if (!['quick', 'bundle', 'campaign'].includes(genType)) {
+      throw new GenerationValidationError('Unsupported generation type');
+    }
+    if (genType === 'bundle') {
+      selectedBundleAssets = parseBundleAssets(assets);
+      if (selectedBundleAssets.length === 0) {
+        selectedBundleAssets = parseBundleAssets(bundleAssets.filter((asset) => asset.default).map((asset) => `${asset.id}:${asset.label}`).join(','));
+      }
+    } else if (genType === 'quick' && !isValidContentType(cleanContentType)) {
+      throw new GenerationValidationError('Unsupported content type');
+    }
+  } catch (err) {
+    if (err instanceof GenerationValidationError) {
+      console.warn('Dashboard generation validation failed.');
+      if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
+      return res.status(err.statusCode).render('dashboard', {
+        title: 'Dashboard - CopyQuick',
+        contentTypes: getContentTypes(),
+        tones: getTones(),
+        history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+        results: null,
+        error: 'Please check your generation request and try again.',
+        totalGenerations: 0, favorites: 0, thisMonth: 0,
+        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        recent: [], typeBreakdown: [],
+        bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+        brain: db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {},
+        brainPct: 0, brainFilled: 0,
+        journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false, firstQuickGenerate:false, firstMarketingBundle:false, firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
+        goalLabels,
+        journeyGroupsData: getGroupsWithJourneys(),
+        journeysData: JSON.stringify(getAllJourneys()),
+        aiCredits: getAiCredits(db, user),
+        builderGoal: user.builder_goal || '',
+        input: { productDescription: cleanProductDescription || '', targetAudience: cleanTargetAudience || '', contentType: cleanContentType || 'sales_message', tone: cleanTone || 'professional' }
+      });
+    }
+    throw err;
+  }
+
   const usageSnapshot = getCurrentUsageSnapshot(db, user);
   if (usageSnapshot.isOverLimit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
@@ -226,23 +372,21 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   try {
     let results = [];
     let wordCount = 0;
-    let title = productDescription ? (productDescription.length > 60 ? productDescription.substring(0, 60) + '...' : productDescription) : '';
+    let title = cleanProductDescription.length > 60 ? cleanProductDescription.substring(0, 60) + '...' : cleanProductDescription;
 
     if (genType === 'quick') {
-      results = generateCopy({ productDescription, targetAudience, contentType, tone });
+      results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone });
       wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
     } else if (genType === 'bundle') {
       // Generate for each selected asset
-      const selectedAssets = assets ? assets.split(',') : [];
-      selectedAssets.forEach(asset => {
-        const [typeId, label] = asset.split(':');
-        const assetResults = generateCopy({ productDescription, targetAudience, contentType: typeId, tone });
-        results.push(...assetResults.map(r => ({ ...r, assetLabel: label, assetType: typeId })));
+      selectedBundleAssets.forEach(asset => {
+        const assetResults = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: asset.contentType, tone: cleanTone });
+        results.push(...assetResults.map(r => ({ ...r, assetLabel: asset.label, assetType: asset.assetId, contentType: asset.contentType })));
       });
       wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
       if (results.length === 0) {
         // Generate a default set if no assets selected
-        results = generateCopy({ productDescription, targetAudience, contentType: 'sales_message', tone });
+        results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: 'sales_message', tone: cleanTone });
         wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
       }
     } else if (genType === 'campaign') {
@@ -254,8 +398,8 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
         if (section) {
           section.deliverables.forEach((deliverable, idx) => {
             results.push({
-              text: `[${section.label}] ${deliverable}\n\nBased on your product "${productDescription}"${targetAudience ? ' targeting ' + targetAudience : ''} with goal: ${goal || 'Increase Sales'}.\n\nThis ${deliverable.toLowerCase()} for the ${section.label.toLowerCase()} channel will be generated in Build #3 when the full AI campaign engine goes live. Your Brand Brain data and campaign settings have been saved for a seamless transition.`,
-              tone: tone || 'Professional',
+              text: `[${section.label}] ${deliverable}\n\nBased on your product "${cleanProductDescription}"${cleanTargetAudience ? ' targeting ' + cleanTargetAudience : ''} with goal: ${goal || 'Increase Sales'}.\n\nThis ${deliverable.toLowerCase()} for the ${section.label.toLowerCase()} channel will be generated in Build #3 when the full AI campaign engine goes live. Your Brand Brain data and campaign settings have been saved for a seamless transition.`,
+              tone: cleanTone || 'professional',
               assetLabel: deliverable,
               assetType: sectionId
             });
@@ -266,7 +410,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     }
 
     const resultsJson = JSON.stringify(results);
-    const contentTypeVal = genType === 'quick' ? (contentType || 'sales_message') : genType;
+    const contentTypeVal = genType === 'quick' ? (cleanContentType || 'sales_message') : genType;
 
     const persisted = persistGenerationUsageTransaction(db, {
       userId: user.id,
@@ -279,7 +423,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
           INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        const result = stmt.run(user.id, title, productDescription, contentTypeVal, tone || 'Professional', resultsJson, wordCount, goal || '', genType);
+        const result = stmt.run(user.id, title, cleanProductDescription, contentTypeVal, cleanTone || 'professional', resultsJson, wordCount, goal || '', genType);
         return result.lastInsertRowid;
       }
     });
@@ -330,12 +474,23 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       journeysData: JSON.stringify(getAllJourneys()),
       aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser),
       builderGoal: updatedUser.builder_goal || '',
-      input: { productDescription, targetAudience, contentType, tone },
+      input: { productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone },
       genId,
       genMode: genType
     });
   } catch (err) {
-    console.error('Dashboard generation failed.');
+    if (err instanceof GenerationValidationError) {
+      console.warn('Dashboard generation validation failed.');
+      if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
+    } else if (err instanceof UsageLimitExceededError) {
+      console.warn('Dashboard generation limit rejected.');
+    } else if (err.message && err.message.includes('Invalid content type')) {
+      console.warn('Dashboard generation prompt mapping failed.');
+    } else if (err.message && err.message.includes('Invalid tone')) {
+      console.warn('Dashboard generation prompt tone failed.');
+    } else {
+      console.error('Dashboard generation failed.');
+    }
     if (err instanceof UsageLimitExceededError) {
       if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
 
