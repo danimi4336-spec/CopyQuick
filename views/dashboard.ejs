@@ -324,16 +324,19 @@
                     </div>
                     <div class="form-group">
                         <label>Select Assets to Generate</label>
-                        <div class="bundle-assets-grid">
+                        <div class="bundle-assets-grid" role="listbox" aria-label="Marketing Bundle assets" aria-multiselectable="true">
                             <% bundleAssets.forEach(function(a, i){ %>
-                                <label class="bundle-asset-chip <%= a.default ? 'selected' : '' %>">
+                                <label class="bundle-asset-chip <%= a.default ? 'selected' : '' %>" data-asset-label="<%= a.label %>">
                                     <input type="checkbox" name="assets" value="<%= a.id %>:<%= a.label %>" <%= a.default ? 'checked' : '' %>>
+                                    <span class="bundle-order-badge" aria-hidden="<%= a.default ? 'false' : 'true' %>"></span>
                                     <span class="chip-icon"><%= a.icon %></span>
                                     <span class="chip-label"><%= a.label %></span>
                                 </label>
                             <% }); %>
                         </div>
-                        <span class="bundle-count" id="bundleCount">5 of 10 selected</span>
+                        <span class="bundle-count" id="bundleCount">Selected Assets (5 / 5)</span>
+                        <div class="bundle-selection-toast" id="bundleSelectionToast" role="status" aria-live="polite"></div>
+                        <div class="sr-only" id="bundleSelectionLive" aria-live="polite"></div>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn">📦 Generate Bundle</button>
                 </form>
@@ -550,12 +553,18 @@
 .mode-panel-desc{font-size:0.85rem;color:var(--secondary);margin-bottom:1.25rem;}
 
 .bundle-assets-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-bottom:0.5rem;}
-.bundle-asset-chip{display:flex;align-items:center;gap:0.4rem;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:0.6rem;cursor:pointer;transition:all 0.15s;font-size:0.8rem;background:var(--white);user-select:none;}
+.bundle-asset-chip{position:relative;display:flex;align-items:center;gap:0.4rem;min-height:2.75rem;padding:0.5rem 0.6rem 0.5rem 2rem;border:1px solid var(--border);border-radius:0.6rem;cursor:pointer;transition:background-color 0.18s ease,border-color 0.18s ease,box-shadow 0.18s ease,transform 0.18s ease;font-size:0.8rem;background:var(--white);user-select:none;}
+.bundle-asset-chip:hover,.bundle-asset-chip:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);outline:none;}
 .bundle-asset-chip.selected{border-color:var(--primary);background:var(--primary-light);}
 .bundle-asset-chip input{position:absolute;opacity:0;pointer-events:none;}
+.bundle-order-badge{position:absolute;left:0.5rem;top:50%;transform:translateY(-50%) scale(0.85);display:flex;align-items:center;justify-content:center;width:1rem;height:1rem;border-radius:999px;background:var(--primary);color:white;font-size:0.65rem;font-weight:700;opacity:0;transition:opacity 0.18s ease,transform 0.18s ease;}
+.bundle-asset-chip.selected .bundle-order-badge{opacity:1;transform:translateY(-50%) scale(1);}
 .bundle-asset-chip .chip-icon{font-size:1rem;}
 .bundle-asset-chip .chip-label{font-size:0.8rem;font-weight:500;color:var(--dark);}
 .bundle-count{font-size:0.75rem;color:var(--secondary);display:block;text-align:right;}
+.bundle-selection-toast{min-height:1.25rem;margin-top:0.5rem;padding:0.45rem 0.65rem;border-radius:0.5rem;background:var(--dark);color:white;font-size:0.78rem;line-height:1.35;opacity:0;transform:translateY(4px);transition:opacity 0.18s ease,transform 0.18s ease;pointer-events:none;}
+.bundle-selection-toast.visible{opacity:1;transform:translateY(0);}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
 .campaign-workspace{display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;}
 .campaign-sec-btn{display:inline-flex;align-items:center;gap:0.35rem;padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--white);font-size:0.78rem;font-weight:500;color:var(--secondary);cursor:pointer;transition:all 0.15s;font-family:inherit;}
@@ -605,13 +614,15 @@
     .bc-welcome-right{width:100%;}
     .mode-launcher-grid{grid-template-columns:1fr;}
     .form-grid-3,.form-grid-2{grid-template-columns:1fr;}
-    .bundle-assets-grid{grid-template-columns:repeat(2,1fr);}
+    .bundle-assets-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .bundle-selection-toast{font-size:0.75rem;}
     .ai-credits-grid{grid-template-columns:1fr;}
     .ai-credits-card{padding:1rem;}
 }
 </style>
 
 <script src="/js/dashboardResults.js"></script>
+<script src="/js/bundleAssetSelection.js"></script>
 <script>
 (function(){
   var h=new Date().getHours(),g='Welcome back';
@@ -696,24 +707,9 @@
   });
 
   // ===== Bundle Asset Selection =====
-  var chips=document.querySelectorAll('.bundle-asset-chip');
-  var countEls=document.getElementById('bundleCount');
-  function updateBundleCount(){
-    var c=document.querySelectorAll('.bundle-asset-chip.selected').length;
-    if(countEls)countEls.textContent=c+' of '+chips.length+' selected';
-  }
-  chips.forEach(function(chip){
-    chip.addEventListener('click',function(e){
-      var inp=chip.querySelector('input[type="checkbox"]');
-      if(e.target===inp)return;
-      inp.checked=!inp.checked;
-      chip.classList.toggle('selected',inp.checked);
-      updateBundleCount();
-    });
-    var inp=chip.querySelector('input');
-    inp.addEventListener('change',function(){chip.classList.toggle('selected',inp.checked);updateBundleCount();});
-	  });
-	  updateBundleCount();
+  var bundleSelection = window.CopyQuickBundleSelection && window.CopyQuickBundleSelection.init({
+    maxSelected: 5
+  });
 
 	  // ===== Generation Mode Launcher =====
 	  var toolsSection=document.getElementById('bc-tools');
