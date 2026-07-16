@@ -21,17 +21,23 @@ for (const suffix of ['', '-wal', '-shm']) {
 const { initDb } = require('../db/init');
 const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
-const { generateCopy, normalizeContentType, normalizeTone } = require('../lib/generator');
+const { generateCopy, normalizeContentType, normalizeTone, resolveTone, MAX_CUSTOM_TONE_LENGTH } = require('../lib/generator');
 const { bundleAssets } = require('../lib/generatorModes');
 const generationRoutes = require('../routes/generations');
 
 function request(agent, method, url, options = {}) {
   return new Promise((resolve, reject) => {
     const body = options.body || null;
-    const payload = body ? new URLSearchParams(body).toString() : '';
+    const contentType = options.contentType || 'application/x-www-form-urlencoded';
+    let payload = '';
+    if (body && contentType === 'application/json') {
+      payload = JSON.stringify(body);
+    } else if (body) {
+      payload = new URLSearchParams(body).toString();
+    }
     const headers = { ...(options.headers || {}) };
     if (payload) {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      headers['Content-Type'] = contentType;
       headers['Content-Length'] = Buffer.byteLength(payload);
     }
     if (agent.cookie) headers.Cookie = agent.cookie;
@@ -130,6 +136,18 @@ async function postGenerate(agent, token, body, headers = {}) {
   });
 }
 
+async function postGenerateJson(agent, token, body, headers = {}) {
+  return request(agent, 'POST', '/dashboard/generate', {
+    contentType: 'application/json',
+    headers: {
+      Accept: 'application/json',
+      'X-CSRF-Token': token,
+      ...headers
+    },
+    body
+  });
+}
+
 function snapshot(db, userId) {
   return {
     generations: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(userId).count,
@@ -160,7 +178,7 @@ function quickBody(overrides = {}) {
   return {
     productDescription: overrides.productDescription || 'Turmeric Curcumin and Ginger',
     contentType: overrides.contentType || 'product_description',
-    tone: overrides.tone || 'Professional',
+    tone: Object.prototype.hasOwnProperty.call(overrides, 'tone') ? overrides.tone : 'Professional',
     generationType: 'quick'
   };
 }
@@ -171,6 +189,13 @@ async function run() {
 
   assert.strictEqual(normalizeTone('Professional'), 'professional');
   assert.strictEqual(normalizeTone('Luxury'), 'professional');
+  assert.strictEqual(normalizeTone('  pRoFeSsIoNaL  '), 'professional');
+  assert.strictEqual(resolveTone('Warm, trustworthy, educational, and science-forward').templateTone, 'professional');
+  assert.strictEqual(resolveTone('Warm, trustworthy, educational, and science-forward').customGuidance, 'Warm, trustworthy, educational, and science-forward');
+  assert.strictEqual(resolveTone('').templateTone, 'professional');
+  assert.strictEqual(resolveTone('   ').templateTone, 'professional');
+  assert.strictEqual(resolveTone({ voice: 'warm' }).templateTone, 'professional');
+  assert.strictEqual(resolveTone({ voice: 'warm' }).customGuidance, '');
   assert.strictEqual(normalizeContentType('Product Descriptions'), 'product_description');
   assert.strictEqual(normalizeContentType('Product Description'), 'product_description');
   assert.strictEqual(normalizeContentType('Ad copy'), 'ad_headline');
@@ -252,6 +277,97 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 400);
     assert.strictEqual(parseJson(response).error, 'Invalid generation request');
     assert.deepStrictEqual(snapshot(db, malformedUserId), before);
+  });
+
+  const customQuickUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(customQuickUserId, async (agent) => {
+    const token = await getToken(agent);
+    const response = await postGenerate(agent, token, quickBody({
+      tone: 'Warm, trustworthy, educational, and science-forward',
+      contentType: 'Product Descriptions'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    const body = parseJson(response);
+    assert.strictEqual(body.results.length, 5);
+    assert(body.results.every((result) => result.tone === 'professional'));
+    assertNoUndefinedValues(body.results);
+    assert.strictEqual(snapshot(db, customQuickUserId).usageEvents, 1);
+  });
+
+  const customBundleUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(customBundleUserId, async (agent) => {
+    const token = await getToken(agent);
+    const response = await postGenerate(agent, token, {
+      ...bundleBody(productionSelection),
+      tone: 'Warm, trustworthy, educational, and science-forward'
+    });
+    assert.strictEqual(response.res.statusCode, 200);
+    const body = parseJson(response);
+    assert.strictEqual(body.results.length, 25);
+    assert(body.results.every((result) => result.tone === 'professional'));
+    assertNoUndefinedValues(body.results);
+    assert.strictEqual(snapshot(db, customBundleUserId).usageEvents, 1);
+  });
+
+  const customCampaignUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(customCampaignUserId, async (agent) => {
+    const token = await getToken(agent);
+    const response = await postGenerate(agent, token, {
+      productDescription: 'Turmeric Curcumin and Ginger',
+      targetAudience: 'Professionals',
+      tone: 'Warm, trustworthy, educational, and science-forward',
+      generationType: 'campaign',
+      campaignSections: 'email',
+      goal: 'Launch Product'
+    });
+    assert.strictEqual(response.res.statusCode, 200);
+    const body = parseJson(response);
+    assert(body.results.length > 0);
+    assert(body.results.every((result) => result.tone === 'professional'));
+    assertNoUndefinedValues(body.results);
+    assert.strictEqual(snapshot(db, customCampaignUserId).usageEvents, 1);
+  });
+
+  const emptyToneUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(emptyToneUserId, async (agent) => {
+    const token = await getToken(agent);
+    const emptyResponse = await postGenerate(agent, token, quickBody({ tone: '' }));
+    assert.strictEqual(emptyResponse.res.statusCode, 200);
+    assert(parseJson(emptyResponse).results.every((result) => result.tone === 'professional'));
+    const whitespaceResponse = await postGenerate(agent, token, quickBody({ tone: '   ' }));
+    assert.strictEqual(whitespaceResponse.res.statusCode, 200);
+    assert(parseJson(whitespaceResponse).results.every((result) => result.tone === 'professional'));
+  });
+
+  const oversizedToneUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(oversizedToneUserId, async (agent) => {
+    const token = await getToken(agent);
+    const customTone = 'x'.repeat(MAX_CUSTOM_TONE_LENGTH + 1);
+    const before = snapshot(db, oversizedToneUserId);
+    const logs = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => logs.push(args.join(' '));
+    try {
+      const response = await postGenerate(agent, token, quickBody({ tone: customTone }));
+      assert.strictEqual(response.res.statusCode, 400);
+      assert.strictEqual(parseJson(response).error, 'Invalid generation request');
+    } finally {
+      console.warn = originalWarn;
+    }
+    assert.deepStrictEqual(snapshot(db, oversizedToneUserId), before);
+    assert(logs.some((line) => line.includes('Dashboard generation tone validation failed.')));
+    assert(!logs.join('\n').includes(customTone));
+  });
+
+  const objectToneUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(objectToneUserId, async (agent) => {
+    const token = await getToken(agent);
+    const response = await postGenerateJson(agent, token, quickBody({ tone: { voice: 'warm' } }));
+    assert.strictEqual(response.res.statusCode, 200);
+    const body = parseJson(response);
+    assert(body.results.every((result) => result.tone === 'professional'));
+    assertNoUndefinedValues(body.results);
+    assert(!JSON.stringify(body.results).includes('[object Object]'));
   });
 
   const csrfUserId = createUser(db, { monthly_limit: 20 });

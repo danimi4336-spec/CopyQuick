@@ -76,6 +76,13 @@ function normalizeGenerationContentType(contentType) {
   return normalizeField(contentType).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
+function resolveGenerationTone(tone) {
+  if (typeof generator.resolveTone === 'function') {
+    return generator.resolveTone(tone);
+  }
+  return { templateTone: normalizeField(tone || 'professional').toLowerCase() || 'professional', customGuidance: '' };
+}
+
 function parseBundleAssets(rawAssets) {
   const rawList = Array.isArray(rawAssets) ? rawAssets : [rawAssets || ''];
   const values = rawList
@@ -287,12 +294,15 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   let cleanTargetAudience;
   let cleanContentType;
   let cleanTone;
+  let customToneGuidance = '';
   let selectedBundleAssets = [];
   try {
     cleanProductDescription = normalizeField(productDescription);
     cleanTargetAudience = normalizeField(targetAudience);
     cleanContentType = normalizeGenerationContentType(contentType || 'sales_message');
-    cleanTone = normalizeField(tone || 'professional');
+    const toneResolution = resolveGenerationTone(tone);
+    cleanTone = toneResolution.templateTone;
+    customToneGuidance = toneResolution.customGuidance;
 
     if (!cleanProductDescription) {
       throw new GenerationValidationError('Product description is required');
@@ -309,10 +319,11 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       throw new GenerationValidationError('Unsupported content type');
     }
   } catch (err) {
-    if (err instanceof GenerationValidationError) {
-      console.warn('Dashboard generation validation failed.');
-      if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
-      return res.status(err.statusCode).render('dashboard', {
+    if (err instanceof GenerationValidationError || err.code === 'CUSTOM_TONE_TOO_LONG') {
+      console.warn(err.code === 'CUSTOM_TONE_TOO_LONG' ? 'Dashboard generation tone validation failed.' : 'Dashboard generation validation failed.');
+      const statusCode = err.statusCode || 400;
+      if (isAjax) return res.status(statusCode).json({ error: 'Invalid generation request' });
+      return res.status(statusCode).render('dashboard', {
         title: 'Dashboard - CopyQuick',
         contentTypes: getContentTypes(),
         tones: getTones(),
@@ -375,18 +386,18 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     let title = cleanProductDescription.length > 60 ? cleanProductDescription.substring(0, 60) + '...' : cleanProductDescription;
 
     if (genType === 'quick') {
-      results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone });
+      results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone, customToneGuidance });
       wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
     } else if (genType === 'bundle') {
       // Generate for each selected asset
       selectedBundleAssets.forEach(asset => {
-        const assetResults = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: asset.contentType, tone: cleanTone });
+        const assetResults = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: asset.contentType, tone: cleanTone, customToneGuidance });
         results.push(...assetResults.map(r => ({ ...r, assetLabel: asset.label, assetType: asset.assetId, contentType: asset.contentType })));
       });
       wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
       if (results.length === 0) {
         // Generate a default set if no assets selected
-        results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: 'sales_message', tone: cleanTone });
+        results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: 'sales_message', tone: cleanTone, customToneGuidance });
         wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
       }
     } else if (genType === 'campaign') {
@@ -482,6 +493,9 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
     if (err instanceof GenerationValidationError) {
       console.warn('Dashboard generation validation failed.');
       if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
+    } else if (err.code === 'CUSTOM_TONE_TOO_LONG') {
+      console.warn('Dashboard generation tone validation failed.');
+      if (isAjax) return res.status(400).json({ error: 'Invalid generation request' });
     } else if (err instanceof UsageLimitExceededError) {
       console.warn('Dashboard generation limit rejected.');
     } else if (err.message && err.message.includes('Invalid content type')) {
