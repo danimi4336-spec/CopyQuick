@@ -198,6 +198,8 @@ function createBundleDocument(selectedIndexes = [0, 1, 2, 3, 4]) {
 
     const input = new FakeElement('input');
     input.setAttribute('name', 'assets');
+    input.setAttribute('tabindex', '-1');
+    input.setAttribute('aria-hidden', 'true');
     input.value = value;
     input.checked = selectedSet.has(index);
 
@@ -338,6 +340,10 @@ async function run() {
   chips(doc).forEach((chip) => {
     assert.strictEqual(chip.getAttribute('tabindex'), '0');
     assert.strictEqual(chip.getAttribute('role'), 'option');
+    const input = chip.querySelector('input[name="assets"]');
+    assert.strictEqual(input.getAttribute('tabindex'), '-1');
+    assert.strictEqual(input.getAttribute('aria-hidden'), 'true');
+    assert.notStrictEqual(input.getAttribute('disabled'), 'true');
   });
   assert.deepStrictEqual(controller.getSelectionOrder(), assetDefs.slice(0, 5).map(([value]) => value));
   assert.strictEqual(doc.getElementById('bundleCount').textContent, 'Selected Assets (5 / 5)');
@@ -377,9 +383,26 @@ async function run() {
   const enterEvent = chips(doc)[7].keydown('Enter');
   assert.strictEqual(enterEvent.defaultPrevented, true);
   assert(checkedValues(doc).includes(assetDefs[7][0]));
+  assert(controller.getSelectionOrder().includes(assetDefs[7][0]));
+  assert.strictEqual(chips(doc)[7].getAttribute('aria-selected'), 'true');
   const spaceEvent = chips(doc)[7].keydown(' ');
   assert.strictEqual(spaceEvent.defaultPrevented, true);
   assert(!checkedValues(doc).includes(assetDefs[7][0]));
+  assert(!controller.getSelectionOrder().includes(assetDefs[7][0]));
+  assert.strictEqual(chips(doc)[7].getAttribute('aria-selected'), 'false');
+
+  const beforeHiddenCheckboxState = {
+    checked: checkedValues(doc),
+    order: controller.getSelectionOrder(),
+    counter: doc.getElementById('bundleCount').textContent
+  };
+  const hiddenInput = chips(doc)[8].querySelector('input[name="assets"]');
+  assert.strictEqual(hiddenInput.getAttribute('tabindex'), '-1');
+  assert.strictEqual(hiddenInput.getAttribute('aria-hidden'), 'true');
+  assert.notStrictEqual(hiddenInput.getAttribute('disabled'), 'true');
+  assert.deepStrictEqual(checkedValues(doc), beforeHiddenCheckboxState.checked);
+  assert.deepStrictEqual(controller.getSelectionOrder(), beforeHiddenCheckboxState.order);
+  assert.strictEqual(doc.getElementById('bundleCount').textContent, beforeHiddenCheckboxState.counter);
 
   assert.strictEqual(new Set(checkedValues(doc)).size, checkedValues(doc).length);
 
@@ -387,6 +410,7 @@ async function run() {
   assert(dashboardSource.includes('Selected Assets (5 / 5)'));
   assert(dashboardSource.includes('bundle-selection-toast'));
   assert(dashboardSource.includes('bundle-order-badge'));
+  assert(dashboardSource.includes('tabindex="-1" aria-hidden="true"'));
   assert(dashboardSource.includes('aria-live="polite"'));
   assert(dashboardSource.includes('mode-bundle input[name="assets"]:checked'));
   assert(dashboardSource.includes('d.append(\'generationType\',\'bundle\')'));

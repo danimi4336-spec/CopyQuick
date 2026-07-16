@@ -327,7 +327,7 @@
                         <div class="bundle-assets-grid" role="listbox" aria-label="Marketing Bundle assets" aria-multiselectable="true">
                             <% bundleAssets.forEach(function(a, i){ %>
                                 <label class="bundle-asset-chip <%= a.default ? 'selected' : '' %>" data-asset-label="<%= a.label %>">
-                                    <input type="checkbox" name="assets" value="<%= a.id %>:<%= a.label %>" <%= a.default ? 'checked' : '' %>>
+                                    <input type="checkbox" name="assets" value="<%= a.id %>:<%= a.label %>" tabindex="-1" aria-hidden="true" <%= a.default ? 'checked' : '' %>>
                                     <span class="bundle-order-badge" aria-hidden="<%= a.default ? 'false' : 'true' %>"></span>
                                     <span class="chip-icon"><%= a.icon %></span>
                                     <span class="chip-label"><%= a.label %></span>
