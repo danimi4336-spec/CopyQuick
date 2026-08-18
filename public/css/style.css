@@ -35,6 +35,30 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Objective Universe */
+.objective-universe-page { min-height: calc(100vh - 82px); padding: 4.5rem 0 5rem; background: #f8fafc; }
+.objective-universe-container { max-width: 1120px; }
+.objective-universe-header { max-width: 760px; margin: 0 auto 2.75rem; text-align: center; }
+.objective-eyebrow { display: inline-block; margin-bottom: .8rem; color: var(--primary); font-size: .78rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.objective-universe-header h1 { margin-bottom: .85rem; color: #172033; font-size: clamp(2.2rem, 5vw, 3.45rem); }
+.objective-universe-header p { max-width: 680px; font-size: 1.08rem; line-height: 1.65; }
+.objective-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.objective-card { position: relative; display: grid; grid-template-columns: 3.25rem minmax(0, 1fr) auto; gap: 1rem; min-height: 178px; padding: 1.5rem; overflow: hidden; border: 1px solid #dbe2ea; border-radius: 1rem; background: var(--white); color: var(--dark); font: inherit; text-align: left; cursor: pointer; transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.objective-card:hover, .objective-card:focus-visible { transform: translateY(-3px); border-color: #a5b4fc; box-shadow: 0 14px 32px rgba(30, 41, 59, .1); }
+.objective-card:focus-visible { outline: 3px solid rgba(79, 70, 229, .22); outline-offset: 3px; }
+.objective-icon { display: flex; width: 3.25rem; height: 3.25rem; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: .85rem; background: #f8fafc; font-size: 1.55rem; }
+.objective-card-content { display: flex; min-width: 0; flex-direction: column; }
+.objective-card-title { color: #172033; font-size: 1.1rem; font-weight: 700; line-height: 1.35; }
+.objective-card-description { margin-top: .4rem; color: var(--secondary); font-size: .88rem; line-height: 1.45; }
+.objective-card-outcome { max-height: 0; margin-top: 0; overflow: hidden; color: #334155; font-size: .82rem; line-height: 1.5; opacity: 0; transition: max-height 220ms ease, margin-top 220ms ease, opacity 180ms ease; }
+.objective-card:hover .objective-card-outcome, .objective-card:focus-visible .objective-card-outcome { max-height: 6rem; margin-top: .65rem; opacity: 1; }
+.objective-arrow { align-self: center; color: #94a3b8; font-size: 1.3rem; transition: color 180ms ease, transform 180ms ease; }
+.objective-card:hover .objective-arrow, .objective-card:focus-visible .objective-arrow { color: var(--primary); transform: translateX(3px); }
+.objective-assurance { margin-top: 1.5rem; color: #64748b; font-size: .82rem; text-align: center; }
+@media (max-width: 760px) { .objective-universe-page { padding: 3rem 0 4rem; } .objective-grid { grid-template-columns: 1fr; } .objective-card { min-height: 0; } }
+@media (max-width: 480px) { .objective-universe-page .container { padding: 0 1rem; } .objective-card { grid-template-columns: 2.8rem minmax(0, 1fr) auto; padding: 1.15rem; } .objective-icon { width: 2.8rem; height: 2.8rem; font-size: 1.35rem; } }
+@media (prefers-reduced-motion: reduce) { .objective-card, .objective-card-outcome, .objective-arrow { transition: none; } }
+
 .container {
     max-width: 1100px;
     margin: 0 auto;

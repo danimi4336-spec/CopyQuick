@@ -364,12 +364,19 @@ async function run() {
     assert.strictEqual(valid.res.statusCode, 302);
     assert.strictEqual(valid.res.headers.location, '/brand-brain');
 
+    const welcome = await request(agent, 'GET', '/welcome');
+    assert.strictEqual(welcome.res.statusCode, 200);
+    assert.match(welcome.body, /What do you want to accomplish\?/);
+    assert.match(welcome.body, /Get More Customers/);
+    assert.match(welcome.body, /More Objectives/);
+
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/welcome', {
-      body: { goal: 'launch_product', _csrf: token }
+      body: { goal: 'get_more_customers', _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 302);
     assert.strictEqual(valid.res.headers.location, '/dashboard');
+    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'get_more_customers');
 
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/logout', {

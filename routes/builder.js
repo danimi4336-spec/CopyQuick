@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
+const { objectiveUniverse, getObjective } = require('../lib/businessJourneys');
 
 function emptyBrandBrain(userId) {
   return {
@@ -25,12 +26,16 @@ router.get('/welcome', requireAuth, (req, res) => {
   const db = getDb();
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
   if (user.builder_goal) return res.redirect('/dashboard');
-  res.render('welcome', { title: 'Welcome to CopyQuick', currentPage: 'welcome' });
+  res.render('welcome', {
+    title: 'Choose Your Business Objective - CopyQuick',
+    currentPage: 'welcome',
+    objectives: objectiveUniverse
+  });
 });
 
 router.post('/welcome', requireAuth, (req, res) => {
   const { goal } = req.body;
-  if (!goal) return res.redirect('/welcome');
+  if (!getObjective(goal)) return res.redirect('/welcome');
   const db = getDb();
   db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
   // Ensure brand_brain row exists
