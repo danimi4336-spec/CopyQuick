@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('./auth');
-const { createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
+const { isBillingEnabled, createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
+
+function rejectWhenBillingDisabled(res) {
+  if (isBillingEnabled !== false) return false;
+  res.status(503).send('Billing is unavailable in local development until STRIPE_KEY is configured.');
+  return true;
+}
 
 router.get('/pricing', (req, res) => {
   res.render('pricing', { 
@@ -17,6 +23,8 @@ router.get('/subscribe', requireAuth, (req, res) => {
 
 // POST /subscribe (alternate version if using form)
 router.post('/subscribe', requireAuth, async (req, res) => {
+  if (rejectWhenBillingDisabled(res)) return;
+
   const { price } = req.body;
   const user = res.locals.user;
   
@@ -40,6 +48,9 @@ router.post('/subscribe', requireAuth, async (req, res) => {
     );
     res.redirect(session.url);
   } catch (err) {
+    if (err?.code === 'BILLING_DISABLED') {
+      return res.status(503).send('Billing is unavailable in local development until STRIPE_KEY is configured.');
+    }
     console.error('Checkout session creation failed.');
     res.status(500).send('Error creating checkout session.');
   }
@@ -47,6 +58,8 @@ router.post('/subscribe', requireAuth, async (req, res) => {
 
 // POST /manage
 router.post('/manage', requireAuth, async (req, res) => {
+  if (rejectWhenBillingDisabled(res)) return;
+
   const user = res.locals.user;
   
   if (!user.stripe_customer_id) {
@@ -60,6 +73,9 @@ router.post('/manage', requireAuth, async (req, res) => {
     );
     res.redirect(session.url);
   } catch (err) {
+    if (err?.code === 'BILLING_DISABLED') {
+      return res.status(503).send('Billing is unavailable in local development until STRIPE_KEY is configured.');
+    }
     console.error('Customer portal session creation failed.');
     res.status(500).send('Error creating portal session.');
   }

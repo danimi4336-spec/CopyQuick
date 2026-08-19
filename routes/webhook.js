@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { stripe } = require('../lib/stripe');
+const { stripe, isBillingEnabled } = require('../lib/stripe');
 const { getDb } = require('../db/database');
 const { getPlanConfigFromPriceId, getSubscriptionSyncIssues, syncSubscriptionRecord } = require('../lib/subscriptions');
 
@@ -216,6 +216,11 @@ function applyAuthoritativeSubscriptionState(db, event, {
 
 // Use express.raw() for webhook route to verify signature
 router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  // Undefined preserves compatibility with injected Stripe test implementations.
+  if (isBillingEnabled === false) {
+    return res.status(503).send('Stripe billing is disabled until STRIPE_KEY is configured.');
+  }
+
   const sig = req.headers['stripe-signature'];
   let event;
 
