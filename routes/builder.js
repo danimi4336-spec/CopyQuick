@@ -43,7 +43,7 @@ router.post('/welcome', requireAuth, (req, res) => {
   if (!existing) {
     db.prepare('INSERT INTO brand_brain (user_id) VALUES (?)').run(req.session.userId);
   }
-  res.redirect('/dashboard');
+  res.redirect(goal === 'launch_product' ? '/discovery' : '/dashboard');
 });
 
 // ====== Brand Brain ======

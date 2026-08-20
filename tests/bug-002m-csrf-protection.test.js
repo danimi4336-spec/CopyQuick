@@ -372,6 +372,13 @@ async function run() {
 
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/welcome', {
+      body: { goal: 'launch_product', _csrf: token }
+    });
+    assert.strictEqual(valid.res.statusCode, 302);
+    assert.strictEqual(valid.res.headers.location, '/discovery');
+
+    token = await getToken(agent);
+    valid = await request(agent, 'POST', '/welcome', {
       body: { goal: 'get_more_customers', _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 302);

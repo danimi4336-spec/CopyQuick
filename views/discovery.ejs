@@ -1,0 +1,54 @@
+<div class="discovery-page">
+    <div class="container discovery-container">
+        <section class="discovery-card" aria-labelledby="discovery-title">
+            <div class="discovery-progress" aria-label="Step 1 of 6">
+                <span>Step 1 of 6</span>
+                <div class="discovery-progress-track" aria-hidden="true">
+                    <span class="discovery-progress-fill"></span>
+                </div>
+            </div>
+
+            <header class="discovery-header">
+                <h1 id="discovery-title">Let's Build Something Amazing</h1>
+                <p>We'll begin with what you know today, then adapt the conversation as we learn about your business. You can keep your answer simple—we'll help bring the important details into focus.</p>
+            </header>
+
+            <% if (error) { %>
+                <div class="alert alert-error discovery-error" role="alert"><%= error %></div>
+            <% } %>
+
+            <form action="/discovery" method="POST" class="discovery-form">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <div class="form-group">
+                    <label for="whatBuilding">What are you building?</label>
+                    <textarea id="whatBuilding" name="whatBuilding" rows="5" maxlength="2000" placeholder="Describe the product you want to bring to market..." required autofocus><%= answer %></textarea>
+                </div>
+
+                <div class="discovery-examples" aria-labelledby="discovery-examples-label">
+                    <span id="discovery-examples-label">For example:</span>
+                    <div class="discovery-example-list">
+                        <% examplePrompts.forEach(function(prompt) { %>
+                            <button type="button" class="discovery-example" data-example="<%= prompt %>"><%= prompt %></button>
+                        <% }); %>
+                    </div>
+                </div>
+
+                <div class="discovery-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">Continue <span aria-hidden="true">→</span></button>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+
+<script>
+(function(){
+  var input = document.getElementById('whatBuilding');
+  document.querySelectorAll('.discovery-example').forEach(function(example){
+    example.addEventListener('click', function(){
+      input.value = example.getAttribute('data-example') || '';
+      input.focus();
+    });
+  });
+})();
+</script>
