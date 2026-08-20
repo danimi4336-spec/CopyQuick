@@ -72,7 +72,7 @@ async function run() {
     assert.strictEqual(page.res.statusCode, 200);
     assert.match(page.body, /Let's Build Something Amazing/);
     assert.match(page.body, /What are you building\?/);
-    assert.match(page.body, /Step 1 of 6/);
+    assert.match(page.body, /Building your understanding/);
     assert.strictEqual((page.body.match(/class="discovery-example"/g) || []).length, 5);
     const csrfToken = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     assert(csrfToken, 'Discovery form should include a CSRF token');
@@ -88,17 +88,64 @@ async function run() {
     const refreshedToken = refreshedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const submitted = await request(authenticated, 'POST', '/discovery', {
       _csrf: refreshedToken,
-      whatBuilding: '  A refillable home cleaning product  '
+      whatBuilding: '  Organic turmeric supplement  '
     });
     assert.strictEqual(submitted.res.statusCode, 303);
     assert.strictEqual(submitted.res.headers.location, '/discovery');
 
     const saved = await request(authenticated, 'GET', '/test/session');
-    assert.deepStrictEqual(JSON.parse(saved.body), {
-      objective: 'launch_product',
-      whatBuilding: 'A refillable home cleaning product',
-      currentStep: 1
+    const savedSession = JSON.parse(saved.body);
+    assert.strictEqual(savedSession.objective, 'launch_product');
+    assert.strictEqual(savedSession.answers.initial_description, 'Organic turmeric supplement');
+    assert.deepStrictEqual(savedSession.completedQuestions, ['initial_description']);
+    assert.strictEqual(savedSession.understanding.businessType.value, 'physical_product');
+    assert.strictEqual(savedSession.understanding.category.value, 'dietary_supplement');
+    assert.strictEqual(savedSession.nextQuestion.id, 'sales_channel');
+    assert.match(savedSession.startedAt, /^\d{4}-\d{2}-\d{2}T/);
+    assert.match(savedSession.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
+
+    const nextState = await request(authenticated, 'GET', '/discovery');
+    assert.strictEqual(nextState.res.statusCode, 200);
+    assert.match(nextState.body, /Here’s what I understand so far/);
+    assert.match(nextState.body, /Physical Product/);
+    assert.match(nextState.body, /Health &amp; Wellness/);
+    assert.match(nextState.body, /Dietary Supplement/);
+    assert.match(nextState.body, /Where do you plan to sell this product\?/);
+    assert.match(nextState.body, /value="amazon"/);
+    assert.match(nextState.body, /value="other"/);
+    const nextToken = nextState.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+
+    const missingCsrf = await request(authenticated, 'POST', '/discovery', {
+      questionId: 'sales_channel',
+      choice: 'amazon'
     });
+    assert.strictEqual(missingCsrf.res.statusCode, 403);
+
+    const structuredSubmission = await request(authenticated, 'POST', '/discovery', {
+      _csrf: nextToken,
+      questionId: 'sales_channel',
+      choice: 'amazon'
+    });
+    assert.strictEqual(structuredSubmission.res.statusCode, 303);
+    assert.strictEqual(structuredSubmission.res.headers.location, '/discovery');
+
+    const updated = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
+    assert.strictEqual(updated.answers.sales_channel, 'amazon');
+    assert.strictEqual(updated.understanding.salesChannel.source, 'user_confirmed');
+    assert.strictEqual(updated.understanding.salesChannel.confidence, 1);
+    assert(updated.completedQuestions.includes('sales_channel'));
+    assert.strictEqual(updated.nextQuestion.id, 'target_audience');
+
+    const targetPage = await request(authenticated, 'GET', '/discovery');
+    const targetToken = targetPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const emptyOther = await request(authenticated, 'POST', '/discovery', {
+      _csrf: targetToken,
+      questionId: 'target_audience',
+      choice: 'other',
+      otherAnswer: '   '
+    });
+    assert.strictEqual(emptyOther.res.statusCode, 400);
+    assert.match(emptyOther.body, /Tell us a little more about your/);
 
     console.log('Story 3.1 Intelligent Discovery tests passed');
   } finally {
