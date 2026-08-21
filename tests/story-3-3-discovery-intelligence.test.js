@@ -70,6 +70,7 @@ async function run() {
   assert.strictEqual(complete.completion, 100, 'all known domains should produce full weighted completion');
   assert.strictEqual(complete.nextQuestion, null);
   assert.strictEqual(complete.remainingKnowledgeGaps.length, 0);
+  assert.strictEqual(complete.planningReadiness.ready, true);
 
   const empty = analyzeDiscovery({
     objective: 'launch_product',
@@ -129,7 +130,7 @@ async function run() {
     answers: { target_audience: 'unsure' }
   });
   assert(answeredUnknown.remainingKnowledgeGaps.includes('Customer'));
-  assert.strictEqual(answeredUnknown.nextQuestion.id, 'customer_motivation');
+  assert.strictEqual(answeredUnknown.nextQuestion.id, 'target_audience');
 
   const app = express();
   app.set('view engine', 'ejs');

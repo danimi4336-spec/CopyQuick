@@ -1,0 +1,74 @@
+<div class="reflection-page">
+    <div class="container reflection-container">
+        <header class="reflection-header">
+            <span class="reflection-eyebrow">Business Reflection</span>
+            <h1>Here's what I've learned about your business.</h1>
+            <p>Review what I understand, make any corrections, and confirm when this foundation is ready for planning.</p>
+        </header>
+
+        <% if (error) { %><div class="alert alert-error reflection-alert" role="alert"><%= error %></div><% } %>
+        <% if (confirmed) { %><div class="alert reflection-success" role="status">Your business understanding is confirmed and ready for planning.</div><% } %>
+
+        <div class="reflection-groups">
+            <% reflection.groups.forEach(function(group) { %>
+                <section class="reflection-group" aria-labelledby="reflection-domain-<%= group.domain.replace(/\s+/g, '-').toLowerCase() %>">
+                    <div class="reflection-group-header">
+                        <h2 id="reflection-domain-<%= group.domain.replace(/\s+/g, '-').toLowerCase() %>"><%= group.domain %></h2>
+                        <span><%= group.required ? 'Planning essential' : 'Optional context' %></span>
+                    </div>
+                    <div class="reflection-fields">
+                        <% group.fields.forEach(function(field) { %>
+                            <details class="reflection-field">
+                                <summary>
+                                    <span class="reflection-field-copy">
+                                        <span class="reflection-field-label"><%= field.label %></span>
+                                        <strong><%= field.value %></strong>
+                                        <small><%= field.confidenceMessage %></small>
+                                    </span>
+                                    <span class="reflection-edit-label">Edit</span>
+                                </summary>
+                                <form action="/discovery/reflection/edit" method="POST" class="reflection-edit-form">
+                                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                                    <input type="hidden" name="field" value="<%= field.key %>">
+                                    <label for="reflection-<%= field.key %>">Update <%= field.label.toLowerCase() %></label>
+                                    <div>
+                                        <input id="reflection-<%= field.key %>" type="text" name="value" value="<%= field.value %>" maxlength="2000" required>
+                                        <button type="submit" class="btn btn-outline">Save</button>
+                                    </div>
+                                </form>
+                            </details>
+                        <% }); %>
+                    </div>
+                </section>
+            <% }); %>
+        </div>
+
+        <% if (reflection.optionalKnowledgeGaps.length) { %>
+            <section class="reflection-improvements" aria-labelledby="reflection-improvements-title">
+                <h2 id="reflection-improvements-title">Areas I'd still like to improve</h2>
+                <p>These details can make future recommendations more precise, but they will not hold up your plan.</p>
+                <ul>
+                    <% reflection.optionalKnowledgeGaps.forEach(function(domain) { %><li><%= domain %></li><% }); %>
+                </ul>
+            </section>
+        <% } %>
+
+        <section class="reflection-readiness <%= planningReadiness.ready ? 'ready' : 'blocked' %>">
+            <% if (planningReadiness.ready) { %>
+                <div>
+                    <h2>Your business foundation is ready.</h2>
+                    <p>The required areas are understood well enough to begin personalized planning.</p>
+                </div>
+            <% } else { %>
+                <div>
+                    <h2>A few essentials still need attention.</h2>
+                    <p>Required areas: <%= planningReadiness.unsatisfiedRequiredDomains.join(', ') %>.</p>
+                </div>
+            <% } %>
+            <form action="/discovery/reflection/plan" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary btn-lg" <%- planningReadiness.ready ? '' : 'disabled aria-disabled="true"' %>>Build My Personalized Plan</button>
+            </form>
+        </section>
+    </div>
+</div>

@@ -2,6 +2,7 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
+const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 
 const router = express.Router();
 const MAX_ANSWER_LENGTH = 2000;
@@ -45,7 +46,40 @@ function validationError(req, res, error, options = {}) {
   return renderDiscovery(req, res, { status: 400, error, ...options });
 }
 
+function applyIntelligenceResult(discoverySession, intelligenceResult) {
+  discoverySession.completion = intelligenceResult.completion;
+  discoverySession.knowledgeDomains = intelligenceResult.knowledgeDomains;
+  discoverySession.nextQuestion = intelligenceResult.nextQuestion;
+  discoverySession.reasoning = intelligenceResult.reasoning;
+  discoverySession.remainingKnowledgeGaps = intelligenceResult.remainingKnowledgeGaps;
+  discoverySession.planningReadiness = intelligenceResult.planningReadiness;
+}
+
+function canViewReflection(discoverySession) {
+  return Boolean(discoverySession?.planningReadiness?.ready || discoverySession?.reflectionStartedAt);
+}
+
+function renderReflection(req, res, options = {}) {
+  const discoverySession = req.session.discoverySession;
+  const reflection = buildBusinessReflection({
+    answers: discoverySession.answers,
+    understanding: discoverySession.understanding,
+    planningReadiness: discoverySession.planningReadiness
+  });
+  return res.status(options.status || 200).render('business-reflection', {
+    title: 'Business Reflection - CopyQuick',
+    currentPage: 'discovery',
+    reflection,
+    planningReadiness: discoverySession.planningReadiness,
+    error: options.error || null,
+    confirmed: Boolean(discoverySession.planningConfirmedAt)
+  });
+}
+
 router.get('/discovery', requireAuth, (req, res) => {
+  if (req.session.discoverySession?.planningReadiness?.ready || req.session.discoverySession?.reflectionStartedAt) {
+    return res.redirect('/discovery/reflection');
+  }
   renderDiscovery(req, res);
 });
 
@@ -81,6 +115,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       nextQuestion: intelligenceResult.nextQuestion,
       reasoning: intelligenceResult.reasoning,
       remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
+      planningReadiness: intelligenceResult.planningReadiness,
       startedAt: req.session.discoverySession?.startedAt || now,
       updatedAt: now
     };
@@ -145,14 +180,78 @@ router.post('/discovery', requireAuth, async (req, res) => {
   discoverySession.completedQuestions = Array.from(new Set(
     discoverySession.completedQuestions.concat(currentQuestion.id)
   ));
-  discoverySession.completion = intelligenceResult.completion;
-  discoverySession.knowledgeDomains = intelligenceResult.knowledgeDomains;
-  discoverySession.nextQuestion = intelligenceResult.nextQuestion;
-  discoverySession.reasoning = intelligenceResult.reasoning;
-  discoverySession.remainingKnowledgeGaps = intelligenceResult.remainingKnowledgeGaps;
+  applyIntelligenceResult(discoverySession, intelligenceResult);
   discoverySession.updatedAt = new Date().toISOString();
 
+  if (intelligenceResult.planningReadiness.ready) {
+    discoverySession.reflectionStartedAt = new Date().toISOString();
+    return res.redirect(303, '/discovery/reflection');
+  }
   return res.redirect(303, '/discovery');
+});
+
+router.get('/discovery/reflection', requireAuth, (req, res) => {
+  if (!canViewReflection(req.session.discoverySession)) {
+    return res.redirect('/discovery');
+  }
+  return renderReflection(req, res);
+});
+
+router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!canViewReflection(discoverySession)) {
+    return res.redirect('/discovery');
+  }
+
+  let edit;
+  try {
+    edit = applyReflectionEdit({
+      answers: discoverySession.answers,
+      understanding: discoverySession.understanding,
+      field: req.body.field,
+      value: req.body.value
+    });
+  } catch (err) {
+    return renderReflection(req, res, { status: 400, error: err.message });
+  }
+
+  const understandingResult = await understandBusiness({
+    objective: discoverySession.objective,
+    answer: edit.answers.initial_description,
+    existingUnderstanding: edit.existingUnderstanding
+  });
+  const intelligenceResult = analyzeDiscovery({
+    objective: discoverySession.objective,
+    understanding: understandingResult.understanding,
+    unknowns: understandingResult.unknowns,
+    answers: edit.answers
+  });
+
+  discoverySession.answers = edit.answers;
+  discoverySession.understanding = understandingResult.understanding;
+  discoverySession.unknowns = understandingResult.unknowns;
+  applyIntelligenceResult(discoverySession, intelligenceResult);
+  discoverySession.updatedAt = new Date().toISOString();
+  discoverySession.planningConfirmedAt = null;
+
+  return res.redirect(303, '/discovery/reflection');
+});
+
+router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!canViewReflection(discoverySession)) {
+    return res.redirect('/discovery');
+  }
+  if (!discoverySession.planningReadiness?.ready) {
+    return renderReflection(req, res, {
+      status: 409,
+      error: 'Complete the required business understanding before building your plan.'
+    });
+  }
+
+  discoverySession.planningConfirmedAt = new Date().toISOString();
+  discoverySession.updatedAt = discoverySession.planningConfirmedAt;
+  return res.redirect(303, '/discovery/reflection');
 });
 
 module.exports = router;

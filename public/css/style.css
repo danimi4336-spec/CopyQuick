@@ -102,6 +102,47 @@ body {
 @media (max-width: 640px) { .discovery-page { padding: 2rem 0 3rem; } .discovery-page .container { padding: 0 1rem; } .discovery-card { padding: 1.5rem; } .discovery-progress { margin-bottom: 2rem; } .discovery-choice-grid { grid-template-columns: 1fr; } .discovery-actions .btn { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .discovery-example { transition: none; } }
 
+/* Business Reflection */
+.reflection-page { min-height: calc(100vh - 82px); padding: 4rem 0 5rem; background: #f8fafc; }
+.reflection-container { max-width: 900px; }
+.reflection-header { max-width: 740px; margin-bottom: 2.5rem; }
+.reflection-eyebrow { display: inline-block; margin-bottom: .7rem; color: var(--primary); font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.reflection-header h1 { margin-bottom: .8rem; color: #172033; font-size: clamp(2.1rem, 5vw, 3.2rem); }
+.reflection-header p { max-width: none; margin: 0; font-size: 1rem; }
+.reflection-alert { margin-bottom: 1.5rem; }
+.reflection-success { margin-bottom: 1.5rem; border: 1px solid #86efac; background: #f0fdf4; color: #166534; }
+.reflection-groups { display: grid; gap: 1rem; }
+.reflection-group { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); box-shadow: var(--shadow-sm); }
+.reflection-group-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: #f8fafc; }
+.reflection-group-header h2 { margin: 0; font-size: 1rem; }
+.reflection-group-header > span { color: var(--secondary); font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.reflection-fields { display: grid; }
+.reflection-field + .reflection-field { border-top: 1px solid var(--border); }
+.reflection-field summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem; cursor: pointer; list-style: none; }
+.reflection-field summary::-webkit-details-marker { display: none; }
+.reflection-field-copy { display: grid; gap: .15rem; }
+.reflection-field-label { color: var(--secondary); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.reflection-field-copy strong { color: #1e293b; font-size: .95rem; }
+.reflection-field-copy small { color: var(--secondary); font-size: .75rem; }
+.reflection-edit-label { color: var(--primary); font-size: .78rem; font-weight: 700; }
+.reflection-edit-form { padding: 0 1.25rem 1.25rem; }
+.reflection-edit-form label { display: block; margin-bottom: .4rem; color: #334155; font-size: .78rem; font-weight: 600; }
+.reflection-edit-form > div { display: flex; gap: .65rem; }
+.reflection-edit-form input { width: 100%; padding: .7rem .85rem; border: 1px solid var(--border); border-radius: .65rem; font: inherit; font-size: .85rem; }
+.reflection-edit-form input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, .1); }
+.reflection-improvements { margin-top: 1.5rem; padding: 1.5rem; border: 1px solid #fde68a; border-radius: 1rem; background: #fffbeb; }
+.reflection-improvements h2 { margin-bottom: .35rem; font-size: 1.05rem; }
+.reflection-improvements p { max-width: none; margin: 0 0 .8rem; font-size: .85rem; }
+.reflection-improvements ul { display: flex; flex-wrap: wrap; gap: .5rem; margin: 0; padding: 0; list-style: none; }
+.reflection-improvements li { padding: .4rem .65rem; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: .75rem; font-weight: 600; }
+.reflection-readiness { display: flex; align-items: center; justify-content: space-between; gap: 2rem; margin-top: 1.5rem; padding: 1.5rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); }
+.reflection-readiness.ready { border-color: #86efac; }
+.reflection-readiness.blocked { border-color: #fca5a5; }
+.reflection-readiness h2 { margin-bottom: .3rem; font-size: 1.05rem; }
+.reflection-readiness p { max-width: none; margin: 0; font-size: .82rem; }
+.reflection-readiness button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
+@media (max-width: 700px) { .reflection-page { padding: 2.5rem 0 4rem; } .reflection-page .container { padding: 0 1rem; } .reflection-readiness { align-items: stretch; flex-direction: column; } .reflection-readiness .btn { width: 100%; } .reflection-edit-form > div { align-items: stretch; flex-direction: column; } }
+
 .container {
     max-width: 1100px;
     margin: 0 auto;
