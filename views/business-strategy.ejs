@@ -1,0 +1,70 @@
+<div class="strategy-page">
+    <div class="container strategy-container">
+        <header class="strategy-header">
+            <span class="strategy-eyebrow">Strategic Foundation</span>
+            <h1>Recommended Business Strategy</h1>
+            <p>Built from the business understanding you confirmed. This foundation will guide future planning and recommendations.</p>
+            <span class="strategy-confidence"><%= strategyResult.confidence %></span>
+        </header>
+
+        <% const sections = [
+            ['marketPosition', 'Market Position'],
+            ['primaryCustomer', 'Primary Customer'],
+            ['customerMotivation', 'Customer Motivation'],
+            ['competitiveApproach', 'Competitive Approach'],
+            ['pricingPosition', 'Pricing Position'],
+            ['primarySalesChannel', 'Primary Sales Channel'],
+            ['communicationStyle', 'Communication Style'],
+            ['marketingFocus', 'Marketing Focus'],
+            ['launchApproach', 'Launch Strategy'],
+            ['risks', 'Strategic Risks']
+        ]; %>
+        <div class="strategy-grid">
+            <% sections.forEach(function(entry) { const item = strategyResult.strategy[entry[0]]; %>
+                <section class="strategy-card">
+                    <div class="strategy-card-heading">
+                        <h2><%= entry[1] %></h2>
+                        <span><%= item.confidence %></span>
+                    </div>
+                    <% if (Array.isArray(item.value)) { %>
+                        <ul class="strategy-risk-list">
+                            <% item.value.forEach(function(risk) { %><li><%= risk %></li><% }); %>
+                        </ul>
+                    <% } else { %>
+                        <p class="strategy-value"><%= item.value %></p>
+                    <% } %>
+                    <div class="strategy-why">
+                        <strong>Why</strong>
+                        <p><%= item.explanation %></p>
+                    </div>
+                </section>
+            <% }); %>
+        </div>
+
+        <% if (strategyResult.assumptions.length) { %>
+            <section class="strategy-supporting-card">
+                <h2>Assumptions to keep in view</h2>
+                <ul><% strategyResult.assumptions.forEach(function(assumption) { %><li><%= assumption %></li><% }); %></ul>
+            </section>
+        <% } %>
+
+        <% if (strategyResult.recommendations.length) { %>
+            <section class="strategy-supporting-card strategy-recommendations">
+                <h2>Areas that may improve your strategy</h2>
+                <div class="strategy-recommendation-list">
+                    <% strategyResult.recommendations.forEach(function(item) { %>
+                        <article>
+                            <h3><%= item.recommendation %></h3>
+                            <p><strong>Why:</strong> <%= item.reason %></p>
+                        </article>
+                    <% }); %>
+                </div>
+            </section>
+        <% } %>
+
+        <div class="strategy-actions">
+            <a href="/discovery/reflection" class="btn btn-outline">Edit Business Understanding</a>
+            <button type="button" class="btn btn-primary" disabled aria-disabled="true" title="Build Plan arrives in the next stage">Continue to Build Plan</button>
+        </div>
+    </div>
+</div>

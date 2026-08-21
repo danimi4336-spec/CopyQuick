@@ -3,6 +3,7 @@ const { requireAuth } = require('./auth');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
+const { buildStrategy } = require('../lib/strategyEngine');
 
 const router = express.Router();
 const MAX_ANSWER_LENGTH = 2000;
@@ -233,6 +234,9 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   applyIntelligenceResult(discoverySession, intelligenceResult);
   discoverySession.updatedAt = new Date().toISOString();
   discoverySession.planningConfirmedAt = null;
+  discoverySession.confirmedUnderstanding = null;
+  discoverySession.strategyResult = null;
+  discoverySession.strategyUpdatedAt = null;
 
   return res.redirect(303, '/discovery/reflection');
 });
@@ -249,9 +253,36 @@ router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
     });
   }
 
+  discoverySession.confirmedUnderstanding = { ...discoverySession.understanding };
+  discoverySession.strategyResult = buildStrategy({
+    objective: discoverySession.objective,
+    understanding: discoverySession.understanding,
+    answers: discoverySession.answers,
+    confirmedUnderstanding: discoverySession.confirmedUnderstanding
+  });
   discoverySession.planningConfirmedAt = new Date().toISOString();
+  discoverySession.strategyUpdatedAt = discoverySession.planningConfirmedAt;
   discoverySession.updatedAt = discoverySession.planningConfirmedAt;
-  return res.redirect(303, '/discovery/reflection');
+  return res.redirect(303, '/discovery/strategy');
+});
+
+router.get('/discovery/strategy', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!discoverySession?.planningReadiness?.ready || !discoverySession?.planningConfirmedAt) {
+    return res.redirect('/discovery/reflection');
+  }
+
+  const strategyResult = discoverySession.strategyResult || buildStrategy({
+    objective: discoverySession.objective,
+    understanding: discoverySession.understanding,
+    answers: discoverySession.answers,
+    confirmedUnderstanding: discoverySession.confirmedUnderstanding
+  });
+  return res.render('business-strategy', {
+    title: 'Recommended Business Strategy - CopyQuick',
+    currentPage: 'discovery',
+    strategyResult
+  });
 });
 
 module.exports = router;

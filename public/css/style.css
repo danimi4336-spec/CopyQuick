@@ -143,6 +143,37 @@ body {
 .reflection-readiness button:disabled { cursor: not-allowed; opacity: .5; transform: none; }
 @media (max-width: 700px) { .reflection-page { padding: 2.5rem 0 4rem; } .reflection-page .container { padding: 0 1rem; } .reflection-readiness { align-items: stretch; flex-direction: column; } .reflection-readiness .btn { width: 100%; } .reflection-edit-form > div { align-items: stretch; flex-direction: column; } }
 
+/* Recommended business strategy */
+.strategy-page { min-height: calc(100vh - 82px); padding: 4rem 0 5rem; background: #f8fafc; }
+.strategy-container { max-width: 1040px; }
+.strategy-header { max-width: 760px; margin-bottom: 2.5rem; }
+.strategy-eyebrow { display: inline-block; margin-bottom: .7rem; color: var(--primary); font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.strategy-header h1 { margin-bottom: .8rem; color: #172033; font-size: clamp(2.1rem, 5vw, 3.2rem); }
+.strategy-header p { max-width: none; margin: 0 0 1rem; font-size: 1rem; }
+.strategy-confidence { display: inline-flex; padding: .35rem .65rem; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: .75rem; font-weight: 700; }
+.strategy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.strategy-card { padding: 1.4rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); box-shadow: var(--shadow-sm); }
+.strategy-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .65rem; }
+.strategy-card-heading h2 { margin: 0; color: #334155; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; }
+.strategy-card-heading span { flex: none; color: var(--secondary); font-size: .7rem; font-weight: 600; }
+.strategy-value { max-width: none; margin: 0 0 1rem; color: #172033; font-size: 1.15rem; font-weight: 700; }
+.strategy-why { padding-top: .85rem; border-top: 1px solid var(--border); }
+.strategy-why strong { color: #475569; font-size: .72rem; text-transform: uppercase; }
+.strategy-why p { max-width: none; margin: .25rem 0 0; font-size: .82rem; line-height: 1.55; }
+.strategy-risk-list { margin: 0 0 1rem; padding-left: 1.2rem; color: #172033; font-size: .88rem; font-weight: 600; }
+.strategy-risk-list li + li { margin-top: .45rem; }
+.strategy-supporting-card { margin-top: 1rem; padding: 1.5rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); }
+.strategy-supporting-card h2 { margin-bottom: .8rem; font-size: 1.05rem; }
+.strategy-supporting-card ul { margin: 0; padding-left: 1.2rem; color: #475569; font-size: .85rem; }
+.strategy-recommendations { border-color: #fde68a; background: #fffbeb; }
+.strategy-recommendation-list { display: grid; gap: .85rem; }
+.strategy-recommendation-list article + article { padding-top: .85rem; border-top: 1px solid #fde68a; }
+.strategy-recommendation-list h3 { margin-bottom: .25rem; color: #78350f; font-size: .92rem; }
+.strategy-recommendation-list p { max-width: none; margin: 0; font-size: .8rem; }
+.strategy-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.5rem; }
+.strategy-actions button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+@media (max-width: 700px) { .strategy-page { padding: 2.5rem 0 4rem; } .strategy-page .container { padding: 0 1rem; } .strategy-grid { grid-template-columns: 1fr; } .strategy-actions { align-items: stretch; flex-direction: column; } .strategy-actions .btn { width: 100%; text-align: center; } }
+
 .container {
     max-width: 1100px;
     margin: 0 auto;
