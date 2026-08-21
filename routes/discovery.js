@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAuth } = require('./auth');
 const { understandBusiness } = require('../lib/businessUnderstanding');
+const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 
 const router = express.Router();
 const MAX_ANSWER_LENGTH = 2000;
@@ -61,14 +62,25 @@ router.post('/discovery', requireAuth, async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const result = await understandBusiness({ objective: 'launch_product', answer });
+    const understandingResult = await understandBusiness({ objective: 'launch_product', answer });
+    const answers = { initial_description: answer };
+    const intelligenceResult = analyzeDiscovery({
+      objective: 'launch_product',
+      understanding: understandingResult.understanding,
+      unknowns: understandingResult.unknowns,
+      answers
+    });
     req.session.discoverySession = {
       objective: 'launch_product',
-      answers: { initial_description: answer },
-      understanding: result.understanding,
-      unknowns: result.unknowns,
+      answers,
+      understanding: understandingResult.understanding,
+      unknowns: understandingResult.unknowns,
       completedQuestions: ['initial_description'],
-      nextQuestion: result.nextQuestion,
+      completion: intelligenceResult.completion,
+      knowledgeDomains: intelligenceResult.knowledgeDomains,
+      nextQuestion: intelligenceResult.nextQuestion,
+      reasoning: intelligenceResult.reasoning,
+      remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
       startedAt: req.session.discoverySession?.startedAt || now,
       updatedAt: now
     };
@@ -109,21 +121,35 @@ router.post('/discovery', requireAuth, async (req, res) => {
       source: 'user_confirmed'
     }
   };
-  const result = await understandBusiness({
+  const updatedAnswers = {
+    ...discoverySession.answers,
+    [currentQuestion.id]: selectedOption.allowsText
+      ? { value: selectedOption.value, detail: otherAnswer }
+      : selectedOption.value
+  };
+  const understandingResult = await understandBusiness({
     objective: discoverySession.objective,
     answer: discoverySession.answers.initial_description,
     existingUnderstanding: confirmedUnderstanding
   });
+  const intelligenceResult = analyzeDiscovery({
+    objective: discoverySession.objective,
+    understanding: understandingResult.understanding,
+    unknowns: understandingResult.unknowns,
+    answers: updatedAnswers
+  });
 
-  discoverySession.answers[currentQuestion.id] = selectedOption.allowsText
-    ? { value: selectedOption.value, detail: otherAnswer }
-    : selectedOption.value;
-  discoverySession.understanding = result.understanding;
-  discoverySession.unknowns = result.unknowns;
+  discoverySession.answers = updatedAnswers;
+  discoverySession.understanding = understandingResult.understanding;
+  discoverySession.unknowns = understandingResult.unknowns;
   discoverySession.completedQuestions = Array.from(new Set(
     discoverySession.completedQuestions.concat(currentQuestion.id)
   ));
-  discoverySession.nextQuestion = result.nextQuestion;
+  discoverySession.completion = intelligenceResult.completion;
+  discoverySession.knowledgeDomains = intelligenceResult.knowledgeDomains;
+  discoverySession.nextQuestion = intelligenceResult.nextQuestion;
+  discoverySession.reasoning = intelligenceResult.reasoning;
+  discoverySession.remainingKnowledgeGaps = intelligenceResult.remainingKnowledgeGaps;
   discoverySession.updatedAt = new Date().toISOString();
 
   return res.redirect(303, '/discovery');

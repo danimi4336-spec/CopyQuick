@@ -72,7 +72,7 @@ async function run() {
     assert.strictEqual(page.res.statusCode, 200);
     assert.match(page.body, /Let's Build Something Amazing/);
     assert.match(page.body, /What are you building\?/);
-    assert.match(page.body, /Building your understanding/);
+    assert.match(page.body, /Understanding your business\.\.\./);
     assert.strictEqual((page.body.match(/class="discovery-example"/g) || []).length, 5);
     const csrfToken = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     assert(csrfToken, 'Discovery form should include a CSRF token');
@@ -100,7 +100,10 @@ async function run() {
     assert.deepStrictEqual(savedSession.completedQuestions, ['initial_description']);
     assert.strictEqual(savedSession.understanding.businessType.value, 'physical_product');
     assert.strictEqual(savedSession.understanding.category.value, 'dietary_supplement');
-    assert.strictEqual(savedSession.nextQuestion.id, 'sales_channel');
+    assert.strictEqual(savedSession.nextQuestion.id, 'target_audience');
+    assert.strictEqual(typeof savedSession.completion, 'number');
+    assert.strictEqual(savedSession.knowledgeDomains.Product.status, 'known');
+    assert(savedSession.reasoning.some((item) => item.skippedDomain === 'Product'));
     assert.match(savedSession.startedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(savedSession.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
 
@@ -110,37 +113,37 @@ async function run() {
     assert.match(nextState.body, /Physical Product/);
     assert.match(nextState.body, /Health &amp; Wellness/);
     assert.match(nextState.body, /Dietary Supplement/);
-    assert.match(nextState.body, /Where do you plan to sell this product\?/);
-    assert.match(nextState.body, /value="amazon"/);
+    assert.match(nextState.body, /Who is this product primarily for\?/);
+    assert.match(nextState.body, /value="consumers"/);
     assert.match(nextState.body, /value="other"/);
     const nextToken = nextState.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
     const missingCsrf = await request(authenticated, 'POST', '/discovery', {
-      questionId: 'sales_channel',
-      choice: 'amazon'
+      questionId: 'target_audience',
+      choice: 'consumers'
     });
     assert.strictEqual(missingCsrf.res.statusCode, 403);
 
     const structuredSubmission = await request(authenticated, 'POST', '/discovery', {
       _csrf: nextToken,
-      questionId: 'sales_channel',
-      choice: 'amazon'
+      questionId: 'target_audience',
+      choice: 'consumers'
     });
     assert.strictEqual(structuredSubmission.res.statusCode, 303);
     assert.strictEqual(structuredSubmission.res.headers.location, '/discovery');
 
     const updated = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
-    assert.strictEqual(updated.answers.sales_channel, 'amazon');
-    assert.strictEqual(updated.understanding.salesChannel.source, 'user_confirmed');
-    assert.strictEqual(updated.understanding.salesChannel.confidence, 1);
-    assert(updated.completedQuestions.includes('sales_channel'));
-    assert.strictEqual(updated.nextQuestion.id, 'target_audience');
+    assert.strictEqual(updated.answers.target_audience, 'consumers');
+    assert.strictEqual(updated.understanding.targetAudience.source, 'user_confirmed');
+    assert.strictEqual(updated.understanding.targetAudience.confidence, 1);
+    assert(updated.completedQuestions.includes('target_audience'));
+    assert.strictEqual(updated.nextQuestion.id, 'customer_motivation');
 
     const targetPage = await request(authenticated, 'GET', '/discovery');
     const targetToken = targetPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const emptyOther = await request(authenticated, 'POST', '/discovery', {
       _csrf: targetToken,
-      questionId: 'target_audience',
+      questionId: 'customer_motivation',
       choice: 'other',
       otherAnswer: '   '
     });

@@ -12,7 +12,6 @@ async function run() {
   assert.strictEqual(supplement.understanding.category.source, 'inference');
   assert(supplement.understanding.category.confidence >= 0.7);
   assert(supplement.unknowns.includes('salesChannel'));
-  assert.strictEqual(supplement.nextQuestion.id, 'sales_channel');
 
   const service = await understandBusiness({
     objective: 'launch_product',
@@ -46,7 +45,6 @@ async function run() {
   });
   assert.strictEqual(ambiguous.understanding.industry.source, 'unknown');
   assert.strictEqual(ambiguous.understanding.category.source, 'unknown');
-  assert.strictEqual(ambiguous.nextQuestion.id, 'business_type');
 
   const withKnownChannel = await understandBusiness({
     objective: 'launch_product',
@@ -56,7 +54,6 @@ async function run() {
     }
   });
   assert(!withKnownChannel.unknowns.includes('salesChannel'));
-  assert.strictEqual(withKnownChannel.nextQuestion.id, 'target_audience');
   assert.strictEqual(withKnownChannel.understanding.salesChannel.source, 'user_confirmed');
 
   const withUnsureChannel = await understandBusiness({
@@ -67,7 +64,6 @@ async function run() {
     }
   });
   assert(withUnsureChannel.unknowns.includes('salesChannel'));
-  assert.strictEqual(withUnsureChannel.nextQuestion.id, 'target_audience');
 
   console.log('Story 3.2 Business Understanding Engine tests passed');
 }
