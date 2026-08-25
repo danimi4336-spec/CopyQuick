@@ -150,8 +150,13 @@ function initDb() {
       generation_type TEXT,
       generation_id INTEGER REFERENCES generations(id),
       error_message TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      last_error_code TEXT,
+      reversal_usage_event_id INTEGER REFERENCES usage_events(id),
       started_at DATETIME,
       completed_at DATETIME,
+      failed_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(production_run_id, deliverable_id)
@@ -231,6 +236,27 @@ function initDb() {
     // Column already exists
   }
 
+  try {
+    db.exec('ALTER TABLE usage_events ADD COLUMN production_job_id INTEGER REFERENCES production_jobs(id)');
+  } catch (e) {
+    // Column already exists
+  }
+
+  const productionJobCols = [
+    'attempt_count INTEGER NOT NULL DEFAULT 0',
+    'max_attempts INTEGER NOT NULL DEFAULT 3',
+    'last_error_code TEXT',
+    'reversal_usage_event_id INTEGER REFERENCES usage_events(id)',
+    'failed_at DATETIME'
+  ];
+  productionJobCols.forEach(function(col) {
+    try {
+      db.exec(`ALTER TABLE production_jobs ADD COLUMN ${col}`);
+    } catch (e) {
+      // Column already exists
+    }
+  });
+
   // Create indexes for performance
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_user_id ON generations(user_id)`);
@@ -249,6 +275,8 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_generation_id ON usage_events(generation_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_user_type ON usage_events(user_id, event_type)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_production_run_id ON usage_events(production_run_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_production_job_id ON usage_events(production_job_id)`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_events_job_reversal ON usage_events(production_job_id, event_type) WHERE event_type = 'production_reversal'`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_user_created ON production_runs(user_id, created_at DESC)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_user_fingerprint ON production_runs(user_id, plan_fingerprint)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_order ON production_jobs(production_run_id, sequence_order)`);

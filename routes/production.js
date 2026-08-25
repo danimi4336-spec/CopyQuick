@@ -2,6 +2,7 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 const { getDb } = require('../db/database');
 const { getProductionReview, getProductionRun, initializeProduction } = require('../lib/productionInitialization');
+const { executeNextProductionJob } = require('../lib/productionExecution');
 
 const router = express.Router();
 
@@ -74,6 +75,25 @@ router.post('/production/start', requireAuth, (req, res) => {
   return res.redirect(303, `/production/${result.productionRunId}`);
 });
 
+router.post('/production/:id/run-next', requireAuth, async (req, res) => {
+  const db = getDb();
+  const user = getUser(req, db);
+  if (!user) return res.redirect('/login');
+  const runId = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(runId)) return res.status(404).send('Production run not found.');
+
+  const result = await executeNextProductionJob({ db, userId: user.id, productionRunId: runId });
+  if (result.outcome === 'not_found') return res.status(404).send('Production run not found.');
+  const messages = {
+    completed: 'One production deliverable was completed successfully.',
+    retry_scheduled: 'A production attempt could not be completed. It is ready for a safe retry.',
+    permanent_failure: "We couldn't complete one asset after multiple attempts. Blocked dependent work was safely handled.",
+    no_runnable_job: 'There are no runnable production jobs at this time.'
+  };
+  req.session.productionExecutionNotice = messages[result.outcome] || 'Production status was refreshed.';
+  return res.redirect(303, `/production/${runId}`);
+});
+
 router.get('/production/:id', requireAuth, (req, res) => {
   const db = getDb();
   const user = getUser(req, db);
@@ -98,12 +118,18 @@ router.get('/production/:id', requireAuth, (req, res) => {
     phase.jobs.push(job);
   });
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
+  const executionNotice = req.session.productionExecutionNotice || null;
+  req.session.productionExecutionNotice = null;
+  const canRunNext = ['queued', 'running'].includes(production.status)
+    && production.jobs.some(function(job) { return job.status === 'queued'; });
   return res.render('production-studio', {
     title: 'Production Studio - CopyQuick',
     currentPage: 'production',
     production,
     phases,
-    completedCount
+    completedCount,
+    executionNotice,
+    canRunNext
   });
 });
 

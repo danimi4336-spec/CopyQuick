@@ -6,6 +6,8 @@
             <p><strong><%= completedCount %> of <%= production.jobs.length %> completed.</strong> Jobs below show their real persisted queue state.</p>
         </header>
 
+        <% if (executionNotice) { %><div class="alert production-execution-notice" role="status"><%= executionNotice %></div><% } %>
+
         <section class="production-run-summary">
             <div><span>Run status</span><strong><%= production.status.replace(/_/g, ' ') %></strong></div>
             <div><span>Production units</span><strong><%= production.production_cost_units %></strong></div>
@@ -27,6 +29,8 @@
                                     <h3><%= job.title %></h3>
                                     <p><%= job.strategic_direction %></p>
                                     <% if (job.dependencies.length) { %><small>Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
+                                    <% if (job.error_message) { %><small class="production-job-error"><%= job.error_message %></small><% } %>
+                                    <% if (job.status === 'completed' && job.generation_id) { %><a class="production-result-link" href="/generation/<%= job.generation_id %>">View result</a><% } %>
                                 </div>
                                 <span class="production-job-status status-<%= job.status %>"><%= job.status.replace(/_/g, ' ') %></span>
                             </li>
@@ -35,5 +39,13 @@
                 </section>
             <% }); %>
         </div>
+
+        <% if (canRunNext) { %>
+            <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary">Continue Production</button>
+                <small>Executes the next dependency-ready deliverable.</small>
+            </form>
+        <% } %>
     </div>
 </div>

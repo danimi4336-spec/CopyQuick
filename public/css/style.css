@@ -286,8 +286,14 @@ body {
 .production-job-status.status-waiting_dependency { background: #fef3c7; color: #92400e; }
 .production-job-status.status-completed { background: #dcfce7; color: #166534; }
 .production-job-status.status-failed { background: #fee2e2; color: #991b1b; }
+.production-job-status.status-skipped { background: #f1f5f9; color: #475569; }
+.production-execution-notice { margin-bottom: 1rem; border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; }
+.production-job-error { color: #991b1b !important; }
+.production-result-link { display: inline-block; margin-top: .45rem; color: var(--primary); font-size: .74rem; font-weight: 700; }
+.production-run-next { display: flex; align-items: center; gap: .8rem; margin-top: 1.25rem; }
+.production-run-next small { color: var(--secondary); font-size: .72rem; }
 @media (max-width: 700px) { .build-plan-page, .production-ready-page { padding: 2.5rem 0 4rem; } .build-plan-page .container, .production-ready-page .container { padding: 0 1rem; } .build-plan-phase-header, .production-ready-phases > section { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-selection-summary, .build-plan-actions, .production-ready-actions { align-items: stretch; flex-direction: column; } .build-plan-actions .btn, .build-plan-actions form, .build-plan-actions button, .production-ready-actions .btn { width: 100%; text-align: center; } }
-@media (max-width: 700px) { .production-review-page, .production-studio-page { padding: 2.5rem 0 4rem; } .production-review-page .container, .production-studio-page .container { padding: 0 1rem; } .production-cost-card, .production-run-summary { grid-template-columns: 1fr; } .production-review-phase { grid-template-columns: 1fr; gap: .4rem; } .production-confirmation { align-items: stretch; flex-direction: column; } .production-confirmation .btn, .production-confirmation form { width: 100%; } .production-studio-phase li { grid-template-columns: 32px 1fr; } .production-job-status { grid-column: 2; justify-self: start; } }
+@media (max-width: 700px) { .production-review-page, .production-studio-page { padding: 2.5rem 0 4rem; } .production-review-page .container, .production-studio-page .container { padding: 0 1rem; } .production-cost-card, .production-run-summary { grid-template-columns: 1fr; } .production-review-phase { grid-template-columns: 1fr; gap: .4rem; } .production-confirmation, .production-run-next { align-items: stretch; flex-direction: column; } .production-confirmation .btn, .production-confirmation form, .production-run-next .btn { width: 100%; } .production-studio-phase li { grid-template-columns: 32px 1fr; } .production-job-status { grid-column: 2; justify-self: start; } }
 
 .container {
     max-width: 1100px;
