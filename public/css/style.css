@@ -184,6 +184,12 @@ body {
 .build-plan-explanation { margin-bottom: 2rem; padding: 1.25rem 1.4rem; border: 1px solid #c7d2fe; border-radius: 1rem; background: #eef2ff; }
 .build-plan-explanation h2 { margin-bottom: .35rem; color: #312e81; font-size: 1rem; }
 .build-plan-explanation p { max-width: none; margin: 0; color: #475569; font-size: .88rem; }
+.build-plan-alert { margin-bottom: 1rem; }
+.build-plan-adjustments { margin-bottom: 1rem; padding: 1rem 1.2rem; border: 1px solid #bfdbfe; border-radius: .85rem; background: #eff6ff; color: #1e40af; }
+.build-plan-adjustments p { max-width: none; margin: 0; font-size: .82rem; }
+.build-plan-adjustments p + p { margin-top: .35rem; }
+.build-plan-selection-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: 1rem 1.2rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--white); }
+.build-plan-selection-summary > div { display: flex; flex-wrap: wrap; gap: .8rem; color: var(--secondary); font-size: .76rem; }
 .build-plan-phases { display: grid; gap: 1.25rem; }
 .build-plan-phase { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); box-shadow: var(--shadow-sm); }
 .build-plan-phase-header { display: grid; grid-template-columns: 76px 1fr; gap: 1rem; padding: 1.25rem 1.4rem; border-bottom: 1px solid var(--border); background: #f8fafc; }
@@ -192,9 +198,14 @@ body {
 .build-plan-phase-header p { max-width: none; margin: 0; font-size: .82rem; }
 .build-plan-deliverables { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .build-plan-deliverable { padding: 1.3rem 1.4rem; border-bottom: 1px solid var(--border); }
+.build-plan-deliverable.selected { background: #fdfdff; }
 .build-plan-deliverable:nth-child(odd) { border-right: 1px solid var(--border); }
 .build-plan-deliverable-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .55rem; }
 .build-plan-deliverable-heading h3 { margin: 0; color: #1e293b; font-size: .98rem; }
+.build-plan-deliverable > h3 { margin: 0 0 .55rem; color: #1e293b; font-size: .98rem; }
+.build-plan-select-control { display: inline-flex; align-items: center; gap: .45rem; color: #475569; font-size: .72rem; font-weight: 600; cursor: pointer; }
+.build-plan-select-control input { width: 1rem; height: 1rem; accent-color: var(--primary); }
+.build-plan-select-control input:disabled { cursor: not-allowed; }
 .build-plan-deliverable > p { max-width: none; margin: 0; font-size: .82rem; line-height: 1.55; }
 .build-plan-level { flex: none; padding: .25rem .48rem; border-radius: 999px; font-size: .62rem; font-weight: 700; text-transform: uppercase; }
 .build-plan-level-essential { background: #dcfce7; color: #166534; }
@@ -203,8 +214,30 @@ body {
 .build-plan-direction { margin-top: .85rem; padding-top: .75rem; border-top: 1px solid var(--border); }
 .build-plan-direction strong { color: #475569; font-size: .68rem; letter-spacing: .04em; text-transform: uppercase; }
 .build-plan-direction p { max-width: none; margin: .2rem 0 0; color: #334155; font-size: .78rem; line-height: 1.5; }
-.build-plan-actions { display: flex; justify-content: flex-start; margin-top: 1.5rem; }
-@media (max-width: 700px) { .build-plan-page { padding: 2.5rem 0 4rem; } .build-plan-page .container { padding: 0 1rem; } .build-plan-phase-header { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-actions .btn { width: 100%; text-align: center; } }
+.build-plan-dependency-note { margin-top: .7rem !important; padding: .55rem .65rem; border-radius: .5rem; background: #f1f5f9; color: #475569; font-size: .72rem !important; }
+.build-plan-save-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.build-plan-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
+
+/* Production handoff */
+.production-ready-page { min-height: calc(100vh - 82px); padding: 4rem 0 5rem; background: #f8fafc; }
+.production-ready-container { max-width: 900px; }
+.production-ready-header { max-width: 740px; margin-bottom: 2rem; }
+.production-ready-icon { display: flex; width: 44px; height: 44px; align-items: center; justify-content: center; margin-bottom: 1rem; border-radius: 50%; background: #dcfce7; color: #166534; font-size: 1.3rem; font-weight: 800; }
+.production-ready-header h1 { margin-bottom: .7rem; color: #172033; font-size: clamp(2.1rem, 5vw, 3.2rem); }
+.production-ready-header p { max-width: none; margin: 0; }
+.production-ready-note { margin-bottom: 1.25rem; padding: 1rem 1.2rem; border: 1px solid #bbf7d0; border-radius: .85rem; background: #f0fdf4; }
+.production-ready-note p { max-width: none; margin: .2rem 0 0; font-size: .8rem; }
+.production-ready-phases { display: grid; gap: 1rem; }
+.production-ready-phases > section { display: grid; grid-template-columns: 80px 1fr; gap: 1rem; padding: 1.3rem 1.4rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); box-shadow: var(--shadow-sm); }
+.production-ready-phases > section > span { color: var(--primary); font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.production-ready-phases h2 { margin-bottom: .8rem; font-size: 1.15rem; }
+.production-ready-phases ol { margin: 0; padding-left: 1.3rem; }
+.production-ready-phases li + li { margin-top: .75rem; }
+.production-ready-phases li p { max-width: none; margin: .15rem 0 0; font-size: .76rem; }
+.production-ready-actions { display: flex; align-items: center; gap: .75rem; margin-top: 1.5rem; }
+.production-ready-actions button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+.production-ready-actions small { color: var(--secondary); font-size: .72rem; }
+@media (max-width: 700px) { .build-plan-page, .production-ready-page { padding: 2.5rem 0 4rem; } .build-plan-page .container, .production-ready-page .container { padding: 0 1rem; } .build-plan-phase-header, .production-ready-phases > section { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-selection-summary, .build-plan-actions, .production-ready-actions { align-items: stretch; flex-direction: column; } .build-plan-actions .btn, .build-plan-actions form, .build-plan-actions button, .production-ready-actions .btn { width: 100%; text-align: center; } }
 
 .container {
     max-width: 1100px;

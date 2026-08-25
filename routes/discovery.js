@@ -5,6 +5,13 @@ const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
+const {
+  buildApprovalView,
+  createApprovedProductionSet,
+  initializeSelection,
+  planFingerprint,
+  updateSelection
+} = require('../lib/buildPlanApproval');
 
 const router = express.Router();
 const MAX_ANSWER_LENGTH = 2000;
@@ -70,6 +77,33 @@ function hasCurrentStrategyState(discoverySession) {
   const confirmedAt = Date.parse(discoverySession.planningConfirmedAt);
   const strategyAt = Date.parse(discoverySession.strategyUpdatedAt);
   return Number.isFinite(confirmedAt) && Number.isFinite(strategyAt) && strategyAt >= confirmedAt;
+}
+
+function hasCurrentBuildPlanState(discoverySession) {
+  if (!hasCurrentStrategyState(discoverySession)
+    || !discoverySession?.buildPlan
+    || !discoverySession?.buildPlanUpdatedAt
+    || !discoverySession?.buildPlanSource
+    || !discoverySession?.buildPlanFingerprint) return false;
+
+  return discoverySession.buildPlanSource.planningConfirmedAt === discoverySession.planningConfirmedAt
+    && discoverySession.buildPlanSource.strategyUpdatedAt === discoverySession.strategyUpdatedAt
+    && discoverySession.buildPlanFingerprint === planFingerprint(discoverySession.buildPlan);
+}
+
+function renderBuildPlan(req, res, options = {}) {
+  const discoverySession = req.session.discoverySession;
+  discoverySession.buildPlanSelection = initializeSelection(
+    discoverySession.buildPlan,
+    discoverySession.buildPlanSelection
+  );
+  return res.status(options.status || 200).render('build-plan', {
+    title: 'Your Personalized Build Plan - CopyQuick',
+    currentPage: 'discovery',
+    plan: discoverySession.buildPlan,
+    approval: buildApprovalView(discoverySession.buildPlan, discoverySession.buildPlanSelection),
+    error: options.error || null
+  });
 }
 
 function renderReflection(req, res, options = {}) {
@@ -251,6 +285,10 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   discoverySession.strategyUpdatedAt = null;
   discoverySession.buildPlan = null;
   discoverySession.buildPlanUpdatedAt = null;
+  discoverySession.buildPlanSource = null;
+  discoverySession.buildPlanFingerprint = null;
+  discoverySession.buildPlanSelection = null;
+  discoverySession.approvedProductionSet = null;
 
   return res.redirect(303, '/discovery/reflection');
 });
@@ -321,10 +359,81 @@ router.get('/discovery/build-plan', requireAuth, (req, res) => {
 
   discoverySession.buildPlan = plan;
   discoverySession.buildPlanUpdatedAt = new Date().toISOString();
-  return res.render('build-plan', {
-    title: 'Your Personalized Build Plan - CopyQuick',
+  discoverySession.buildPlanSource = {
+    planningConfirmedAt: discoverySession.planningConfirmedAt,
+    strategyUpdatedAt: discoverySession.strategyUpdatedAt
+  };
+  discoverySession.buildPlanFingerprint = planFingerprint(plan);
+  return renderBuildPlan(req, res);
+});
+
+router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!hasCurrentBuildPlanState(discoverySession)) {
+    return res.redirect('/discovery/build-plan');
+  }
+  const requested = Array.isArray(req.body.selectedDeliverableIds)
+    ? req.body.selectedDeliverableIds
+    : req.body.selectedDeliverableIds ? [req.body.selectedDeliverableIds] : [];
+  const result = updateSelection({
+    plan: discoverySession.buildPlan,
+    currentSelection: discoverySession.buildPlanSelection,
+    requestedDeliverableIds: requested
+  });
+  if (!result.valid) {
+    return renderBuildPlan(req, res, { status: 409, error: result.error });
+  }
+  discoverySession.buildPlanSelection = result.selection;
+  discoverySession.approvedProductionSet = null;
+  return res.redirect(303, '/discovery/build-plan');
+});
+
+router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!hasCurrentBuildPlanState(discoverySession)) {
+    return res.redirect('/discovery/build-plan');
+  }
+  const result = createApprovedProductionSet({
+    plan: discoverySession.buildPlan,
+    selection: discoverySession.buildPlanSelection,
+    strategyResult: discoverySession.strategyResult
+  });
+  if (!result.valid) {
+    return renderBuildPlan(req, res, { status: 409, error: result.error });
+  }
+
+  discoverySession.buildPlanSelection.approvedAt = result.approvedAt;
+  discoverySession.buildPlanSelection.updatedAt = result.approvedAt;
+  discoverySession.approvedProductionSet = result.productionSet;
+  return res.redirect(303, '/discovery/production-ready');
+});
+
+router.get('/discovery/production-ready', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!hasCurrentBuildPlanState(discoverySession)) {
+    return res.redirect('/discovery/build-plan');
+  }
+  if (!discoverySession.approvedProductionSet
+    || discoverySession.approvedProductionSet.planFingerprint !== discoverySession.buildPlanFingerprint) {
+    return res.redirect('/discovery/build-plan');
+  }
+
+  const productionSet = discoverySession.approvedProductionSet;
+  const phases = discoverySession.buildPlan.phases.map(function(phase) {
+    return {
+      id: phase.id,
+      title: phase.title,
+      deliverables: productionSet.selectedDeliverables.filter(function(item) {
+        return item.phase === phase.id;
+      })
+    };
+  }).filter(function(phase) { return phase.deliverables.length; });
+  return res.render('production-ready', {
+    title: 'Your Production Plan Is Ready - CopyQuick',
     currentPage: 'discovery',
-    plan
+    productionSet,
+    phases,
+    dependencyCount: discoverySession.buildPlanSelection.requiredDependencyIds.length
   });
 });
 

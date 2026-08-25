@@ -11,8 +11,26 @@
             <p><%= plan.summary.whyThisPlan %></p>
         </section>
 
-        <div class="build-plan-phases">
-            <% plan.phases.forEach(function(phase, phaseIndex) { %>
+        <% if (error) { %><div class="alert alert-error build-plan-alert" role="alert"><%= error %></div><% } %>
+        <% if (approval.messages.length) { %>
+            <div class="build-plan-adjustments" role="status">
+                <% approval.messages.forEach(function(message) { %><p><%= message %></p><% }); %>
+            </div>
+        <% } %>
+
+        <section class="build-plan-selection-summary" aria-label="Selected plan summary">
+            <strong><span data-plan-count="total"><%= approval.counts.total %></span> deliverables selected</strong>
+            <div>
+                <span>Essential: <b data-plan-count="essential"><%= approval.counts.essential %></b></span>
+                <span>Recommended: <b data-plan-count="recommended"><%= approval.counts.recommended %></b></span>
+                <span>Optional: <b data-plan-count="optional"><%= approval.counts.optional %></b></span>
+            </div>
+        </section>
+
+        <form action="/discovery/build-plan/selection" method="POST" id="build-plan-selection-form">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <div class="build-plan-phases">
+            <% approval.phases.forEach(function(phase, phaseIndex) { %>
                 <section class="build-plan-phase" aria-labelledby="phase-<%= phase.id %>">
                     <header class="build-plan-phase-header">
                         <span>Phase <%= phaseIndex + 1 %></span>
@@ -23,11 +41,16 @@
                     </header>
                     <div class="build-plan-deliverables">
                         <% phase.deliverables.forEach(function(item) { %>
-                            <article class="build-plan-deliverable">
+                            <article class="build-plan-deliverable <%= item.selected ? 'selected' : '' %>">
                                 <div class="build-plan-deliverable-heading">
-                                    <h3><%= item.title %></h3>
+                                    <label class="build-plan-select-control">
+                                        <% if (item.locked) { %><input type="hidden" name="selectedDeliverableIds" value="<%= item.id %>"><% } %>
+                                        <input type="checkbox" name="selectedDeliverableIds" value="<%= item.id %>" data-level="<%= item.recommendationLevel %>" <%= item.selected ? 'checked' : '' %> <%= item.locked ? 'disabled' : '' %>>
+                                        <span><%= item.locked ? 'Included as a prerequisite' : 'Include in production' %></span>
+                                    </label>
                                     <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>"><%= item.recommendationLevel %></span>
                                 </div>
+                                <h3><%= item.title %></h3>
                                 <p><%= item.reason %></p>
                                 <% if (item.strategicDirection) { %>
                                     <div class="build-plan-direction">
@@ -35,15 +58,48 @@
                                         <p><%= item.strategicDirection %></p>
                                     </div>
                                 <% } %>
+                                <% if (item.dependencyNote) { %><p class="build-plan-dependency-note"><%= item.dependencyNote %></p><% } %>
                             </article>
                         <% }); %>
                     </div>
                 </section>
             <% }); %>
-        </div>
+            </div>
+
+            <div class="build-plan-save-actions">
+                <button type="submit" class="btn btn-outline">Save Plan Choices</button>
+            </div>
+        </form>
 
         <div class="build-plan-actions">
             <a href="/discovery/strategy" class="btn btn-outline">Review Strategy</a>
+            <form action="/discovery/build-plan/approve" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary">Approve &amp; Prepare for Production</button>
+            </form>
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    const form = document.getElementById('build-plan-selection-form');
+    if (!form) return;
+    const controls = Array.from(form.querySelectorAll('input[type="checkbox"][data-level]'));
+    function updateSummary() {
+        const counts = { total: 0, essential: 0, recommended: 0, optional: 0 };
+        controls.forEach(function(control) {
+            control.closest('.build-plan-deliverable').classList.toggle('selected', control.checked);
+            if (control.checked) {
+                counts.total += 1;
+                counts[control.dataset.level] += 1;
+            }
+        });
+        Object.keys(counts).forEach(function(key) {
+            const target = document.querySelector('[data-plan-count="' + key + '"]');
+            if (target) target.textContent = counts[key];
+        });
+    }
+    controls.forEach(function(control) { control.addEventListener('change', updateSummary); });
+})();
+</script>

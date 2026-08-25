@@ -1,0 +1,42 @@
+<div class="production-ready-page">
+    <div class="container production-ready-container">
+        <header class="production-ready-header">
+            <span class="production-ready-icon" aria-hidden="true">✓</span>
+            <span class="build-plan-eyebrow">Production Handoff</span>
+            <h1>Your production plan is ready.</h1>
+            <p>You approved <strong><%= productionSet.selectedDeliverables.length %> deliverables</strong> in dependency-aware production order. Nothing has been generated yet.</p>
+        </header>
+
+        <% if (dependencyCount) { %>
+            <div class="production-ready-note">
+                <strong><%= dependencyCount %> prerequisite<%= dependencyCount === 1 ? '' : 's' %> included</strong>
+                <p>These foundational deliverables keep downstream production consistent with your approved strategy.</p>
+            </div>
+        <% } %>
+
+        <div class="production-ready-phases">
+            <% phases.forEach(function(phase, phaseIndex) { %>
+                <section>
+                    <span>Phase <%= phaseIndex + 1 %></span>
+                    <div>
+                        <h2><%= phase.title %></h2>
+                        <ol>
+                            <% phase.deliverables.forEach(function(item) { %>
+                                <li>
+                                    <strong><%= item.title %></strong>
+                                    <p><%= item.strategicDirection %></p>
+                                </li>
+                            <% }); %>
+                        </ol>
+                    </div>
+                </section>
+            <% }); %>
+        </div>
+
+        <div class="production-ready-actions">
+            <a href="/discovery/build-plan" class="btn btn-outline">Review Build Plan</a>
+            <button type="button" class="btn btn-primary" disabled aria-disabled="true" title="Production Studio is coming next">Start Production</button>
+            <small>Production Studio comes next. No assets have been created.</small>
+        </div>
+    </div>
+</div>
