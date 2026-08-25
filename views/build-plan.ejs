@@ -1,0 +1,49 @@
+<div class="build-plan-page">
+    <div class="container build-plan-container">
+        <header class="build-plan-header">
+            <span class="build-plan-eyebrow">Personalized Execution Plan</span>
+            <h1>Your Personalized Build Plan</h1>
+            <p>This plan is based on what CopyQuick learned about your business and the strategy you approved. It organizes the work so each deliverable supports what comes next.</p>
+        </header>
+
+        <section class="build-plan-explanation" aria-labelledby="why-this-plan">
+            <h2 id="why-this-plan">Why this plan?</h2>
+            <p><%= plan.summary.whyThisPlan %></p>
+        </section>
+
+        <div class="build-plan-phases">
+            <% plan.phases.forEach(function(phase, phaseIndex) { %>
+                <section class="build-plan-phase" aria-labelledby="phase-<%= phase.id %>">
+                    <header class="build-plan-phase-header">
+                        <span>Phase <%= phaseIndex + 1 %></span>
+                        <div>
+                            <h2 id="phase-<%= phase.id %>"><%= phase.title %></h2>
+                            <p><%= phase.reason %></p>
+                        </div>
+                    </header>
+                    <div class="build-plan-deliverables">
+                        <% phase.deliverables.forEach(function(item) { %>
+                            <article class="build-plan-deliverable">
+                                <div class="build-plan-deliverable-heading">
+                                    <h3><%= item.title %></h3>
+                                    <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>"><%= item.recommendationLevel %></span>
+                                </div>
+                                <p><%= item.reason %></p>
+                                <% if (item.strategicDirection) { %>
+                                    <div class="build-plan-direction">
+                                        <strong>Strategic direction</strong>
+                                        <p><%= item.strategicDirection %></p>
+                                    </div>
+                                <% } %>
+                            </article>
+                        <% }); %>
+                    </div>
+                </section>
+            <% }); %>
+        </div>
+
+        <div class="build-plan-actions">
+            <a href="/discovery/strategy" class="btn btn-outline">Review Strategy</a>
+        </div>
+    </div>
+</div>

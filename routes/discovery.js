@@ -4,6 +4,7 @@ const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 const { buildStrategy } = require('../lib/strategyEngine');
+const { buildPlan } = require('../lib/buildPlanEngine');
 
 const router = express.Router();
 const MAX_ANSWER_LENGTH = 2000;
@@ -58,6 +59,17 @@ function applyIntelligenceResult(discoverySession, intelligenceResult) {
 
 function canViewReflection(discoverySession) {
   return Boolean(discoverySession?.planningReadiness?.ready || discoverySession?.reflectionStartedAt);
+}
+
+function hasCurrentStrategyState(discoverySession) {
+  if (!discoverySession?.planningConfirmedAt
+    || !discoverySession?.confirmedUnderstanding
+    || !discoverySession?.strategyResult
+    || !discoverySession?.strategyUpdatedAt) return false;
+
+  const confirmedAt = Date.parse(discoverySession.planningConfirmedAt);
+  const strategyAt = Date.parse(discoverySession.strategyUpdatedAt);
+  return Number.isFinite(confirmedAt) && Number.isFinite(strategyAt) && strategyAt >= confirmedAt;
 }
 
 function renderReflection(req, res, options = {}) {
@@ -237,6 +249,8 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   discoverySession.confirmedUnderstanding = null;
   discoverySession.strategyResult = null;
   discoverySession.strategyUpdatedAt = null;
+  discoverySession.buildPlan = null;
+  discoverySession.buildPlanUpdatedAt = null;
 
   return res.redirect(303, '/discovery/reflection');
 });
@@ -281,7 +295,36 @@ router.get('/discovery/strategy', requireAuth, (req, res) => {
   return res.render('business-strategy', {
     title: 'Recommended Business Strategy - CopyQuick',
     currentPage: 'discovery',
-    strategyResult
+    strategyResult,
+    canBuildPlan: hasCurrentStrategyState(discoverySession)
+  });
+});
+
+router.get('/discovery/build-plan', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!discoverySession?.planningReadiness?.ready || !discoverySession?.planningConfirmedAt) {
+    return res.redirect('/discovery/reflection');
+  }
+  if (!hasCurrentStrategyState(discoverySession)) {
+    return res.redirect('/discovery/reflection');
+  }
+
+  const plan = buildPlan({
+    objective: discoverySession.objective,
+    confirmedUnderstanding: discoverySession.confirmedUnderstanding,
+    strategyResult: discoverySession.strategyResult,
+    answers: discoverySession.answers
+  });
+  if (!plan.readiness.ready) {
+    return res.redirect('/discovery/reflection');
+  }
+
+  discoverySession.buildPlan = plan;
+  discoverySession.buildPlanUpdatedAt = new Date().toISOString();
+  return res.render('build-plan', {
+    title: 'Your Personalized Build Plan - CopyQuick',
+    currentPage: 'discovery',
+    plan
   });
 });
 

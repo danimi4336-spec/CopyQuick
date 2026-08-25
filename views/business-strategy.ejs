@@ -64,7 +64,11 @@
 
         <div class="strategy-actions">
             <a href="/discovery/reflection" class="btn btn-outline">Edit Business Understanding</a>
-            <button type="button" class="btn btn-primary" disabled aria-disabled="true" title="Build Plan arrives in the next stage">Continue to Build Plan</button>
+            <% if (canBuildPlan) { %>
+                <a href="/discovery/build-plan" class="btn btn-primary">Continue to Build Plan</a>
+            <% } else { %>
+                <button type="button" class="btn btn-primary" disabled aria-disabled="true">Continue to Build Plan</button>
+            <% } %>
         </div>
     </div>
 </div>
