@@ -1,0 +1,61 @@
+<div class="production-review-page">
+    <div class="container production-review-container">
+        <header class="production-review-header">
+            <span class="build-plan-eyebrow">Final Production Review</span>
+            <h1>Review before starting production</h1>
+            <p>Confirm exactly what CopyQuick will queue, the approved strategic direction, and the authoritative usage cost before production begins.</p>
+        </header>
+
+        <% if (error) { %><div class="alert alert-error production-review-alert" role="alert"><%= error %></div><% } %>
+
+        <section class="production-cost-card" aria-labelledby="production-cost-title">
+            <div>
+                <span>Authoritative production cost</span>
+                <h2 id="production-cost-title"><%= cost.productionUnitCount %> generation<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
+                <p>One approved deliverable uses one existing CopyQuick generation unit when production is initialized.</p>
+            </div>
+            <dl>
+                <div><dt>Current usage</dt><dd><%= cost.currentUsage %></dd></div>
+                <div><dt>Monthly allowance</dt><dd><%= cost.monthlyAllowance %></dd></div>
+                <div><dt>Available before production</dt><dd><%= cost.remainingAllowance %></dd></div>
+                <div><dt>Available after production</dt><dd><%= Math.max(cost.remainingAllowance - cost.productionUnitCount, 0) %></dd></div>
+            </dl>
+        </section>
+
+        <section class="production-review-plan" aria-labelledby="production-review-plan-title">
+            <h2 id="production-review-plan-title">What will be produced</h2>
+            <p><%= productionSet.selectedDeliverables.length %> approved deliverables, preserved in dependency-aware order.</p>
+            <% phases.forEach(function(phase, phaseIndex) { %>
+                <div class="production-review-phase">
+                    <span>Phase <%= phaseIndex + 1 %></span>
+                    <div>
+                        <h3><%= phase.title %></h3>
+                        <ol>
+                            <% phase.deliverables.forEach(function(item) { %>
+                                <li>
+                                    <strong><%= item.title %></strong>
+                                    <p><%= item.strategicDirection %></p>
+                                </li>
+                            <% }); %>
+                        </ol>
+                    </div>
+                </div>
+            <% }); %>
+        </section>
+
+        <% if (cost.canAfford) { %>
+            <div class="production-confirmation">
+                <p>Starting this production plan will use <strong><%= cost.productionUnitCount %></strong> of your available generations. Usage begins only when you select Start Production.</p>
+                <form action="/production/start" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-primary">Start Production</button>
+                </form>
+            </div>
+        <% } else { %>
+            <div class="production-confirmation blocked">
+                <p><%= cost.blockingReason %></p>
+                <a href="/pricing" class="btn btn-primary">View Plans</a>
+            </div>
+        <% } %>
+    </div>
+</div>

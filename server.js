@@ -16,6 +16,7 @@ const pricingRoutes = require('./routes/pricing');
 const webhookRoutes = require('./routes/webhook');
 const builderRoutes = require('./routes/builder');
 const discoveryRoutes = require('./routes/discovery');
+const productionRoutes = require('./routes/production');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
 const { getAuthenticatedUserById } = require('./lib/authUser');
@@ -92,6 +93,7 @@ app.use('/', dashboardRoutes);
 app.use('/', pricingRoutes);
 app.use('/', builderRoutes);
 app.use('/', discoveryRoutes);
+app.use('/', productionRoutes);
 
 app.get('/', (req, res) => {
   res.render('index', { title: 'CopyQuick - AI Powered Marketing Copy', currentPage: 'home', contentTypes });

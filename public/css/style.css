@@ -237,7 +237,57 @@ body {
 .production-ready-actions { display: flex; align-items: center; gap: .75rem; margin-top: 1.5rem; }
 .production-ready-actions button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 .production-ready-actions small { color: var(--secondary); font-size: .72rem; }
+
+/* Production review and studio */
+.production-review-page, .production-studio-page { min-height: calc(100vh - 82px); padding: 4rem 0 5rem; background: #f8fafc; }
+.production-review-container, .production-studio-container { max-width: 920px; }
+.production-review-header, .production-studio-header { max-width: 760px; margin-bottom: 1.75rem; }
+.production-review-header h1, .production-studio-header h1 { margin-bottom: .7rem; color: #172033; font-size: clamp(2.1rem, 5vw, 3.2rem); }
+.production-review-header p, .production-studio-header p { max-width: none; margin: 0; }
+.production-review-alert { margin-bottom: 1rem; }
+.production-cost-card { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; margin-bottom: 1.25rem; padding: 1.5rem; border: 1px solid #c7d2fe; border-radius: 1rem; background: #eef2ff; }
+.production-cost-card > div > span { color: #4338ca; font-size: .72rem; font-weight: 700; text-transform: uppercase; }
+.production-cost-card h2 { margin: .3rem 0; color: #312e81; font-size: 1.65rem; }
+.production-cost-card p { max-width: none; margin: 0; font-size: .8rem; }
+.production-cost-card dl { display: grid; gap: .45rem; margin: 0; }
+.production-cost-card dl div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .4rem; border-bottom: 1px solid #c7d2fe; }
+.production-cost-card dt { color: #475569; font-size: .75rem; }
+.production-cost-card dd { margin: 0; color: #1e293b; font-size: .8rem; font-weight: 700; }
+.production-review-plan { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); }
+.production-review-plan > h2, .production-review-plan > p { margin-right: 1.4rem; margin-left: 1.4rem; }
+.production-review-plan > h2 { margin-top: 1.3rem; margin-bottom: .3rem; font-size: 1.2rem; }
+.production-review-plan > p { max-width: none; margin-bottom: 1.2rem; font-size: .82rem; }
+.production-review-phase { display: grid; grid-template-columns: 80px 1fr; gap: 1rem; padding: 1.2rem 1.4rem; border-top: 1px solid var(--border); }
+.production-review-phase > span { color: var(--primary); font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.production-review-phase h3 { margin-bottom: .7rem; font-size: 1rem; }
+.production-review-phase ol { margin: 0; padding-left: 1.2rem; }
+.production-review-phase li + li { margin-top: .65rem; }
+.production-review-phase li p { max-width: none; margin: .1rem 0 0; font-size: .74rem; }
+.production-confirmation { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin-top: 1.25rem; padding: 1.3rem 1.4rem; border: 1px solid #86efac; border-radius: 1rem; background: #f0fdf4; }
+.production-confirmation.blocked { border-color: #fca5a5; background: #fef2f2; }
+.production-confirmation p { max-width: 640px; margin: 0; font-size: .84rem; }
+.production-run-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; margin-bottom: 1.25rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--border); }
+.production-run-summary div { display: grid; gap: .2rem; padding: 1rem; background: var(--white); }
+.production-run-summary span { color: var(--secondary); font-size: .7rem; text-transform: uppercase; }
+.production-run-summary strong { color: #1e293b; font-size: .85rem; text-transform: capitalize; }
+.production-studio-phases { display: grid; gap: 1rem; }
+.production-studio-phase { overflow: hidden; border: 1px solid var(--border); border-radius: 1rem; background: var(--white); }
+.production-studio-phase > header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.3rem; border-bottom: 1px solid var(--border); background: #f8fafc; }
+.production-studio-phase > header span { color: var(--primary); font-size: .7rem; font-weight: 700; text-transform: uppercase; }
+.production-studio-phase > header h2 { margin: 0; font-size: 1.05rem; }
+.production-studio-phase ol { margin: 0; padding: 0; list-style: none; }
+.production-studio-phase li { display: grid; grid-template-columns: 32px 1fr auto; align-items: start; gap: .8rem; padding: 1rem 1.3rem; }
+.production-studio-phase li + li { border-top: 1px solid var(--border); }
+.production-job-order { display: flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 50%; background: #f1f5f9; color: #475569; font-size: .72rem; font-weight: 700; }
+.production-studio-phase h3 { margin-bottom: .2rem; font-size: .9rem; }
+.production-studio-phase p { max-width: none; margin: 0; font-size: .75rem; }
+.production-studio-phase small { display: block; margin-top: .3rem; color: #92400e; font-size: .68rem; }
+.production-job-status { padding: .28rem .5rem; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: .64rem; font-weight: 700; text-transform: capitalize; }
+.production-job-status.status-waiting_dependency { background: #fef3c7; color: #92400e; }
+.production-job-status.status-completed { background: #dcfce7; color: #166534; }
+.production-job-status.status-failed { background: #fee2e2; color: #991b1b; }
 @media (max-width: 700px) { .build-plan-page, .production-ready-page { padding: 2.5rem 0 4rem; } .build-plan-page .container, .production-ready-page .container { padding: 0 1rem; } .build-plan-phase-header, .production-ready-phases > section { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-selection-summary, .build-plan-actions, .production-ready-actions { align-items: stretch; flex-direction: column; } .build-plan-actions .btn, .build-plan-actions form, .build-plan-actions button, .production-ready-actions .btn { width: 100%; text-align: center; } }
+@media (max-width: 700px) { .production-review-page, .production-studio-page { padding: 2.5rem 0 4rem; } .production-review-page .container, .production-studio-page .container { padding: 0 1rem; } .production-cost-card, .production-run-summary { grid-template-columns: 1fr; } .production-review-phase { grid-template-columns: 1fr; gap: .4rem; } .production-confirmation { align-items: stretch; flex-direction: column; } .production-confirmation .btn, .production-confirmation form { width: 100%; } .production-studio-phase li { grid-template-columns: 32px 1fr; } .production-job-status { grid-column: 2; justify-self: start; } }
 
 .container {
     max-width: 1100px;

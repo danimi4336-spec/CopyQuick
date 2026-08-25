@@ -7,6 +7,8 @@
             <span class="strategy-confidence"><%= strategyResult.confidence %></span>
         </header>
 
+        <% if (error) { %><div class="alert alert-error strategy-alert" role="alert"><%= error %></div><% } %>
+
         <% const sections = [
             ['marketPosition', 'Market Position'],
             ['primaryCustomer', 'Primary Customer'],

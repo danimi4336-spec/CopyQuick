@@ -1,0 +1,39 @@
+<div class="production-studio-page">
+    <div class="container production-studio-container">
+        <header class="production-studio-header">
+            <span class="build-plan-eyebrow">Production Studio</span>
+            <h1>Production Plan</h1>
+            <p><strong><%= completedCount %> of <%= production.jobs.length %> completed.</strong> Jobs below show their real persisted queue state.</p>
+        </header>
+
+        <section class="production-run-summary">
+            <div><span>Run status</span><strong><%= production.status.replace(/_/g, ' ') %></strong></div>
+            <div><span>Production units</span><strong><%= production.production_cost_units %></strong></div>
+            <div><span>Started</span><strong><%= production.started_at %></strong></div>
+        </section>
+
+        <div class="production-studio-phases">
+            <% phases.forEach(function(phase, phaseIndex) { %>
+                <section class="production-studio-phase">
+                    <header>
+                        <span>Phase <%= phaseIndex + 1 %></span>
+                        <h2><%= phase.title %></h2>
+                    </header>
+                    <ol>
+                        <% phase.jobs.forEach(function(job) { %>
+                            <li>
+                                <span class="production-job-order"><%= job.sequence_order + 1 %></span>
+                                <div>
+                                    <h3><%= job.title %></h3>
+                                    <p><%= job.strategic_direction %></p>
+                                    <% if (job.dependencies.length) { %><small>Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
+                                </div>
+                                <span class="production-job-status status-<%= job.status %>"><%= job.status.replace(/_/g, ' ') %></span>
+                            </li>
+                        <% }); %>
+                    </ol>
+                </section>
+            <% }); %>
+        </div>
+    </div>
+</div>

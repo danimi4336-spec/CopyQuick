@@ -310,8 +310,8 @@ async function run() {
     assert.strictEqual(handoff.res.statusCode, 200);
     assert.match(handoff.body, /Your production plan is ready\./);
     assert.match(handoff.body, /Nothing has been generated yet/);
-    assert.match(handoff.body, /Start Production/);
-    assert.match(handoff.body, /disabled aria-disabled="true"/);
+    assert.match(handoff.body, /Review Cost &amp; Start Production/);
+    assert.match(handoff.body, /No usage is consumed until/);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);
     assert(stored.discoverySession.buildPlanSelection.approvedAt);

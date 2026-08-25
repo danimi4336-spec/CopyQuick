@@ -115,6 +115,47 @@ function initDb() {
       metadata TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS production_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      objective TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'awaiting_start',
+      plan_fingerprint TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL UNIQUE,
+      approved_at DATETIME NOT NULL,
+      started_at DATETIME,
+      completed_at DATETIME,
+      failed_at DATETIME,
+      strategy_snapshot TEXT NOT NULL,
+      production_cost_units INTEGER NOT NULL,
+      usage_period_id INTEGER REFERENCES usage_periods(id),
+      usage_event_id INTEGER REFERENCES usage_events(id),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS production_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      production_run_id INTEGER NOT NULL REFERENCES production_runs(id),
+      deliverable_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      phase TEXT NOT NULL,
+      phase_title TEXT DEFAULT '',
+      sequence_order INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'queued',
+      strategic_direction TEXT NOT NULL,
+      strategy_snapshot TEXT NOT NULL,
+      dependencies TEXT NOT NULL DEFAULT '[]',
+      generation_type TEXT,
+      generation_id INTEGER REFERENCES generations(id),
+      error_message TEXT,
+      started_at DATETIME,
+      completed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(production_run_id, deliverable_id)
+    );
   `);
 
   // Add new columns to existing table if they don't exist (for older databases)
@@ -184,6 +225,12 @@ function initDb() {
     }
   });
 
+  try {
+    db.exec('ALTER TABLE usage_events ADD COLUMN production_run_id INTEGER REFERENCES production_runs(id)');
+  } catch (e) {
+    // Column already exists
+  }
+
   // Create indexes for performance
   try {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_generations_user_id ON generations(user_id)`);
@@ -201,6 +248,11 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_period_id ON usage_events(usage_period_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_generation_id ON usage_events(generation_id)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_user_type ON usage_events(user_id, event_type)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_production_run_id ON usage_events(production_run_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_user_created ON production_runs(user_id, created_at DESC)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_user_fingerprint ON production_runs(user_id, plan_fingerprint)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_order ON production_jobs(production_run_id, sequence_order)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_status ON production_jobs(production_run_id, status)`);
   } catch (e) {
     // Index already exists
   }

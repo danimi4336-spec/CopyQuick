@@ -93,6 +93,8 @@ function hasCurrentBuildPlanState(discoverySession) {
 
 function renderBuildPlan(req, res, options = {}) {
   const discoverySession = req.session.discoverySession;
+  const productionNotice = discoverySession.productionNotice || null;
+  discoverySession.productionNotice = null;
   discoverySession.buildPlanSelection = initializeSelection(
     discoverySession.buildPlan,
     discoverySession.buildPlanSelection
@@ -102,12 +104,14 @@ function renderBuildPlan(req, res, options = {}) {
     currentPage: 'discovery',
     plan: discoverySession.buildPlan,
     approval: buildApprovalView(discoverySession.buildPlan, discoverySession.buildPlanSelection),
-    error: options.error || null
+    error: options.error || productionNotice
   });
 }
 
 function renderReflection(req, res, options = {}) {
   const discoverySession = req.session.discoverySession;
+  const productionNotice = discoverySession.productionNotice || null;
+  discoverySession.productionNotice = null;
   const reflection = buildBusinessReflection({
     answers: discoverySession.answers,
     understanding: discoverySession.understanding,
@@ -118,7 +122,7 @@ function renderReflection(req, res, options = {}) {
     currentPage: 'discovery',
     reflection,
     planningReadiness: discoverySession.planningReadiness,
-    error: options.error || null,
+    error: options.error || productionNotice,
     confirmed: Boolean(discoverySession.planningConfirmedAt)
   });
 }
@@ -330,11 +334,14 @@ router.get('/discovery/strategy', requireAuth, (req, res) => {
     answers: discoverySession.answers,
     confirmedUnderstanding: discoverySession.confirmedUnderstanding
   });
+  const productionNotice = discoverySession.productionNotice || null;
+  discoverySession.productionNotice = null;
   return res.render('business-strategy', {
     title: 'Recommended Business Strategy - CopyQuick',
     currentPage: 'discovery',
     strategyResult,
-    canBuildPlan: hasCurrentStrategyState(discoverySession)
+    canBuildPlan: hasCurrentStrategyState(discoverySession),
+    error: productionNotice
   });
 });
 
