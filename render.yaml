@@ -3,7 +3,9 @@ services:
     name: copyquick
     runtime: node
     repo: https://github.com/danimi4336-spec/CopyQuick
-    plan: free
+    # Persistent disk attachment and DATABASE_PATH are intentionally configured
+    # in the Render dashboard after migration review; see the durable-storage runbook.
+    plan: starter
     envVars:
       - key: PORT
         value: 3000

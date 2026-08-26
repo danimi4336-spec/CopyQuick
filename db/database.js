@@ -1,16 +1,8 @@
 const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
-
-const dbPath = process.env.DATABASE_URL || path.join(__dirname, 'copyquick.db');
-
-// Ensure directory exists
-const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+const { prepareDatabaseStorage } = require('../lib/databasePath');
 
 let db;
+let storage;
 
 function isSqlDebugEnabled(env = process.env) {
   return env.NODE_ENV !== 'production' && env.SQL_DEBUG === 'true';
@@ -26,10 +18,16 @@ function createDatabaseOptions(env = process.env) {
 
 function getDb() {
   if (!db) {
-    db = new Database(dbPath, createDatabaseOptions());
+    storage = prepareDatabaseStorage();
+    db = new Database(storage.databasePath, createDatabaseOptions());
     db.pragma('foreign_keys = ON');
   }
   return db;
 }
 
-module.exports = { createDatabaseOptions, getDb, isSqlDebugEnabled };
+function getDatabaseStorage() {
+  if (!storage) storage = prepareDatabaseStorage();
+  return storage;
+}
+
+module.exports = { createDatabaseOptions, getDatabaseStorage, getDb, isSqlDebugEnabled };

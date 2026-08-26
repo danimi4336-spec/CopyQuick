@@ -8,7 +8,8 @@ const app = express();
 app.set('trust proxy', 1); // Trust Render's proxy for HTTPS
 const PORT = process.env.PORT || 3000;
 
-const { getDb } = require('./db/database');
+const { getDatabaseStorage, getDb } = require('./db/database');
+const { safeStorageDiagnostics } = require('./lib/databasePath');
 const { initDb } = require('./db/init');
 const { router: authRoutes, requireAuth } = require('./routes/auth');
 const dashboardRoutes = require('./routes/generations');
@@ -37,8 +38,17 @@ console.log(`  GOOGLE_CALLBACK_URL:  ${hasGoogleCallbackUrl ? 'present' : 'missi
 console.log(`  Google OAuth:         ${hasGoogleClientId && hasGoogleClientSecret ? 'configured' : 'disabled'}`);
 console.log(`  SESSION_SECRET:       ${getSessionSecretStatus(process.env)}`);
 
-// Initialize database
+// Validate storage before opening SQLite. Production never falls back to a local path.
+const databaseStorage = getDatabaseStorage();
+const databaseDiagnostics = safeStorageDiagnostics(databaseStorage);
+console.log('Database storage:');
+console.log(`  mode:     ${databaseDiagnostics.mode}`);
+if (databaseDiagnostics.path) console.log(`  path:     ${databaseDiagnostics.path}`);
+console.log(`  writable: ${databaseDiagnostics.writable ? 'yes' : 'no'}`);
 initDb();
+console.log(databaseStorage.existedBeforeStartup
+  ? 'Existing SQLite database opened without reset.'
+  : 'New SQLite database initialized at the configured storage location. Existing data was not migrated automatically.');
 
 // Stripe webhooks are intentionally mounted before body parsing, sessions, and
 // CSRF protection because Stripe authenticates them with a signed raw body.

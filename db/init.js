@@ -329,7 +329,11 @@ function initDb() {
     // Index already exists
   }
 
+  const integrity = db.pragma('quick_check', { simple: true });
+  if (integrity !== 'ok') throw new Error('SQLite integrity validation failed.');
+
   console.log('Database initialized successfully.');
+  return { integrity };
 }
 
 if (require.main === module) {
