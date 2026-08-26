@@ -30,6 +30,7 @@
                                     <p><%= job.strategic_direction %></p>
                                     <% if (job.dependencies.length) { %><small>Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
                                     <% if (job.error_message) { %><small class="production-job-error"><%= job.error_message %></small><% } %>
+                                    <% if (job.status === 'recovery_required') { %><small class="production-job-recovery">CopyQuick will not regenerate this item until its prior attempt can be verified safely.</small><% } %>
                                     <% if (job.status === 'completed' && job.generation_id) { %><a class="production-result-link" href="/generation/<%= job.generation_id %>">View result</a><% } %>
                                 </div>
                                 <span class="production-job-status status-<%= job.status %>"><%= job.status.replace(/_/g, ' ') %></span>
@@ -45,6 +46,13 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="btn btn-primary">Continue Production</button>
                 <small>Executes the next dependency-ready deliverable.</small>
+            </form>
+        <% } %>
+        <% if (!canRunNext && hasExpiredLease) { %>
+            <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-primary">Review Interrupted Work</button>
+                <small>Checks persisted results before deciding whether retry is safe.</small>
             </form>
         <% } %>
     </div>

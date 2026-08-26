@@ -88,6 +88,7 @@ router.post('/production/:id/run-next', requireAuth, async (req, res) => {
     completed: 'One production deliverable was completed successfully.',
     retry_scheduled: 'A production attempt could not be completed. It is ready for a safe retry.',
     permanent_failure: "We couldn't complete one asset after multiple attempts. Blocked dependent work was safely handled.",
+    recovery_required: 'An interrupted production attempt needs safe verification before it can continue.',
     no_runnable_job: 'There are no runnable production jobs at this time.'
   };
   req.session.productionExecutionNotice = messages[result.outcome] || 'Production status was refreshed.';
@@ -122,6 +123,10 @@ router.get('/production/:id', requireAuth, (req, res) => {
   req.session.productionExecutionNotice = null;
   const canRunNext = ['queued', 'running'].includes(production.status)
     && production.jobs.some(function(job) { return job.status === 'queued'; });
+  const hasExpiredLease = production.jobs.some(function(job) {
+    return job.status === 'running' && job.lease_expires_at
+      && Date.parse(job.lease_expires_at) <= Date.now();
+  });
   return res.render('production-studio', {
     title: 'Production Studio - CopyQuick',
     currentPage: 'production',
@@ -129,7 +134,8 @@ router.get('/production/:id', requireAuth, (req, res) => {
     phases,
     completedCount,
     executionNotice,
-    canRunNext
+    canRunNext,
+    hasExpiredLease
   });
 });
 

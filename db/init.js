@@ -157,6 +157,12 @@ function initDb() {
       started_at DATETIME,
       completed_at DATETIME,
       failed_at DATETIME,
+      claimed_at DATETIME,
+      lease_expires_at DATETIME,
+      claim_token TEXT,
+      provider_started_at DATETIME,
+      contract_version TEXT,
+      recovery_reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(production_run_id, deliverable_id)
@@ -176,7 +182,11 @@ function initDb() {
     'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP',
     'generation_type TEXT DEFAULT \'quick\'',
     'brand_voice TEXT DEFAULT \'professional\'',
-    'goal TEXT DEFAULT \'\''
+    'goal TEXT DEFAULT \'\'',
+    'production_job_id INTEGER REFERENCES production_jobs(id)',
+    'deliverable_id TEXT',
+    'contract_version TEXT',
+    'structured_result TEXT'
   ];
 
   columns.forEach(col => {
@@ -247,7 +257,13 @@ function initDb() {
     'max_attempts INTEGER NOT NULL DEFAULT 3',
     'last_error_code TEXT',
     'reversal_usage_event_id INTEGER REFERENCES usage_events(id)',
-    'failed_at DATETIME'
+    'failed_at DATETIME',
+    'claimed_at DATETIME',
+    'lease_expires_at DATETIME',
+    'claim_token TEXT',
+    'provider_started_at DATETIME',
+    'contract_version TEXT',
+    'recovery_reason TEXT'
   ];
   productionJobCols.forEach(function(col) {
     try {
@@ -281,6 +297,8 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_user_fingerprint ON production_runs(user_id, plan_fingerprint)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_order ON production_jobs(production_run_id, sequence_order)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_status ON production_jobs(production_run_id, status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_expired_lease ON production_jobs(status, lease_expires_at)`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_generations_production_job ON generations(production_job_id) WHERE production_job_id IS NOT NULL`);
   } catch (e) {
     // Index already exists
   }
