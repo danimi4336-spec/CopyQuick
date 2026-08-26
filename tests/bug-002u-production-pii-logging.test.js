@@ -6,6 +6,8 @@ const path = require('path');
 
 process.env.NODE_ENV = 'production';
 process.env.DATABASE_URL = path.join('/tmp', 'copyquick-bug-002u-test.sqlite');
+process.env.DATABASE_PATH = process.env.DATABASE_URL;
+process.env.PERSISTENT_DATA_DIR = '/tmp';
 process.env.SESSION_SECRET = 'BUG002U_SESSION_SECRET_MARKER';
 process.env.GOOGLE_CLIENT_ID = 'BUG002U_GOOGLE_CLIENT_ID_MARKER';
 process.env.GOOGLE_CLIENT_SECRET = 'BUG002U_GOOGLE_CLIENT_SECRET_MARKER';

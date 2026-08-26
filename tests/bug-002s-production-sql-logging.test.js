@@ -46,11 +46,18 @@ function runDatabaseScenario({ nodeEnv, sqlDebug }) {
     ...originalEnv,
     DATABASE_URL: dbPath
   };
+  delete process.env.DATABASE_PATH;
+  delete process.env.PERSISTENT_DATA_DIR;
 
   if (nodeEnv === undefined) {
     delete process.env.NODE_ENV;
   } else {
     process.env.NODE_ENV = nodeEnv;
+  }
+
+  if (nodeEnv === 'production') {
+    process.env.DATABASE_PATH = dbPath;
+    process.env.PERSISTENT_DATA_DIR = '/tmp';
   }
 
   if (sqlDebug === undefined) {

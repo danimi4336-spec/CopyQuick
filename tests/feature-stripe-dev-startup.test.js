@@ -99,7 +99,8 @@ async function run() {
     const production = await runNode(['server.js'], {
       NODE_ENV: 'production',
       STRIPE_KEY: '',
-      DATABASE_URL: databasePath,
+      DATABASE_PATH: databasePath,
+      PERSISTENT_DATA_DIR: '/tmp',
       SESSION_SECRET: 'feature-stripe-prod-session-secret',
       PORT: '0'
     });
