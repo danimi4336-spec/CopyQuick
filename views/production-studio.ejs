@@ -3,13 +3,13 @@
         <header class="production-studio-header">
             <span class="build-plan-eyebrow">Production Studio</span>
             <h1>Production Plan</h1>
-            <p><strong><%= completedCount %> of <%= production.jobs.length %> completed.</strong> Jobs below show their real persisted queue state.</p>
+            <p><strong id="production-progress"><%= completedCount %> of <%= production.jobs.length %> completed.</strong> Jobs below show their real persisted queue state.</p>
         </header>
 
         <% if (executionNotice) { %><div class="alert production-execution-notice" role="status"><%= executionNotice %></div><% } %>
 
         <section class="production-run-summary">
-            <div><span>Run status</span><strong><%= production.status.replace(/_/g, ' ') %></strong></div>
+            <div><span>Run status</span><strong id="production-run-status"><%= production.status.replace(/_/g, ' ') %></strong></div>
             <div><span>Production units</span><strong><%= production.production_cost_units %></strong></div>
             <div><span>Started</span><strong><%= production.started_at %></strong></div>
         </section>
@@ -23,7 +23,7 @@
                     </header>
                     <ol>
                         <% phase.jobs.forEach(function(job) { %>
-                            <li>
+                            <li data-production-sequence="<%= job.sequence_order %>">
                                 <span class="production-job-order"><%= job.sequence_order + 1 %></span>
                                 <div>
                                     <h3><%= job.title %></h3>
@@ -41,19 +41,46 @@
             <% }); %>
         </div>
 
-        <% if (canRunNext) { %>
-            <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="btn btn-primary">Continue Production</button>
-                <small>Executes the next dependency-ready deliverable.</small>
-            </form>
-        <% } %>
-        <% if (!canRunNext && hasExpiredLease) { %>
+        <% if (hasExpiredLease) { %>
             <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="btn btn-primary">Review Interrupted Work</button>
                 <small>Checks persisted results before deciding whether retry is safe.</small>
             </form>
         <% } %>
+        <noscript>
+            <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="btn btn-outline">Continue Production</button>
+                <small>Optional no-JavaScript fallback. Production continues automatically.</small>
+            </form>
+        </noscript>
     </div>
 </div>
+<script>
+(function () {
+    var runId = <%- JSON.stringify(production.id) %>;
+    var terminal = ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'];
+    function label(value) { return String(value || '').replace(/_/g, ' '); }
+    async function refreshProduction() {
+        try {
+            var response = await fetch('/production/' + runId + '/status', { headers: { Accept: 'application/json' } });
+            if (!response.ok) return;
+            var state = await response.json();
+            document.getElementById('production-progress').textContent = state.completedCount + ' of ' + state.totalCount + ' completed.';
+            document.getElementById('production-run-status').textContent = label(state.runStatus);
+            state.jobs.forEach(function (job) {
+                var row = document.querySelector('[data-production-sequence="' + job.sequenceOrder + '"]');
+                if (!row) return;
+                var status = row.querySelector('.production-job-status');
+                status.className = 'production-job-status status-' + job.status;
+                status.textContent = label(job.status);
+            });
+            if (!terminal.includes(state.runStatus)) window.setTimeout(refreshProduction, 3000);
+        } catch (err) {
+            window.setTimeout(refreshProduction, 5000);
+        }
+    }
+    if (!terminal.includes(<%- JSON.stringify(production.status) %>)) window.setTimeout(refreshProduction, 3000);
+})();
+</script>

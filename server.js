@@ -24,6 +24,7 @@ const { createGlobalErrorHandler } = require('./lib/errorHandler');
 const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
 const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
+const { createProductionWorker } = require('./lib/productionWorker');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -132,6 +133,19 @@ app.get('/refunds', (req, res) => {
 // Global error handler — logs full errors, but hides internals from production users.
 app.use(createGlobalErrorHandler());
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });
+const productionWorker = createProductionWorker({ db: getDb() });
+productionWorker.start();
+
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Received ${signal}. Stopping production scheduling safely.`);
+  await productionWorker.stop();
+  server.close(() => process.exit(0));
+}
+process.once('SIGTERM', () => { shutdown('SIGTERM'); });
+process.once('SIGINT', () => { shutdown('SIGINT'); });

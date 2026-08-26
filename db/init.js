@@ -127,6 +127,7 @@ function initDb() {
       started_at DATETIME,
       completed_at DATETIME,
       failed_at DATETIME,
+      last_scheduled_at DATETIME,
       strategy_snapshot TEXT NOT NULL,
       production_cost_units INTEGER NOT NULL,
       usage_period_id INTEGER REFERENCES usage_periods(id),
@@ -163,9 +164,23 @@ function initDb() {
       provider_started_at DATETIME,
       contract_version TEXT,
       recovery_reason TEXT,
+      next_attempt_at DATETIME,
+      last_attempt_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(production_run_id, deliverable_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS production_job_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      production_run_id INTEGER NOT NULL REFERENCES production_runs(id),
+      production_job_id INTEGER NOT NULL REFERENCES production_jobs(id),
+      event_type TEXT NOT NULL,
+      from_status TEXT,
+      to_status TEXT,
+      attempt_number INTEGER NOT NULL DEFAULT 0,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -263,7 +278,9 @@ function initDb() {
     'claim_token TEXT',
     'provider_started_at DATETIME',
     'contract_version TEXT',
-    'recovery_reason TEXT'
+    'recovery_reason TEXT',
+    'next_attempt_at DATETIME',
+    'last_attempt_at DATETIME'
   ];
   productionJobCols.forEach(function(col) {
     try {
@@ -272,6 +289,12 @@ function initDb() {
       // Column already exists
     }
   });
+
+  try {
+    db.exec('ALTER TABLE production_runs ADD COLUMN last_scheduled_at DATETIME');
+  } catch (e) {
+    // Column already exists
+  }
 
   // Create indexes for performance
   try {
@@ -298,6 +321,9 @@ function initDb() {
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_order ON production_jobs(production_run_id, sequence_order)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_run_status ON production_jobs(production_run_id, status)`);
     db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_expired_lease ON production_jobs(status, lease_expires_at)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_jobs_runnable_at ON production_jobs(status, next_attempt_at, production_run_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_runs_schedule ON production_runs(status, last_scheduled_at, created_at)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_production_job_events_job_created ON production_job_events(production_job_id, created_at)`);
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_generations_production_job ON generations(production_job_id) WHERE production_job_id IS NOT NULL`);
   } catch (e) {
     // Index already exists

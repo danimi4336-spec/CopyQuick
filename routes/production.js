@@ -121,8 +121,6 @@ router.get('/production/:id', requireAuth, (req, res) => {
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
   const executionNotice = req.session.productionExecutionNotice || null;
   req.session.productionExecutionNotice = null;
-  const canRunNext = ['queued', 'running'].includes(production.status)
-    && production.jobs.some(function(job) { return job.status === 'queued'; });
   const hasExpiredLease = production.jobs.some(function(job) {
     return job.status === 'running' && job.lease_expires_at
       && Date.parse(job.lease_expires_at) <= Date.now();
@@ -134,8 +132,32 @@ router.get('/production/:id', requireAuth, (req, res) => {
     phases,
     completedCount,
     executionNotice,
-    canRunNext,
     hasExpiredLease
+  });
+});
+
+router.get('/production/:id/status', requireAuth, (req, res) => {
+  const db = getDb();
+  const user = getUser(req, db);
+  if (!user) return res.redirect('/login');
+  const runId = Number.parseInt(req.params.id, 10);
+  const production = Number.isInteger(runId) ? getProductionRun(db, user.id, runId) : null;
+  if (!production) return res.status(404).json({ error: 'Production run not found.' });
+  const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
+  return res.json({
+    runStatus: production.status,
+    completedCount,
+    totalCount: production.jobs.length,
+    jobs: production.jobs.map(function(job) {
+      return {
+        sequenceOrder: job.sequence_order,
+        title: job.title,
+        phase: job.phase,
+        status: job.status,
+        message: ['failed', 'skipped', 'recovery_required'].includes(job.status) ? job.error_message : null,
+        resultUrl: job.status === 'completed' && job.generation_id ? `/generation/${job.generation_id}` : null
+      };
+    })
   });
 });
 
