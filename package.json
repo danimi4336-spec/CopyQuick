@@ -8,6 +8,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate:sqlite-storage": "node scripts/migrate-sqlite-storage.js",
     "backup:database": "node scripts/backup-database.js",
+    "backup:offsite": "node scripts/backup-offsite.js",
+    "backup:offsite:download": "node scripts/prepare-offsite-restore.js",
     "health:storage": "node scripts/storage-health.js",
     "restore:database": "node scripts/restore-database.js"
   },
@@ -15,7 +17,11 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1119.0",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.11.1",
     "dotenv": "^17.4.2",
