@@ -12,7 +12,7 @@ const {
   verifySqliteBackup
 } = require('../lib/databaseBackup');
 const { restoreDatabase } = require('../lib/databaseRestore');
-const { getRuntimeLockPath } = require('../lib/databaseRuntimeLock');
+const { acquireRuntimeLock, getRuntimeLockPath } = require('../lib/databaseRuntimeLock');
 const { classifyStorageCapacity, inspectStorageHealth } = require('../lib/storageHealth');
 
 const projectRoot = path.join(__dirname, '..');
@@ -198,10 +198,11 @@ async function run() {
       error => error.code === 'RESTORE_OFFLINE_CONFIRMATION_REQUIRED');
 
     const lockPath = getRuntimeLockPath(restorePath);
-    fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid }));
+    const releaseRestoreLock = acquireRuntimeLock(restorePath);
     await assert.rejects(restoreDatabase({ source: validRestoreSource, env: restoreEnv, confirmApplicationStopped: true, confirmProductionRestore: true, logger: () => {} }),
       error => error.code === 'RESTORE_DATABASE_ACTIVE');
-    fs.unlinkSync(lockPath);
+    assert.strictEqual(releaseRestoreLock().released, true);
+    assert.strictEqual(fs.existsSync(lockPath), false);
 
     const destinationBeforeCorruptAttempt = new Database(restorePath, { readonly: true });
     const beforeName = destinationBeforeCorruptAttempt.prepare('SELECT name FROM users').get().name;

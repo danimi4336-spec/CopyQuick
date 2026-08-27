@@ -35,7 +35,9 @@ npm run restore:database -- --source /var/data/backups/copyquick-YYYY-MM-DDTHHMM
 7. Confirm startup integrity checks pass, then run `npm run health:storage`.
 8. Verify login, usage state, production runs, and that the worker resumes queued work without repeating completed work.
 
-The runtime lock deliberately refuses restoration while the application process is active. Never delete the lock to bypass that protection while Node is running.
+The runtime owner marker deliberately refuses restoration while the application process is active. It uses a process-instance identity plus a short heartbeat lease so an unclean restart can recover a dead owner without confusing a reused PID for the old application. Never delete the marker to bypass that protection while Node is running.
+
+Normal deploys acquire ownership atomically. A genuinely live second CopyQuick process is rejected; a dead marker is quarantined and replaced. Cross-instance ownership is treated as active while its heartbeat is fresh, so restore and deploy coordination remain conservative.
 
 ## Integrity and low-space incidents
 
