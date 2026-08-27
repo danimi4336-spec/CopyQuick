@@ -17,5 +17,5 @@ services:
         value: price_1Tk32kDYjZIa0wMA00QC6C7e
       - key: STRIPE_UNLIMITED_PRICE
         value: price_1Tk32kDYjZIa0wMAKZ19U8e2
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: node server.js
