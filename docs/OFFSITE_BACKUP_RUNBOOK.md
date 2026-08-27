@@ -10,6 +10,8 @@ Set these secrets and environment values in Render:
 
 ```text
 OFFSITE_BACKUP_ENABLED=true
+OFFSITE_BACKUP_SCHEDULE_ENABLED=true
+OFFSITE_BACKUP_INTERVAL_HOURS=24
 OFFSITE_BACKUP_ENDPOINT=<provider S3 endpoint; omit for AWS S3>
 OFFSITE_BACKUP_REGION=<region>
 OFFSITE_BACKUP_BUCKET=<private bucket>
@@ -66,11 +68,34 @@ Freshness status is included in `health:storage`:
 
 The health command exits non-zero for warning, critical, or never-succeeded status so external monitoring can alert operators.
 
-## Scheduling decision
+## Automatic scheduling
 
-V1 intentionally does not add an in-process timer. A timer tied to web-process restarts is not a durable scheduler, and a separate Render cron service cannot access the web service's attached local disk. Schedule the operator command through a controlled mechanism that executes inside the web service environment, or run it manually daily until CopyQuick has shared durable database storage or a supported job-control plane.
+Scheduling requires both `OFFSITE_BACKUP_ENABLED=true` and
+`OFFSITE_BACKUP_SCHEDULE_ENABLED=true`. The single Render web process waits
+about 60 seconds after startup, then evaluates durable off-site state every
+five minutes. A verified success is due again after
+`OFFSITE_BACKUP_INTERVAL_HOURS` (24 by default). Missing or stale success state
+causes one catch-up attempt; a failure records an eligibility time about one
+hour later, preventing restart and polling storms.
 
-Do not start overlapping manual local and off-site backup commands. The in-process Story 3.13 guard does not coordinate separate Render Shell processes.
+The timer is only a wake-up mechanism. Durable timestamps in
+`.offsite-backup-state.json` reconstruct scheduling decisions after every
+deploy or restart. The scheduler is browser/session independent and ordinary
+R2 failures are logged without terminating the website.
+
+A filesystem lease beneath the private backup directory coordinates manual
+local backups, manual off-site backups, and the scheduler across processes.
+It uses atomic acquisition, a unique ownership token, heartbeat renewal, and
+stale-owner recovery. A manual command exits safely with
+`BACKUP_OPERATION_LOCKED` when another backup owns the lease. During graceful
+shutdown the scheduler stops accepting work and waits a bounded interval for
+an active operation. If termination interrupts it, the expiring lease permits
+safe recovery later.
+
+There is an unavoidable delivery window: R2 may accept and verify an object
+immediately before the process dies, before local success state is written.
+The next eligible catch-up may upload another valid object. Object naming and
+retention make this safe; the system does not claim exactly-once remote upload.
 
 ## Download and recovery preparation
 
@@ -116,4 +141,13 @@ Quarterly restore rehearsal is recommended:
 5. Confirm authentication, usage ledger, generations, production runs, and worker restart behavior.
 6. Record the measured recovery time and any remediation.
 
-Current limitations: scheduling is operator-managed, encrypted artifacts are built in process memory in V1, no automatic production restore exists, and local SQLite remains single-instance. Off-site storage protects against persistent-disk loss only when verified backups remain fresh and encryption keys remain recoverable.
+For an emergency backup, run `npm run backup:offsite`. If an automatic or other
+manual backup is active, wait for it to finish rather than deleting the lease.
+Confirm `npm run health:storage` reports a new verified success and the next
+eligible attempt. Never remove the database runtime lock or SQLite sidecars.
+
+Current limitations: encrypted artifacts are built in process memory in V1,
+remote upload is at-least-once across the narrow state-write crash window, no
+automatic production restore exists, and local SQLite remains single-instance.
+Off-site storage protects against persistent-disk loss only when verified
+backups remain fresh and encryption keys remain recoverable.

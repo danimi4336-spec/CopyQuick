@@ -22,6 +22,7 @@ const {
   normalizeOperationalCode,
   objectKeyFor,
   prepareOffsiteRestore,
+  readOffsiteState,
   recognizedObjectKey,
   resolveOffsiteConfig,
   validateRemoteContentLength,
@@ -279,6 +280,8 @@ async function run() {
     assert.strictEqual(afterFailedAttempt.lastSuccessAt, preservedSuccessAt);
     assert.strictEqual(afterFailedAttempt.status, 'healthy');
     assert.strictEqual(afterFailedAttempt.lastFailureCode, 'REMOTE_VERIFICATION_FAILED');
+    assert.strictEqual(readOffsiteState(stateConfig).retryEligibleAt, '2026-08-27T05:00:00.000Z',
+      'failed operations persist one-hour retry eligibility without replacing verified success');
     assert.strictEqual(fs.readdirSync(config.stagingDirectory).length, 0);
 
     const retentionFailureStorage = new FakeStorage();

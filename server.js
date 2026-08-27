@@ -27,6 +27,7 @@ const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionCo
 const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
 const { createProductionWorker } = require('./lib/productionWorker');
 const { DEFAULT_LEASE_MS, acquireRuntimeLock, startRuntimeLockHeartbeat } = require('./lib/databaseRuntimeLock');
+const { createOffsiteBackupScheduler } = require('./lib/offsiteBackupScheduler');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -155,6 +156,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 const productionWorker = createProductionWorker({ db: getDb() });
 productionWorker.start();
+const offsiteBackupScheduler = createOffsiteBackupScheduler();
+offsiteBackupScheduler.start();
 
 let shuttingDown = false;
 let stopRuntimeLockHeartbeat = () => {};
@@ -162,7 +165,7 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}. Stopping production scheduling safely.`);
-  await productionWorker.stop();
+  await Promise.all([productionWorker.stop(), offsiteBackupScheduler.stop()]);
   server.close(() => {
     stopRuntimeLockHeartbeat();
     const release = releaseDatabaseRuntimeLock();
