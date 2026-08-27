@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "migrate:sqlite-storage": "node scripts/migrate-sqlite-storage.js"
+    "migrate:sqlite-storage": "node scripts/migrate-sqlite-storage.js",
+    "backup:database": "node scripts/backup-database.js",
+    "health:storage": "node scripts/storage-health.js",
+    "restore:database": "node scripts/restore-database.js"
   },
   "keywords": [],
   "author": "",

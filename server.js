@@ -26,6 +26,7 @@ const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
 const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
 const { createProductionWorker } = require('./lib/productionWorker');
+const { acquireRuntimeLock } = require('./lib/databaseRuntimeLock');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -40,6 +41,7 @@ console.log(`  SESSION_SECRET:       ${getSessionSecretStatus(process.env)}`);
 
 // Validate storage before opening SQLite. Production never falls back to a local path.
 const databaseStorage = getDatabaseStorage();
+const releaseDatabaseRuntimeLock = acquireRuntimeLock(databaseStorage.databasePath);
 const databaseDiagnostics = safeStorageDiagnostics(databaseStorage);
 console.log('Database storage:');
 console.log(`  mode:     ${databaseDiagnostics.mode}`);
@@ -155,7 +157,10 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`Received ${signal}. Stopping production scheduling safely.`);
   await productionWorker.stop();
-  server.close(() => process.exit(0));
+  server.close(() => {
+    releaseDatabaseRuntimeLock();
+    process.exit(0);
+  });
 }
 process.once('SIGTERM', () => { shutdown('SIGTERM'); });
 process.once('SIGINT', () => { shutdown('SIGINT'); });
