@@ -13,9 +13,21 @@ npm run health:storage
 
 The backup command writes a temporary snapshot beneath `/var/data/backups`, independently runs `PRAGMA quick_check`, checks the expected CopyQuick schema, then atomically promotes it. A zero exit code means the backup was verified. Filenames sort chronologically. `health:storage` reports the recognized backup count and most recent independently verified backup time without exposing database contents or filesystem paths.
 
+Production also runs an independent hourly Backup Health Watcher. With
+`BACKUP_HEALTH_ALERTS_ENABLED=true`, a valid `BACKUP_ALERT_EMAIL`, and Resend
+configured, it sends deduplicated operator alerts for database integrity,
+critical capacity, local backup availability, and encrypted off-site backup
+conditions. Reminders default to every 24 hours and one optional recovery
+notice follows a previously delivered alert. Private durable alert state
+prevents deployment/restart notification storms.
+
 Backups default to seven retained files. Cleanup recognizes only `copyquick-YYYY-MM-DDTHHMMSSZ[-N].db`; it never deletes unrelated files or the live database.
 
-V1 does not run an in-process backup timer. A timer in the web process would be tied to restarts and could create misleading scheduling guarantees. A separate Render cron service cannot share this service's local persistent disk. Run the command through a controlled Render Shell operational schedule until off-disk backup storage is introduced.
+The single-instance web service runs the Story 3.15 off-site backup scheduler.
+Its timer is only a wake-up mechanism: durable backup state determines when a
+backup is due after restart. A separate Render cron service still cannot share
+this service's local persistent disk. Manual backup commands remain available
+for controlled operator use and share the same backup-operation lease.
 
 ## Restore production safely
 
@@ -49,6 +61,15 @@ Storage status is:
 - `warning`: at or below 1 GiB free or 20% free.
 - `critical`: at or below 512 MiB free or 10% free, or database integrity/readability fails.
 
+An unavailable or unwritable backup directory is also critical. A writable
+directory without a valid independently verified backup is warning. These
+states affect the `health:storage` exit code and operational alert policy.
+
+Render probes `GET /healthz`, which is intentionally limited to process and
+minimal SQLite readiness. It does not run `quick_check`, inspect backups, or
+contact R2. Do not make stale backups fail readiness; use the watcher and
+`npm run health:storage` for detailed diagnostics.
+
 Thresholds are configurable through the documented environment variables. Low space never causes application data deletion. Only expired, recognized backup files are eligible for retention cleanup.
 
 While CopyQuick is running, never manually delete or replace:
@@ -69,5 +90,9 @@ Backup files contain production user data. Keep `/var/data/backups` private; nev
 - A confirmed corrupt live production database should be taken offline rather than allowed to continue mutating.
 
 The Render persistent disk protects data across supported deploys and restarts, but it is not a complete backup or disaster-recovery system. Backups stored on the same `/var/data` disk protect against logical database damage and some operator mistakes; they do **not** protect against loss of the entire Render persistent disk. Off-disk encrypted backups and tested recovery objectives are the next durability step.
+
+Story 3.17 will provide isolated off-site restore drills. Until then, continue
+the deliberate offline production restore workflow; `/healthz` is not evidence
+that a backup is restorable.
 
 SQLite persistent disk remains a single-instance architecture. Do not horizontally scale the web service and do not add a separate Render worker that expects to share this disk. Shared durable storage such as PostgreSQL is required before multi-instance deployment.

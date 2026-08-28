@@ -19,3 +19,4 @@ services:
         value: price_1Tk32kDYjZIa0wMAKZ19U8e2
     buildCommand: npm ci
     startCommand: node server.js
+    healthCheckPath: /healthz

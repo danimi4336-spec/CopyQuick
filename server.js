@@ -18,6 +18,7 @@ const webhookRoutes = require('./routes/webhook');
 const builderRoutes = require('./routes/builder');
 const discoveryRoutes = require('./routes/discovery');
 const productionRoutes = require('./routes/production');
+const { createHealthRouter } = require('./routes/health');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
 const { getAuthenticatedUserById } = require('./lib/authUser');
@@ -28,6 +29,7 @@ const { createContactHandler, createContactRateLimiter } = require('./lib/contac
 const { createProductionWorker } = require('./lib/productionWorker');
 const { DEFAULT_LEASE_MS, acquireRuntimeLock, startRuntimeLockHeartbeat } = require('./lib/databaseRuntimeLock');
 const { createOffsiteBackupScheduler } = require('./lib/offsiteBackupScheduler');
+const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -61,6 +63,9 @@ console.log(databaseStorage.existedBeforeStartup
 // Stripe webhooks are intentionally mounted before body parsing, sessions, and
 // CSRF protection because Stripe authenticates them with a signed raw body.
 app.use('/', webhookRoutes);
+// Render readiness is intentionally cheap and does not evaluate backup age,
+// R2, filesystem capacity, or full SQLite integrity.
+app.use('/', createHealthRouter({ getDatabase: getDb }));
 
 // View engine setup
 app.set('view engine', 'ejs');
@@ -158,6 +163,8 @@ const productionWorker = createProductionWorker({ db: getDb() });
 productionWorker.start();
 const offsiteBackupScheduler = createOffsiteBackupScheduler();
 offsiteBackupScheduler.start();
+const backupHealthWatcher = createBackupHealthWatcher({ db: getDb() });
+backupHealthWatcher.start();
 
 let shuttingDown = false;
 let stopRuntimeLockHeartbeat = () => {};
@@ -165,7 +172,11 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}. Stopping production scheduling safely.`);
-  await Promise.all([productionWorker.stop(), offsiteBackupScheduler.stop()]);
+  await Promise.all([
+    productionWorker.stop(),
+    offsiteBackupScheduler.stop(),
+    backupHealthWatcher.stop()
+  ]);
   server.close(() => {
     stopRuntimeLockHeartbeat();
     const release = releaseDatabaseRuntimeLock();

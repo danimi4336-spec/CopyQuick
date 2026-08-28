@@ -282,6 +282,20 @@ async function run() {
     assert.strictEqual(afterFailedAttempt.lastFailureCode, 'REMOTE_VERIFICATION_FAILED');
     assert.strictEqual(readOffsiteState(stateConfig).retryEligibleAt, '2026-08-27T05:00:00.000Z',
       'failed operations persist one-hour retry eligibility without replacing verified success');
+    assert.strictEqual(readOffsiteState(stateConfig).consecutiveFailureCount, 1);
+    await assert.rejects(
+      createOffsiteBackup({ source: localPath, env: baseEnv, storage: badHeadStorage, logger: () => {}, now: () => new Date('2026-08-27T04:01:00Z') }),
+      error => error.code === 'REMOTE_VERIFICATION_FAILED'
+    );
+    assert.strictEqual(readOffsiteState(stateConfig).consecutiveFailureCount, 2,
+      'each distinct failed operation increments the durable count once');
+    await createOffsiteBackup({
+      source: localPath, env: baseEnv, storage: new FakeStorage(), logger: () => {},
+      now: () => new Date('2026-08-27T04:02:00Z')
+    });
+    assert.strictEqual(readOffsiteState(stateConfig).consecutiveFailureCount, 0,
+      'verified success resets consecutive failure tracking');
+    assert.strictEqual(readOffsiteState(stateConfig).lastFailureAt, null);
     assert.strictEqual(fs.readdirSync(config.stagingDirectory).length, 0);
 
     const retentionFailureStorage = new FakeStorage();

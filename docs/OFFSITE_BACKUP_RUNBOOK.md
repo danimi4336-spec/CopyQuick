@@ -2,7 +2,8 @@
 
 CopyQuick off-site backups are optional and disabled by default. The service first creates or verifies a Story 3.13 SQLite snapshot, encrypts it locally with AES-256-GCM, and uploads only the encrypted `.cqbackup` artifact to private S3-compatible object storage.
 
-The S3 client requires Node.js 20 or newer. Confirm the Render service runtime satisfies the `package.json` engine before deployment.
+CopyQuick pins Node.js 24.x. Confirm the Render service runtime satisfies the
+`package.json` engine before deployment.
 
 ## Configuration
 
@@ -23,6 +24,10 @@ OFFSITE_BACKUP_KEY_ID=v1
 OFFSITE_BACKUP_RETENTION=30
 OFFSITE_BACKUP_MAX_AGE_HOURS=36
 OFFSITE_BACKUP_MAX_ARTIFACT_BYTES=67108864
+BACKUP_HEALTH_ALERTS_ENABLED=true
+BACKUP_ALERT_EMAIL=<private operator recipient>
+BACKUP_ALERT_REMINDER_HOURS=24
+BACKUP_RECOVERY_NOTIFICATIONS_ENABLED=true
 ```
 
 The V1 artifact limit defaults to, and is capped at, 64 MiB. Encryption and
@@ -67,6 +72,46 @@ Freshness status is included in `health:storage`:
 - `disabled`: off-site backups are disabled.
 
 The health command exits non-zero for warning, critical, or never-succeeded status so external monitoring can alert operators.
+
+## Operational alerts
+
+The independent Backup Health Watcher evaluates complete storage health about
+once per hour after a three-minute startup grace. It does not decide when to
+create backups and does not depend on browser traffic. Alerting remains off
+unless `BACKUP_HEALTH_ALERTS_ENABLED=true` and a valid `BACKUP_ALERT_EMAIL` is
+configured. Missing email or Resend configuration is contained and never
+terminates the website.
+
+The watcher alerts on a never-successful, stale, critically stale, failed, or
+repeatedly failing off-site backup; invalid off-site state; an unexpectedly
+disabled production scheduler; SQLite integrity failure; critical persistent
+disk capacity; an unavailable local backup directory; and a missing or invalid
+local backup. Three distinct failed off-site attempts constitute repeated
+failure. A verified success resets the count.
+
+Each independent condition is stored in a private atomic state file beneath
+the persistent root. The first transition sends once, severity escalation
+sends once, and unresolved conditions receive at most one reminder per
+`BACKUP_ALERT_REMINDER_HOURS` (24 by default). When enabled, one recovery
+message is sent only if the original alert was successfully delivered.
+Restarting the service reconstructs this state and does not create a fresh
+alert storm.
+
+Operator actions:
+
+- Backup stale/failed: inspect scheduler logs and run `npm run backup:offsite`.
+- Scheduler disabled: restore the approved production setting and verify startup.
+- SQLite integrity failure: stop unsafe writes and follow the database recovery runbook.
+- Critical capacity: inspect disk use; never delete the live database, WAL, or SHM files.
+- Local backup unavailable: verify the persistent mount/permissions and run `npm run backup:database`.
+
+Disable email delivery safely with `BACKUP_HEALTH_ALERTS_ENABLED=false`;
+health inspection and `npm run health:storage` remain available.
+
+`GET /healthz` is a separate, intentionally minimal Render readiness check. It
+performs only a cheap SQLite query and returns `{"status":"ok"}`. It never
+returns backup timestamps, paths, object keys, or alert state. Backup staleness
+does not fail readiness because restarting CopyQuick cannot repair R2 delivery.
 
 ## Automatic scheduling
 
@@ -151,3 +196,7 @@ remote upload is at-least-once across the narrow state-write crash window, no
 automatic production restore exists, and local SQLite remains single-instance.
 Off-site storage protects against persistent-disk loss only when verified
 backups remain fresh and encryption keys remain recoverable.
+
+Story 3.17 will add isolated restore verification drills. Story 3.16 alerts
+confirm operational health; they do not by themselves prove end-to-end
+restorability.
