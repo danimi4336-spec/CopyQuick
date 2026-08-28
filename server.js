@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 const { getDatabaseStorage, getDb } = require('./db/database');
 const { safeStorageDiagnostics } = require('./lib/databasePath');
-const { initDb } = require('./db/init');
+const { initializeDatabase } = require('./db/init');
 const { router: authRoutes, requireAuth } = require('./routes/auth');
 const dashboardRoutes = require('./routes/generations');
 const pricingRoutes = require('./routes/pricing');
@@ -50,15 +50,17 @@ const databaseStorage = getDatabaseStorage();
 const releaseDatabaseRuntimeLock = acquireRuntimeLock(databaseStorage.databasePath, {
   waitForStaleMs: DEFAULT_LEASE_MS + 5000
 });
+let stopRuntimeLockHeartbeat = startRuntimeLockHeartbeat(releaseDatabaseRuntimeLock, {
+  onFailure: () => {
+    console.error('Database runtime lock heartbeat failed. Shutting down to preserve restore safety.');
+    shutdown('runtime-lock-failure');
+  }
+});
 const databaseDiagnostics = safeStorageDiagnostics(databaseStorage);
 console.log('Database storage:');
 console.log(`  mode:     ${databaseDiagnostics.mode}`);
 if (databaseDiagnostics.path) console.log(`  path:     ${databaseDiagnostics.path}`);
 console.log(`  writable: ${databaseDiagnostics.writable ? 'yes' : 'no'}`);
-initDb();
-console.log(databaseStorage.existedBeforeStartup
-  ? 'Existing SQLite database opened without reset.'
-  : 'New SQLite database initialized at the configured storage location. Existing data was not migrated automatically.');
 
 // Stripe webhooks are intentionally mounted before body parsing, sessions, and
 // CSRF protection because Stripe authenticates them with a signed raw body.
@@ -156,41 +158,57 @@ app.get('/refunds', (req, res) => {
 // Global error handler — logs full errors, but hides internals from production users.
 app.use(createGlobalErrorHandler());
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on http://0.0.0.0:${PORT}`);
-});
-const productionWorker = createProductionWorker({ db: getDb() });
-productionWorker.start();
-const offsiteBackupScheduler = createOffsiteBackupScheduler();
-offsiteBackupScheduler.start();
-const backupHealthWatcher = createBackupHealthWatcher({ db: getDb() });
-backupHealthWatcher.start();
-
+let server = null;
+let productionWorker = null;
+let offsiteBackupScheduler = null;
+let backupHealthWatcher = null;
 let shuttingDown = false;
-let stopRuntimeLockHeartbeat = () => {};
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}. Stopping production scheduling safely.`);
   await Promise.all([
-    productionWorker.stop(),
-    offsiteBackupScheduler.stop(),
-    backupHealthWatcher.stop()
+    productionWorker?.stop(),
+    offsiteBackupScheduler?.stop(),
+    backupHealthWatcher?.stop()
   ]);
-  server.close(() => {
+  const finish = () => {
     stopRuntimeLockHeartbeat();
     const release = releaseDatabaseRuntimeLock();
     if (!release.released || release.cleanupFailed) {
       console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
     }
     process.exit(0);
-  });
+  };
+  if (server) server.close(finish);
+  else finish();
 }
-stopRuntimeLockHeartbeat = startRuntimeLockHeartbeat(releaseDatabaseRuntimeLock, {
-  onFailure: () => {
-    console.error('Database runtime lock heartbeat failed. Shutting down to preserve restore safety.');
-    shutdown('runtime-lock-failure');
-  }
-});
 process.once('SIGTERM', () => { shutdown('SIGTERM'); });
 process.once('SIGINT', () => { shutdown('SIGINT'); });
+
+async function startApplication() {
+  await initializeDatabase({ db: getDb(), env: process.env });
+  console.log(databaseStorage.existedBeforeStartup
+    ? 'Existing SQLite database opened without reset.'
+    : 'New SQLite database initialized at the configured storage location. Existing data was not migrated automatically.');
+  if (shuttingDown) return;
+  server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+  });
+  productionWorker = createProductionWorker({ db: getDb() });
+  productionWorker.start();
+  offsiteBackupScheduler = createOffsiteBackupScheduler();
+  offsiteBackupScheduler.start();
+  backupHealthWatcher = createBackupHealthWatcher({ db: getDb() });
+  backupHealthWatcher.start();
+}
+
+startApplication().catch(error => {
+  console.error(`Database startup failed: ${error.code || 'DATABASE_STARTUP_FAILED'}`);
+  stopRuntimeLockHeartbeat();
+  const release = releaseDatabaseRuntimeLock();
+  if (!release.released || release.cleanupFailed) {
+    console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
+  }
+  process.exitCode = 1;
+});

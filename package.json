@@ -12,7 +12,9 @@
     "backup:offsite:download": "node scripts/prepare-offsite-restore.js",
     "verify:offsite-restore": "node scripts/verify-offsite-restore.js",
     "health:storage": "node scripts/storage-health.js",
-    "restore:database": "node scripts/restore-database.js"
+    "restore:database": "node scripts/restore-database.js",
+    "migrations:status": "node scripts/migration-status.js",
+    "migrate:database": "node scripts/migrate-database.js"
   },
   "keywords": [],
   "author": "",

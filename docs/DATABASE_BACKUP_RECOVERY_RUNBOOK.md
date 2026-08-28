@@ -2,6 +2,14 @@
 
 CopyQuick V1 uses one SQLite database on the Render persistent disk. Backups are SQLite-consistent snapshots created with the SQLite backup API; never copy the live `.db` file with `cp` while the service is running.
 
+Schema evolution is tracked by the checksummed `schema_migrations` ledger.
+Before deployment, `npm run migrations:status` provides a read-only sanitized
+compatibility report. A future pending production migration requires a verified
+backup before its transaction begins; backup failure stops the deployment.
+Migration failure never triggers automatic restoration. See the durable-storage
+runbook for baseline adoption, lock ordering, the two-release rollout, and code
+rollback compatibility policy.
+
 ## Create and inspect backups
 
 From the Render Shell, with `DATABASE_PATH=/var/data/copyquick.db` and `PERSISTENT_DATA_DIR=/var/data` configured:

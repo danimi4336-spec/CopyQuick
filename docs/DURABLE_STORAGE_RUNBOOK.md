@@ -28,6 +28,69 @@ CopyQuick V1 uses one SQLite database for users, sessions, generations, billing 
 16. Confirm the Production Worker resumes the same queued run or safely recovers an expired claim.
 17. Confirm completed jobs were not regenerated and the production-start usage event was not duplicated.
 
+## Versioned schema migrations
+
+CopyQuick uses an ordered, checksummed `schema_migrations` ledger. Migration
+versions and the application's supported schema range are code constants, not
+operator-controlled environment variables. Startup acquires the database
+runtime lock before inspecting or changing schema and will not listen, start
+the Production Worker, start backup scheduling, or start health monitoring
+until schema validation succeeds.
+
+Use these operator commands:
+
+```sh
+npm run migrations:status
+npm run migrate:database
+```
+
+`migrations:status` is read-only and reports only the current version,
+supported range, baseline state, pending count, and compatibility. The migrate
+command uses the same migration engine as application startup and therefore
+requires exclusive runtime ownership; it must not be run while the web service
+is active.
+
+The V1 framework accepts only additive migration definitions. Automatic down
+migrations and destructive DDL are intentionally unsupported. A code rollback
+is safe only when the older application declares compatibility with the
+current schema. Restoring a verified backup is disaster recovery, not a normal
+code rollback mechanism.
+
+### First production rollout of the migration framework
+
+Release A contains no business-schema migration. After taking and verifying an
+off-site backup, deploy Release A. Startup will structurally validate every
+required table, column, foreign key, unique constraint, and named index in the
+existing database. Only if that exact pre-ledger baseline is approved will it
+transactionally create the migration ledger and record version 1. It does not
+rewrite business rows or recreate business tables.
+
+After deployment:
+
+1. Confirm startup reports `migration_baseline_recorded` and reaches `/healthz`.
+2. Run `npm run migrations:status` in the Render Shell; expect version 1,
+   `baselineStatus: recorded`, zero pending migrations, and compatibility true.
+3. Run `npm run health:storage` and verify the Production Worker resumes.
+4. Redeploy/restart once and confirm the baseline is not recorded again.
+5. Keep Release B separate. Release B may contain the first reviewed additive
+   migration.
+
+If structural adoption fails, startup fails closed. Do not manually insert a
+ledger row, modify schema, or restore automatically. Preserve the database,
+inspect it offline using a verified snapshot, and reconcile the unexpected
+structure deliberately.
+
+When a future real migration is pending in production, lock order is always:
+
+1. database runtime ownership;
+2. backup-operation lease while producing the verified pre-migration backup;
+3. release backup-operation lease;
+4. apply the transactional migration while runtime ownership remains held.
+
+Manual backups never acquire the runtime lock, so there is no reverse lock
+order. A failed backup prevents migration. A failed migration rolls back that
+migration, stops startup, and never triggers an automatic restore.
+
 ## Existing ephemeral data
 
 Attaching `/var/data` does not move the old `db/copyquick.db`. If the current deployment contains data that must survive, it requires an explicit backup/migration before switching `DATABASE_PATH`. If the old file is no longer accessible after a Render restart or deploy, application code cannot recover it.
