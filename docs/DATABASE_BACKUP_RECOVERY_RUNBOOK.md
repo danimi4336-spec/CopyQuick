@@ -33,6 +33,21 @@ for controlled operator use and share the same backup-operation lease.
 
 Restore is intentionally offline and never runs at startup.
 
+Before an incident, verify selected R2 artifacts without touching production:
+
+```sh
+npm run verify:offsite-restore -- --object copyquick/production/YYYY/MM/DD/copyquick-YYYY-MM-DDTHHMMSSZ-v1.cqbackup
+```
+
+This quarterly drill uses two databases in a unique private OS-temporary
+directory: the authenticated/decrypted snapshot and a second database created
+through SQLite's backup mechanism. It validates both, removes the temporary
+artifacts on normal/error exit, and never opens the live database for restore,
+touches its WAL/SHM/runtime lock, or stops application services. A forced
+process kill can leave restrictive plaintext temporary files; inspect the
+private OS temporary area operationally after an interrupted drill. Never use
+the drill as a substitute for the offline command below.
+
 1. Identify the newest verified backup with `npm run health:storage` and the backup command logs.
 2. Stop the Render web service. Do not merely close a browser session.
 3. Confirm no CopyQuick Node process is using the database.
@@ -91,8 +106,13 @@ Backup files contain production user data. Keep `/var/data/backups` private; nev
 
 The Render persistent disk protects data across supported deploys and restarts, but it is not a complete backup or disaster-recovery system. Backups stored on the same `/var/data` disk protect against logical database damage and some operator mistakes; they do **not** protect against loss of the entire Render persistent disk. Off-disk encrypted backups and tested recovery objectives are the next durability step.
 
-Story 3.17 will provide isolated off-site restore drills. Until then, continue
-the deliberate offline production restore workflow; `/healthz` is not evidence
-that a backup is restorable.
+The isolated off-site drill provides recoverability evidence, while the
+deliberate offline workflow remains the only supported production restore.
+`/healthz` is readiness only and is not evidence that a backup is restorable.
+
+CopyQuick's initial objectives are a 24-hour RPO, a 36-hour operational breach
+threshold, a 72-hour critical backup age, a four-hour RTO target, and an
+eight-hour contingency planning window. Retain every historical encryption key
+for as long as an artifact using it must remain recoverable.
 
 SQLite persistent disk remains a single-instance architecture. Do not horizontally scale the web service and do not add a separate Render worker that expects to share this disk. Shared durable storage such as PostgreSQL is required before multi-instance deployment.

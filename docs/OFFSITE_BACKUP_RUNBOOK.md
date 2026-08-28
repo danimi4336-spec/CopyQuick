@@ -160,6 +160,53 @@ npm run restore:database -- --source <verified-candidate.db> --confirm-applicati
 
 Stop the application before the final restore and follow `DATABASE_BACKUP_RECOVERY_RUNBOOK.md`.
 
+## Isolated restore verification drill
+
+Run a quarterly verification drill against an explicitly selected, recognized
+R2 object:
+
+```sh
+npm run verify:offsite-restore -- --object copyquick/production/YYYY/MM/DD/copyquick-YYYY-MM-DDTHHMMSSZ-v1.cqbackup
+```
+
+The command requires the normal private R2 credentials and the key matching the
+artifact's key ID. For an older key version, provide the retained
+`OFFSITE_BACKUP_DECRYPTION_KEY` and `OFFSITE_BACKUP_DECRYPTION_KEY_ID` through
+the protected environment. The command never selects "latest" automatically.
+
+The drill downloads with the existing HEAD and bounded-stream protections,
+authenticates and decrypts the artifact inside a unique `0700` OS-temporary
+directory, verifies the decrypted snapshot, and uses SQLite's backup API to
+create a second isolated database. It then closes and independently reopens
+that database for `quick_check`, expected-schema checks, and critical-table
+readability checks. It never calls the production restore service, changes
+`DATABASE_PATH`, touches the live WAL/SHM or runtime lock, or starts/stops any
+CopyQuick server or worker lifecycle.
+
+Successful output reports only duration and key ID. Private drill evidence is
+atomically stored with `0600` permissions beneath the persistent root; storage
+health shows only sanitized success age, failure code, key ID, and duration.
+All known encrypted and plaintext temporary files and their exact sidecars are
+removed after success or failure. If the process is forcibly killed after
+decryption, plaintext may remain temporarily in the private OS directory;
+restrictive permissions, unique non-reused directories, and normal/error-path
+cleanup mitigate but cannot claim perfect erasure.
+
+This drill proves artifact and SQLite restore-mechanism viability. It does not
+replace the explicit, offline, confirmation-gated production restore command.
+After a drill, confirm:
+
+1. The command exited zero and reported a plausible duration.
+2. `npm run health:storage` shows the new sanitized drill success timestamp.
+3. The live web service and Production Worker remained available.
+4. No plaintext recovery candidate was promoted beneath persistent backups.
+5. The selected encryption key version remains retained in protected recovery storage.
+
+Current objectives are a 24-hour RPO, 36-hour operational backup-age breach,
+72-hour critical age, four-hour RTO target, and eight-hour contingency planning
+window. Drill duration is evidence toward RTO readiness, not the complete time
+needed for operator decision-making and production replacement.
+
 ## Key rotation
 
 Create a new random key and change `OFFSITE_BACKUP_KEY_ID` from `v1` to `v2`. New artifacts identify `v2`; old artifacts continue to identify `v1` without containing either secret key.
@@ -197,6 +244,7 @@ automatic production restore exists, and local SQLite remains single-instance.
 Off-site storage protects against persistent-disk loss only when verified
 backups remain fresh and encryption keys remain recoverable.
 
-Story 3.17 will add isolated restore verification drills. Story 3.16 alerts
-confirm operational health; they do not by themselves prove end-to-end
-restorability.
+Story 3.17's isolated drill verifies recoverability without production
+replacement. Operational alerts and drill success complement each other; they
+do not eliminate the need to rehearse the deliberate production recovery
+runbook.

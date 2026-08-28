@@ -10,6 +10,7 @@
     "backup:database": "node scripts/backup-database.js",
     "backup:offsite": "node scripts/backup-offsite.js",
     "backup:offsite:download": "node scripts/prepare-offsite-restore.js",
+    "verify:offsite-restore": "node scripts/verify-offsite-restore.js",
     "health:storage": "node scripts/storage-health.js",
     "restore:database": "node scripts/restore-database.js"
   },
