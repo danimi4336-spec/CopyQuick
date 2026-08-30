@@ -113,8 +113,18 @@ async function run() {
     assert.match(nextState.body, /Physical Product/);
     assert.match(nextState.body, /Health &amp; Wellness/);
     assert.match(nextState.body, /Dietary Supplement/);
-    assert.match(nextState.body, /What would you most like this supplement to help people with\?/);
+    assert.match(nextState.body, /What is the primary wellness goal this supplement is intended to support\?/);
+    assert.match(nextState.body, /Choose the closest direction for now\. You can refine it later\./);
+    assert.match(nextState.body, /General health &amp; everyday wellness/);
+    assert.match(nextState.body, /Energy &amp; focus/);
+    assert.match(nextState.body, /Digestive health/);
+    assert.match(nextState.body, /Sleep &amp; relaxation/);
+    assert.match(nextState.body, /Joint, mobility &amp; active-lifestyle support/);
+    assert.match(nextState.body, /Immune health/);
+    assert.match(nextState.body, /Healthy aging/);
     assert.match(nextState.body, /value="everyday_wellness"/);
+    assert.match(nextState.body, /value="immune_health"/);
+    assert.match(nextState.body, /value="healthy_aging"/);
     assert.match(nextState.body, /value="other"/);
     const nextToken = nextState.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
@@ -139,6 +149,15 @@ async function run() {
     assert.strictEqual(updated.nextQuestion.id, 'supplement_outcome_exploration');
 
     const targetPage = await request(authenticated, 'GET', '/discovery');
+    assert.match(targetPage.body, /Which wellness goal feels most useful to explore first\?/);
+    assert.match(targetPage.body, /That’s okay — we can figure this out together\./);
+    assert.match(targetPage.body, /Supporting a steady everyday wellness routine/);
+    assert.match(targetPage.body, /Staying energized and focused through the day/);
+    assert.match(targetPage.body, /Building a more comfortable digestive routine/);
+    assert.match(targetPage.body, /Winding down and relaxing/);
+    assert.match(targetPage.body, /Staying active and mobile/);
+    assert.match(targetPage.body, /Exploring immune wellness/);
+    assert.match(targetPage.body, /Supporting wellness through healthy aging/);
     const targetToken = targetPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const emptyOther = await request(authenticated, 'POST', '/discovery', {
       _csrf: targetToken,

@@ -101,11 +101,21 @@ async function run() {
     assert.strictEqual(state.nextQuestion.id, 'supplement_intended_outcome');
     assert.strictEqual(state.understanding.intendedOutcome, undefined, 'suggested directions must not become facts before selection');
 
+    const intendedOutcomePage = await request(blocked, 'GET', '/discovery');
+    assert.match(intendedOutcomePage.body, /What is the primary wellness goal this supplement is intended to support\?/);
+    assert.match(intendedOutcomePage.body, /Choose the closest direction for now\. You can refine it later\./);
+    for (const value of ['everyday_wellness', 'energy_focus', 'digestive_wellness', 'sleep_stress_support', 'mobility_active_lifestyle', 'immune_health', 'healthy_aging']) {
+      assert.match(intendedOutcomePage.body, new RegExp(`value="${value}"`));
+    }
+
     await answerCurrent(blocked, 'unsure');
     state = await sessionState(blocked);
     assert.strictEqual(state.answers.supplement_intended_outcome, 'unsure');
     assert.strictEqual(state.nextQuestion.id, 'supplement_outcome_exploration');
     assert.strictEqual(state.nextQuestion.guidedExploration, true);
+    assert.strictEqual(state.nextQuestion.prompt, 'Which wellness goal feels most useful to explore first?');
+    assert(state.nextQuestion.options.some((option) => option.value === 'immune_wellness_exploration'));
+    assert(state.nextQuestion.options.some((option) => option.value === 'healthy_aging_exploration'));
 
     await answerCurrent(blocked, 'unsure');
     state = await sessionState(blocked);
@@ -140,11 +150,27 @@ async function run() {
     assert.strictEqual((await request(blocked, 'GET', '/discovery/build-plan')).res.headers.location, '/discovery/reflection');
     assert.strictEqual(validateApprovedProductionSession(state).valid, false);
 
+    const customOutcome = { server, cookie: '' };
+    await begin(customOutcome);
+    const emptyCustomOutcome = await answerCurrent(customOutcome, 'other');
+    assert.strictEqual(emptyCustomOutcome.res.statusCode, 400);
+    state = await sessionState(customOutcome);
+    assert.strictEqual(state.nextQuestion.id, 'supplement_intended_outcome');
+    await answerCurrent(customOutcome, 'other', 'Menopause wellness support');
+    state = await sessionState(customOutcome);
+    assert.deepStrictEqual(state.answers.supplement_intended_outcome, {
+      value: 'other', detail: 'Menopause wellness support'
+    });
+    assert.strictEqual(state.understanding.intendedOutcome.value, 'Menopause wellness support');
+    assert.strictEqual(state.understanding.intendedOutcome.label, 'Menopause wellness support');
+    assert.strictEqual(state.nextQuestion.id, 'supplement_concept_maturity');
+
     const ready = { server, cookie: '' };
     await begin(ready);
-    await answerCurrent(ready, 'everyday_wellness');
+    await answerCurrent(ready, 'digestive_wellness');
     state = await sessionState(ready);
-    assert.strictEqual(state.understanding.intendedOutcome.value, 'everyday_wellness');
+    assert.strictEqual(state.understanding.intendedOutcome.value, 'digestive_wellness');
+    assert.strictEqual(state.understanding.intendedOutcome.label, 'Digestive health');
     assert.strictEqual(state.nextQuestion.id, 'supplement_concept_maturity');
     await answerCurrent(ready, 'direction_no_formula');
     await answerCurrent(ready, 'consumers');
@@ -162,6 +188,9 @@ async function run() {
 
     const readyReflection = await request(ready, 'GET', '/discovery/reflection');
     assert.match(readyReflection.body, /We know enough to build a useful strategy/);
+    assert.match(readyReflection.body, /Intended Customer Outcome/);
+    assert.match(readyReflection.body, /Digestive health/);
+    assert.doesNotMatch(readyReflection.body, /digestive_wellness/);
     const readyToken = readyReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const planned = await request(ready, 'POST', '/discovery/reflection/plan', { _csrf: readyToken });
     assert.strictEqual(planned.res.statusCode, 303);

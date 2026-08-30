@@ -13,6 +13,47 @@ async function run() {
   assert(supplement.understanding.category.confidence >= 0.7);
   assert(supplement.unknowns.includes('salesChannel'));
 
+  const describedSupplement = await understandBusiness({
+    objective: 'launch_product',
+    answer: 'An herbal dietary supplement for adults that I plan to sell on Amazon.'
+  });
+  assert.strictEqual(describedSupplement.understanding.businessType.value, 'physical_product');
+  assert.strictEqual(describedSupplement.understanding.industry.value, 'health_wellness');
+  assert.strictEqual(describedSupplement.understanding.category.value, 'dietary_supplement');
+  assert.strictEqual(describedSupplement.understanding.targetAudience.value, 'adults');
+  assert.strictEqual(describedSupplement.understanding.targetAudience.label, 'Adults');
+  assert.strictEqual(describedSupplement.understanding.salesChannel.value, 'amazon');
+  assert.strictEqual(describedSupplement.understanding.salesChannel.label, 'Amazon');
+
+  for (const audience of [
+    'adults over 50',
+    'busy working parents',
+    'recreational runners',
+    'women experiencing menopause',
+    'women who want better sleep',
+    'athletes who use supplements during training',
+    'adults that need simpler wellness routines',
+    'independent retailers that serve local families'
+  ]) {
+    const inferredAudience = await understandBusiness({
+      objective: 'launch_product',
+      answer: `An herbal supplement for ${audience}.`
+    });
+    assert.strictEqual(inferredAudience.understanding.targetAudience.value, audience);
+  }
+
+  for (const example of [
+    ['An herbal supplement for adults that I intend to sell on Amazon', 'adults', 'amazon'],
+    ['An herbal supplement for adults that I want to sell on Amazon', 'adults', 'amazon'],
+    ['An herbal supplement for busy parents sold on Shopify', 'busy parents', 'own_website'],
+    ['An herbal supplement for seniors available through retail stores', 'seniors', 'retail'],
+    ['An herbal supplement for athletes who will buy it on Amazon', 'athletes', 'amazon']
+  ]) {
+    const separated = await understandBusiness({ objective: 'launch_product', answer: example[0] });
+    assert.strictEqual(separated.understanding.targetAudience.value, example[1]);
+    assert.strictEqual(separated.understanding.salesChannel.value, example[2]);
+  }
+
   const service = await understandBusiness({
     objective: 'launch_product',
     answer: 'Mobile car detailing service'

@@ -221,7 +221,7 @@ async function run() {
 
     const rendered = await request(authenticated, 'GET', '/discovery');
     assert.match(rendered.body, /Understanding your business\.\.\./);
-    assert.match(rendered.body, /What would you most like this supplement to help people with\?/);
+    assert.match(rendered.body, /What is the primary wellness goal this supplement is intended to support\?/);
     assert.strictEqual((rendered.body.match(/<fieldset/g) || []).length, 1);
     assert(!rendered.body.includes(`${stored.completion}%`), 'raw completion must remain internal');
 
