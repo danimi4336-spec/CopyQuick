@@ -23,27 +23,38 @@ function emptyBrandBrain(userId) {
 
 // ====== Welcome / Builder Journey ======
 router.get('/welcome', requireAuth, (req, res) => {
-  const db = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
-  if (user.builder_goal) return res.redirect('/dashboard');
   res.render('welcome', {
     title: 'Choose Your Business Objective - CopyQuick',
     currentPage: 'welcome',
-    objectives: objectiveUniverse
+    objectives: objectiveUniverse,
+    selectedGoal: '',
+    error: null
   });
 });
 
 router.post('/welcome', requireAuth, (req, res) => {
-  const { goal } = req.body;
-  if (!getObjective(goal)) return res.redirect('/welcome');
   const db = getDb();
+  const goal = typeof req.body.goal === 'string' ? req.body.goal.trim() : '';
+  if (!getObjective(goal)) {
+    return res.status(400).render('welcome', {
+      title: 'Choose Your Business Objective - CopyQuick',
+      currentPage: 'welcome',
+      objectives: objectiveUniverse,
+      selectedGoal: '',
+      error: 'Choose a valid business objective to continue.'
+    });
+  }
   db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
   // Ensure brand_brain row exists
   const existing = db.prepare('SELECT id FROM brand_brain WHERE user_id = ?').get(req.session.userId);
   if (!existing) {
     db.prepare('INSERT INTO brand_brain (user_id) VALUES (?)').run(req.session.userId);
   }
-  res.redirect(goal === 'launch_product' ? '/discovery' : '/dashboard');
+  if (goal === 'launch_product') {
+    delete req.session.discoverySession;
+    return res.redirect('/discovery');
+  }
+  return res.redirect('/dashboard');
 });
 
 // ====== Brand Brain ======

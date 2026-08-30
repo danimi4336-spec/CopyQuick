@@ -6,11 +6,15 @@
             <p>Choose your priority. CopyQuick will help you turn it into a clear plan and the work needed to execute it.</p>
         </header>
 
+        <% if (error) { %><div class="alert alert-error objective-universe-error" role="alert"><%= error %></div><% } %>
+
         <form action="/welcome" method="POST" class="objective-universe-form fade-in">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div class="objective-grid" aria-label="Business objectives">
                 <% objectives.forEach(function(objective) { %>
-                    <button type="submit" name="goal" value="<%= objective.id %>" class="objective-card" aria-describedby="objective-summary-<%= objective.id %> objective-outcome-<%= objective.id %>">
+                    <div class="objective-choice">
+                        <input class="objective-choice-input" type="radio" name="goal" id="objective-<%= objective.id %>" value="<%= objective.id %>" <%= selectedGoal === objective.id ? 'checked' : '' %> required>
+                        <label for="objective-<%= objective.id %>" class="objective-card" aria-describedby="objective-summary-<%= objective.id %> objective-outcome-<%= objective.id %>">
                         <span class="objective-icon" aria-hidden="true"><%= objective.icon %></span>
                         <span class="objective-card-content">
                             <span class="objective-card-title"><%= objective.title %></span>
@@ -18,8 +22,12 @@
                             <span class="objective-card-outcome" id="objective-outcome-<%= objective.id %>"><%= objective.outcome %></span>
                         </span>
                         <span class="objective-arrow" aria-hidden="true">→</span>
-                    </button>
+                        </label>
+                    </div>
                 <% }); %>
+            </div>
+            <div class="objective-universe-actions">
+                <button type="submit" class="btn btn-primary btn-lg">Start This Objective <span aria-hidden="true">→</span></button>
             </div>
             <p class="objective-assurance">You can change direction and explore other objectives from your Builder at any time.</p>
         </form>
