@@ -106,7 +106,7 @@ async function run() {
   });
   assert.strictEqual(confidenceWeighted.knowledgeDomains.Customer.status, 'partial');
   assert.strictEqual(confidenceWeighted.knowledgeDomains['Sales Channel'].confidence, 0.2);
-  assert.strictEqual(confidenceWeighted.nextQuestion.id, 'sales_channel');
+  assert.strictEqual(confidenceWeighted.nextQuestion, null, 'user-confirmed answers are established even when a legacy confidence is low');
 
   const knownProduct = analyzeDiscovery({
     objective: 'launch_product',
@@ -115,7 +115,7 @@ async function run() {
     answers: {}
   });
   assert(knownProduct.reasoning.some(function(item) {
-    return item.skippedDomain === 'Product'
+    return item.requirementId === 'product_context'
       && item.reason === 'Already understood from previous answers.';
   }));
   assert.notStrictEqual(knownProduct.nextQuestion.domain, 'Product');
@@ -136,9 +136,9 @@ async function run() {
   const requiredUncertaintyCases = [
     ['business_type', 'businessType', 'Product'],
     ['target_audience', 'targetAudience', 'Customer'],
-    ['customer_motivation', 'customerMotivation', 'Value Proposition'],
+    ['customer_motivation', 'customerMotivation', 'Customer Need / Desired Outcome'],
     ['sales_channel', 'salesChannel', 'Sales Channel'],
-    ['competitive_differentiation', 'competitiveDifferentiation', 'Competitive Positioning'],
+    ['competitive_differentiation', 'competitiveDifferentiation', 'Competitive Context'],
     ['launch_stage', 'launchStage', 'Launch Stage']
   ];
   requiredUncertaintyCases.forEach(function([questionId, field, domain]) {
@@ -152,7 +152,11 @@ async function run() {
     });
     assert.notStrictEqual(result.nextQuestion?.id, questionId, `${questionId} must not repeat`);
     assert(result.remainingKnowledgeGaps.includes(domain));
-    assert(result.planningReadiness.unresolvedRequiredDomains.includes(domain));
+    if (!['Sales Channel', 'Competitive Context'].includes(domain)) {
+      assert(result.planningReadiness.unresolvedRequiredDomains.includes(domain));
+    } else {
+      assert(result.planningReadiness.unresolvedNonBlockingRequirements.some((item) => item.domain === domain));
+    }
   });
 
   const allRequiredUncertain = analyzeDiscovery({
@@ -164,9 +168,10 @@ async function run() {
     answers: Object.fromEntries(requiredUncertaintyCases.map(function([questionId]) { return [questionId, 'unsure']; }))
   });
   assert.strictEqual(allRequiredUncertain.nextQuestion, null);
-  assert.strictEqual(allRequiredUncertain.planningReadiness.ready, true);
+  assert.strictEqual(allRequiredUncertain.planningReadiness.ready, false);
   assert.deepStrictEqual(allRequiredUncertain.planningReadiness.unsatisfiedRequiredDomains, []);
-  assert.strictEqual(allRequiredUncertain.planningReadiness.unresolvedRequiredDomains.length, 6);
+  assert.strictEqual(allRequiredUncertain.planningReadiness.unresolvedBlockingRequirements.length, 4);
+  assert.strictEqual(allRequiredUncertain.planningReadiness.unresolvedNonBlockingRequirements.length, 2);
 
   const otherAnswer = analyzeDiscovery({
     objective: 'launch_product',
@@ -175,7 +180,7 @@ async function run() {
     answers: { customer_motivation: { value: 'other', detail: 'Reduce daily friction' } }
   });
   assert.notStrictEqual(otherAnswer.nextQuestion?.id, 'customer_motivation');
-  assert(!otherAnswer.remainingKnowledgeGaps.includes('Value Proposition'));
+  assert(!otherAnswer.remainingKnowledgeGaps.includes('Customer Need / Desired Outcome'));
 
   const app = express();
   app.set('view engine', 'ejs');
@@ -210,13 +215,13 @@ async function run() {
 
     const stored = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
     assert.strictEqual(stored.knowledgeDomains.Product.status, 'known');
-    assert.strictEqual(stored.nextQuestion.id, 'target_audience');
+    assert.strictEqual(stored.nextQuestion.id, 'supplement_intended_outcome');
     assert.strictEqual(typeof stored.completion, 'number');
     assert(stored.remainingKnowledgeGaps.includes('Customer'));
 
     const rendered = await request(authenticated, 'GET', '/discovery');
     assert.match(rendered.body, /Understanding your business\.\.\./);
-    assert.match(rendered.body, /Who is this product primarily for\?/);
+    assert.match(rendered.body, /What would you most like this supplement to help people with\?/);
     assert.strictEqual((rendered.body.match(/<fieldset/g) || []).length, 1);
     assert(!rendered.body.includes(`${stored.completion}%`), 'raw completion must remain internal');
 

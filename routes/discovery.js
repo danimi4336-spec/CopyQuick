@@ -2,6 +2,7 @@ const express = require('express');
 const { requireAuth } = require('./auth');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
+const { DISCOVERY_POLICY_VERSION, isMeaningfullyReady } = require('../lib/discoveryRequirements');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
@@ -62,10 +63,40 @@ function applyIntelligenceResult(discoverySession, intelligenceResult) {
   discoverySession.reasoning = intelligenceResult.reasoning;
   discoverySession.remainingKnowledgeGaps = intelligenceResult.remainingKnowledgeGaps;
   discoverySession.planningReadiness = intelligenceResult.planningReadiness;
+  discoverySession.discoveryCompleteForNow = intelligenceResult.discoveryCompleteForNow;
+  discoverySession.discoveryPolicyVersion = DISCOVERY_POLICY_VERSION;
 }
 
 function canViewReflection(discoverySession) {
-  return Boolean(discoverySession?.planningReadiness?.ready || discoverySession?.reflectionStartedAt);
+  return Boolean(discoverySession?.planningReadiness?.discoveryCompleteForNow || discoverySession?.reflectionStartedAt);
+}
+
+function clearUnapprovedPlanningArtifacts(discoverySession) {
+  if (discoverySession?.approvedProductionSet) return;
+  discoverySession.planningConfirmedAt = null;
+  discoverySession.confirmedUnderstanding = null;
+  discoverySession.strategyResult = null;
+  discoverySession.strategyUpdatedAt = null;
+  discoverySession.buildPlan = null;
+  discoverySession.buildPlanUpdatedAt = null;
+  discoverySession.buildPlanSource = null;
+  discoverySession.buildPlanFingerprint = null;
+  discoverySession.buildPlanSelection = null;
+}
+
+function refreshDiscoveryPolicy(discoverySession) {
+  if (!discoverySession?.objective || !discoverySession?.understanding || !discoverySession?.answers) return;
+  const previousVersion = discoverySession.discoveryPolicyVersion;
+  const intelligenceResult = analyzeDiscovery({
+    objective: discoverySession.objective,
+    understanding: discoverySession.understanding,
+    unknowns: discoverySession.unknowns || [],
+    answers: discoverySession.answers
+  });
+  applyIntelligenceResult(discoverySession, intelligenceResult);
+  if (previousVersion !== DISCOVERY_POLICY_VERSION && !isMeaningfullyReady(intelligenceResult.planningReadiness)) {
+    clearUnapprovedPlanningArtifacts(discoverySession);
+  }
 }
 
 function hasCurrentStrategyState(discoverySession) {
@@ -128,7 +159,8 @@ function renderReflection(req, res, options = {}) {
 }
 
 router.get('/discovery', requireAuth, (req, res) => {
-  if (req.session.discoverySession?.planningReadiness?.ready || req.session.discoverySession?.reflectionStartedAt) {
+  refreshDiscoveryPolicy(req.session.discoverySession);
+  if (canViewReflection(req.session.discoverySession)) {
     return res.redirect('/discovery/reflection');
   }
   renderDiscovery(req, res);
@@ -167,6 +199,8 @@ router.post('/discovery', requireAuth, async (req, res) => {
       reasoning: intelligenceResult.reasoning,
       remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
       planningReadiness: intelligenceResult.planningReadiness,
+      discoveryCompleteForNow: intelligenceResult.discoveryCompleteForNow,
+      discoveryPolicyVersion: DISCOVERY_POLICY_VERSION,
       startedAt: req.session.discoverySession?.startedAt || now,
       updatedAt: now
     };
@@ -234,7 +268,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
   applyIntelligenceResult(discoverySession, intelligenceResult);
   discoverySession.updatedAt = new Date().toISOString();
 
-  if (intelligenceResult.planningReadiness.ready) {
+  if (intelligenceResult.discoveryCompleteForNow) {
     discoverySession.reflectionStartedAt = new Date().toISOString();
     return res.redirect(303, '/discovery/reflection');
   }
@@ -242,6 +276,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
 });
 
 router.get('/discovery/reflection', requireAuth, (req, res) => {
+  refreshDiscoveryPolicy(req.session.discoverySession);
   if (!canViewReflection(req.session.discoverySession)) {
     return res.redirect('/discovery');
   }
@@ -250,6 +285,7 @@ router.get('/discovery/reflection', requireAuth, (req, res) => {
 
 router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   const discoverySession = req.session.discoverySession;
+  refreshDiscoveryPolicy(discoverySession);
   if (!canViewReflection(discoverySession)) {
     return res.redirect('/discovery');
   }
@@ -299,10 +335,11 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
 
 router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
+  refreshDiscoveryPolicy(discoverySession);
   if (!canViewReflection(discoverySession)) {
     return res.redirect('/discovery');
   }
-  if (!discoverySession.planningReadiness?.ready) {
+  if (!isMeaningfullyReady(discoverySession.planningReadiness)) {
     return renderReflection(req, res, {
       status: 409,
       error: 'Complete the required business understanding before building your plan.'
@@ -324,7 +361,8 @@ router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
 
 router.get('/discovery/strategy', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
-  if (!discoverySession?.planningReadiness?.ready || !discoverySession?.planningConfirmedAt) {
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !discoverySession?.planningConfirmedAt) {
     return res.redirect('/discovery/reflection');
   }
 
@@ -347,7 +385,8 @@ router.get('/discovery/strategy', requireAuth, (req, res) => {
 
 router.get('/discovery/build-plan', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
-  if (!discoverySession?.planningReadiness?.ready || !discoverySession?.planningConfirmedAt) {
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !discoverySession?.planningConfirmedAt) {
     return res.redirect('/discovery/reflection');
   }
   if (!hasCurrentStrategyState(discoverySession)) {
@@ -376,7 +415,8 @@ router.get('/discovery/build-plan', requireAuth, (req, res) => {
 
 router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
-  if (!hasCurrentBuildPlanState(discoverySession)) {
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
     return res.redirect('/discovery/build-plan');
   }
   const requested = Array.isArray(req.body.selectedDeliverableIds)
@@ -397,7 +437,8 @@ router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
 
 router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
-  if (!hasCurrentBuildPlanState(discoverySession)) {
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
     return res.redirect('/discovery/build-plan');
   }
   const result = createApprovedProductionSet({
@@ -417,7 +458,8 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
 
 router.get('/discovery/production-ready', requireAuth, (req, res) => {
   const discoverySession = req.session.discoverySession;
-  if (!hasCurrentBuildPlanState(discoverySession)) {
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
     return res.redirect('/discovery/build-plan');
   }
   if (!discoverySession.approvedProductionSet

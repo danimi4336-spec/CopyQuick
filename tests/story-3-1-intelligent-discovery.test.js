@@ -100,10 +100,10 @@ async function run() {
     assert.deepStrictEqual(savedSession.completedQuestions, ['initial_description']);
     assert.strictEqual(savedSession.understanding.businessType.value, 'physical_product');
     assert.strictEqual(savedSession.understanding.category.value, 'dietary_supplement');
-    assert.strictEqual(savedSession.nextQuestion.id, 'target_audience');
+    assert.strictEqual(savedSession.nextQuestion.id, 'supplement_intended_outcome');
     assert.strictEqual(typeof savedSession.completion, 'number');
     assert.strictEqual(savedSession.knowledgeDomains.Product.status, 'known');
-    assert(savedSession.reasoning.some((item) => item.skippedDomain === 'Product'));
+    assert(savedSession.reasoning.some((item) => item.requirementId === 'product_context' && item.state === 'known'));
     assert.match(savedSession.startedAt, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(savedSession.updatedAt, /^\d{4}-\d{2}-\d{2}T/);
 
@@ -113,37 +113,36 @@ async function run() {
     assert.match(nextState.body, /Physical Product/);
     assert.match(nextState.body, /Health &amp; Wellness/);
     assert.match(nextState.body, /Dietary Supplement/);
-    assert.match(nextState.body, /Who is this product primarily for\?/);
-    assert.match(nextState.body, /value="consumers"/);
+    assert.match(nextState.body, /What would you most like this supplement to help people with\?/);
+    assert.match(nextState.body, /value="everyday_wellness"/);
     assert.match(nextState.body, /value="other"/);
     const nextToken = nextState.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
     const missingCsrf = await request(authenticated, 'POST', '/discovery', {
-      questionId: 'target_audience',
-      choice: 'consumers'
+      questionId: 'supplement_intended_outcome',
+      choice: 'everyday_wellness'
     });
     assert.strictEqual(missingCsrf.res.statusCode, 403);
 
     const structuredSubmission = await request(authenticated, 'POST', '/discovery', {
       _csrf: nextToken,
-      questionId: 'target_audience',
-      choice: 'consumers'
+      questionId: 'supplement_intended_outcome',
+      choice: 'unsure'
     });
     assert.strictEqual(structuredSubmission.res.statusCode, 303);
     assert.strictEqual(structuredSubmission.res.headers.location, '/discovery');
 
     const updated = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
-    assert.strictEqual(updated.answers.target_audience, 'consumers');
-    assert.strictEqual(updated.understanding.targetAudience.source, 'user_confirmed');
-    assert.strictEqual(updated.understanding.targetAudience.confidence, 1);
-    assert(updated.completedQuestions.includes('target_audience'));
-    assert.strictEqual(updated.nextQuestion.id, 'customer_motivation');
+    assert.strictEqual(updated.answers.supplement_intended_outcome, 'unsure');
+    assert.strictEqual(updated.understanding.intendedOutcome.value, 'unsure');
+    assert(updated.completedQuestions.includes('supplement_intended_outcome'));
+    assert.strictEqual(updated.nextQuestion.id, 'supplement_outcome_exploration');
 
     const targetPage = await request(authenticated, 'GET', '/discovery');
     const targetToken = targetPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const emptyOther = await request(authenticated, 'POST', '/discovery', {
       _csrf: targetToken,
-      questionId: 'customer_motivation',
+      questionId: 'supplement_outcome_exploration',
       choice: 'other',
       otherAnswer: '   '
     });
@@ -152,32 +151,32 @@ async function run() {
 
     const unsureSubmission = await request(authenticated, 'POST', '/discovery', {
       _csrf: targetToken,
-      questionId: 'customer_motivation',
+      questionId: 'supplement_outcome_exploration',
       choice: 'unsure'
     });
     assert.strictEqual(unsureSubmission.res.statusCode, 303);
     assert.strictEqual(unsureSubmission.res.headers.location, '/discovery');
     const afterUnsure = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
-    assert.strictEqual(afterUnsure.answers.customer_motivation, 'unsure');
-    assert.strictEqual(afterUnsure.understanding.customerMotivation.value, 'unsure');
-    assert(afterUnsure.completedQuestions.includes('customer_motivation'));
-    assert.notStrictEqual(afterUnsure.nextQuestion.id, 'customer_motivation');
-    assert.strictEqual(afterUnsure.nextQuestion.id, 'sales_channel');
-    assert(afterUnsure.remainingKnowledgeGaps.includes('Value Proposition'));
+    assert.strictEqual(afterUnsure.answers.supplement_outcome_exploration, 'unsure');
+    assert.strictEqual(afterUnsure.understanding.intendedOutcome.value, 'unsure');
+    assert(afterUnsure.completedQuestions.includes('supplement_outcome_exploration'));
+    assert.notStrictEqual(afterUnsure.nextQuestion.id, 'supplement_outcome_exploration');
+    assert.strictEqual(afterUnsure.nextQuestion.id, 'supplement_concept_maturity');
+    assert(afterUnsure.remainingKnowledgeGaps.includes('Customer Need / Desired Outcome'));
 
     const salesPage = await request(authenticated, 'GET', '/discovery');
     const salesToken = salesPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const validOther = await request(authenticated, 'POST', '/discovery', {
       _csrf: salesToken,
-      questionId: 'sales_channel',
+      questionId: 'supplement_concept_maturity',
       choice: 'other',
-      otherAnswer: 'Independent wellness stores'
+      otherAnswer: 'A manufacturer is reviewing an early formula'
     });
     assert.strictEqual(validOther.res.statusCode, 303);
     const afterOther = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
-    assert.deepStrictEqual(afterOther.answers.sales_channel, { value: 'other', detail: 'Independent wellness stores' });
-    assert.strictEqual(afterOther.understanding.salesChannel.value, 'Independent wellness stores');
-    assert.notStrictEqual(afterOther.nextQuestion.id, 'sales_channel');
+    assert.deepStrictEqual(afterOther.answers.supplement_concept_maturity, { value: 'other', detail: 'A manufacturer is reviewing an early formula' });
+    assert.strictEqual(afterOther.understanding.conceptMaturity.value, 'A manufacturer is reviewing an early formula');
+    assert.notStrictEqual(afterOther.nextQuestion.id, 'supplement_concept_maturity');
 
     console.log('Story 3.1 Intelligent Discovery tests passed');
   } finally {

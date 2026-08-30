@@ -3,7 +3,7 @@
         <header class="reflection-header">
             <span class="reflection-eyebrow">Business Reflection</span>
             <h1>Here's what I've learned about your business.</h1>
-            <p>Review what I understand, make any corrections, and confirm when this foundation is ready for planning.</p>
+            <p>Review what I understand, refine anything that is still open, and continue when there is enough grounding for useful strategy.</p>
         </header>
 
         <% if (error) { %><div class="alert alert-error reflection-alert" role="alert"><%= error %></div><% } %>
@@ -56,17 +56,19 @@
         <section class="reflection-readiness <%= planningReadiness.ready ? 'ready' : 'blocked' %>">
             <% if (planningReadiness.ready) { %>
                 <div>
-                    <h2>Your business foundation is ready.</h2>
-                    <% if (planningReadiness.unresolvedRequiredDomains && planningReadiness.unresolvedRequiredDomains.length) { %>
-                        <p>You answered every essential question. Unresolved areas will remain clearly marked instead of being guessed: <%= planningReadiness.unresolvedRequiredDomains.join(', ') %>.</p>
-                    <% } else { %>
-                        <p>The required areas are understood well enough to begin personalized planning.</p>
-                    <% } %>
+                    <h2>We know enough to build a useful strategy.</h2>
+                    <p>The essential product decisions are established. Optional unknowns will remain clearly marked rather than guessed.</p>
                 </div>
             <% } else { %>
                 <div>
-                    <h2>A few essentials still need attention.</h2>
-                    <p>Required areas: <%= planningReadiness.unsatisfiedRequiredDomains.join(', ') %>.</p>
+                    <h2>Your current foundation is clear, but an important decision is still open.</h2>
+                    <p>CopyQuick will not invent this information or build generic strategy around it. Refine the relevant field above when you are ready.</p>
+                    <% var blockingItems = (reflection.blockingRequirements || []).concat(reflection.unaskedEssentialRequirements || []); %>
+                    <% if (blockingItems.length) { %>
+                        <ul class="reflection-blocking-list">
+                            <% blockingItems.forEach(function(item) { %><li><%= item.domain %></li><% }); %>
+                        </ul>
+                    <% } %>
                 </div>
             <% } %>
             <form action="/discovery/reflection/plan" method="POST">

@@ -80,8 +80,13 @@
                     </form>
                 <% } else { %>
                     <div class="discovery-foundation-ready">
-                        <h2>We have a strong foundation.</h2>
-                        <p>Your discovery answers are saved and ready for the next stage.</p>
+                        <% if (discoverySession.planningReadiness && discoverySession.planningReadiness.ready) { %>
+                            <h2>We have a strong foundation.</h2>
+                            <p>Your discovery answers are saved and ready for the next stage.</p>
+                        <% } else { %>
+                            <h2>We have captured what you know today.</h2>
+                            <p>Important uncertainty will stay visible instead of being turned into assumptions.</p>
+                        <% } %>
                     </div>
                 <% } %>
             <% } %>

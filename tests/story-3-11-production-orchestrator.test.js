@@ -31,6 +31,8 @@ function discoveryState() {
     businessType: confirmed('physical_product', 'Physical Product'),
     industry: confirmed('health_wellness', 'Health & Wellness'),
     category: confirmed('dietary_supplement', 'Dietary Supplement'),
+    intendedOutcome: confirmed('everyday_wellness', 'Everyday wellness'),
+    conceptMaturity: confirmed('formula_in_mind', 'Ingredients or formula in mind'),
     targetAudience: confirmed('health-conscious adults', 'Health-conscious adults'),
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
@@ -46,7 +48,7 @@ function discoveryState() {
   selection.approvedAt = approval.approvedAt;
   const now = new Date().toISOString();
   return {
-    objective: 'launch_product', planningReadiness: { ready: true }, planningConfirmedAt: now,
+    objective: 'launch_product', answers, understanding, planningReadiness: { ready: true }, planningConfirmedAt: now,
     confirmedUnderstanding: understanding, strategyResult, strategyUpdatedAt: now,
     buildPlan: plan, buildPlanSource: { planningConfirmedAt: now, strategyUpdatedAt: now },
     buildPlanFingerprint: planFingerprint(plan), buildPlanSelection: selection,

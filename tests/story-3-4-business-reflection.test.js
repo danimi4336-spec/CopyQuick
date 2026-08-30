@@ -16,6 +16,9 @@ function confirmed(value, label = value) {
 function requiredUnderstanding() {
   return {
     businessType: confirmed('physical_product', 'Physical Product'),
+    category: confirmed('dietary_supplement', 'Dietary Supplement'),
+    intendedOutcome: confirmed('everyday_wellness', 'Everyday wellness'),
+    conceptMaturity: confirmed('formula_in_mind', 'Ingredients or formula in mind'),
     targetAudience: confirmed('consumers', 'Individual consumers'),
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
@@ -70,6 +73,8 @@ async function createReadySession() {
   });
   const answers = {
     initial_description: initialDescription,
+    supplement_intended_outcome: 'everyday_wellness',
+    supplement_concept_maturity: 'formula_in_mind',
     target_audience: 'consumers',
     customer_motivation: 'solve_problem',
     sales_channel: 'amazon',
@@ -215,11 +220,11 @@ async function run() {
     const unresolvedPage = await request(authenticated, 'GET', '/discovery/reflection');
     assert.match(unresolvedPage.body, /I&#39;m not sure yet/);
     assert.match(unresolvedPage.body, /remains unresolved and can be refined later/);
-    assert.match(unresolvedPage.body, /Unresolved areas will remain clearly marked instead of being guessed/);
-    assert.doesNotMatch(unresolvedPage.body, /disabled aria-disabled="true"/);
+    assert.match(unresolvedPage.body, /important decision is still open/);
+    assert.match(unresolvedPage.body, /disabled aria-disabled="true"/);
     const unresolvedToken = unresolvedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const unresolvedPlan = await request(authenticated, 'POST', '/discovery/reflection/plan', { _csrf: unresolvedToken });
-    assert.strictEqual(unresolvedPlan.res.statusCode, 303);
+    assert.strictEqual(unresolvedPlan.res.statusCode, 409);
 
     console.log('Story 3.4 Business Reflection tests passed');
   } finally {
