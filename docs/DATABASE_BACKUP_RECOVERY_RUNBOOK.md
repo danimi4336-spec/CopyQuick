@@ -3,12 +3,15 @@
 CopyQuick V1 uses one SQLite database on the Render persistent disk. Backups are SQLite-consistent snapshots created with the SQLite backup API; never copy the live `.db` file with `cp` while the service is running.
 
 Schema evolution is tracked by the checksummed `schema_migrations` ledger.
-Before deployment, `npm run migrations:status` provides a read-only sanitized
-compatibility report. A future pending production migration requires a verified
-backup before its transaction begins; backup failure stops the deployment.
-Migration failure never triggers automatic restoration. See the durable-storage
-runbook for baseline adoption, lock ordering, the two-release rollout, and code
-rollback compatibility policy.
+Before deployment, `npm run migrations:status` provides read-only inspection and
+`npm run migrations:check` provides the fail-closed compatibility gate. Normal
+web startup never applies pending migrations. A future pending production
+migration must be executed explicitly with `npm run migrate:database` and
+requires a verified backup before its transaction begins; backup failure stops
+the operation. Migration failure or an older incompatible application never
+triggers automatic restoration. Application rollback is not necessarily
+database rollback. See the durable-storage runbook for baseline adoption, lock
+ordering, explicit execution, and code/schema compatibility policy.
 
 ## Create and inspect backups
 

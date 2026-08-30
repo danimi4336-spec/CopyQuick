@@ -405,7 +405,7 @@ function runMigrationEngine(db, options = {}) {
   return { ...finalStatus, integrity };
 }
 
-async function initializeDatabaseForStartup(db, options = {}) {
+async function executeMigrationsWithProductionBackup(db, options = {}) {
   const registry = validateMigrationRegistry(options.registry || MIGRATIONS);
   const status = inspectMigrationStatus(db, { ...options, registry });
   const production = (options.env || process.env).NODE_ENV === 'production';
@@ -428,11 +428,11 @@ module.exports = {
   MIGRATIONS,
   MIN_SUPPORTED_SCHEMA_VERSION,
   MigrationError,
+  executeMigrationsWithProductionBackup,
   getApplicationRevision,
   inspectMigrationStatus,
   migrationChecksum,
   runMigrationEngine,
-  initializeDatabaseForStartup,
   validateMigrationRegistry,
   verifyBaselineStructure
 };

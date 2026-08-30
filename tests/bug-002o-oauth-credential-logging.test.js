@@ -1,6 +1,6 @@
 const assert = require('assert');
 const express = require('express');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -144,23 +144,32 @@ function runServerStartupSmoke() {
       }
     }
 
+    const productionEnv = {
+      ...process.env,
+      NODE_ENV: 'production',
+      DATABASE_PATH: databasePath,
+      PERSISTENT_DATA_DIR: '/tmp',
+      SESSION_SECRET: DUMMY_SESSION_SECRET,
+      GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,
+      GOOGLE_CALLBACK_URL: DUMMY_CALLBACK_URL,
+      STRIPE_KEY: 'sk_test_bug_002o',
+      STRIPE_WEBHOOK_SECRET: 'whsec_bug_002o',
+      STRIPE_PRO_PRICE: 'price_bug_002o_pro',
+      STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited'
+    };
+    const migration = spawnSync(process.execPath, ['scripts/migrate-database.js'], {
+      cwd: path.join(__dirname, '..'),
+      env: productionEnv,
+      encoding: 'utf8'
+    });
+    if (migration.status !== 0) {
+      return reject(new Error(`explicit test database migration failed with code ${migration.status}`));
+    }
+
     const child = spawn(process.execPath, ['server.js'], {
       cwd: path.join(__dirname, '..'),
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        PORT: '0',
-        DATABASE_PATH: databasePath,
-        PERSISTENT_DATA_DIR: '/tmp',
-        SESSION_SECRET: DUMMY_SESSION_SECRET,
-        GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,
-        GOOGLE_CALLBACK_URL: DUMMY_CALLBACK_URL,
-        STRIPE_KEY: 'sk_test_bug_002o',
-        STRIPE_WEBHOOK_SECRET: 'whsec_bug_002o',
-        STRIPE_PRO_PRICE: 'price_bug_002o_pro',
-        STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited'
-      },
+      env: { ...productionEnv, PORT: '0' },
       stdio: ['ignore', 'pipe', 'pipe']
     });
 

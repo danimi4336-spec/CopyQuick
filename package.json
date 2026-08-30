@@ -14,6 +14,7 @@
     "health:storage": "node scripts/storage-health.js",
     "restore:database": "node scripts/restore-database.js",
     "migrations:status": "node scripts/migration-status.js",
+    "migrations:check": "node scripts/migration-check.js",
     "migrate:database": "node scripts/migrate-database.js"
   },
   "keywords": [],

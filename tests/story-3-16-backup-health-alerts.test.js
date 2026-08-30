@@ -72,7 +72,9 @@ async function run() {
     fs.mkdirSync(healthBackupDirectory);
     const healthEnv = {
       NODE_ENV: 'test', DATABASE_PATH: databasePath,
-      DATABASE_BACKUP_DIR: healthBackupDirectory, OFFSITE_BACKUP_ENABLED: 'false'
+      DATABASE_BACKUP_DIR: healthBackupDirectory, OFFSITE_BACKUP_ENABLED: 'false',
+      DATABASE_STORAGE_WARNING_FREE_BYTES: '0', DATABASE_STORAGE_CRITICAL_FREE_BYTES: '0',
+      DATABASE_STORAGE_WARNING_FREE_PERCENT: '0', DATABASE_STORAGE_CRITICAL_FREE_PERCENT: '0'
     };
     const inspectedMissing = inspectStorageHealth({ env: healthEnv, db: { pragma: () => [{ quick_check: 'ok' }] } });
     assert.strictEqual(inspectedMissing.backups.status, 'missing');

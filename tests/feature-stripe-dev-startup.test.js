@@ -77,6 +77,13 @@ async function run() {
   }
 
   try {
+    const migration = await runNode(['scripts/migrate-database.js'], {
+      NODE_ENV: 'development',
+      DATABASE_URL: databasePath,
+      SESSION_SECRET: 'feature-stripe-dev-session-secret'
+    });
+    assert.strictEqual(migration.code, 0, migration.stderr);
+
     const developmentOutput = await startDevelopmentServer(databasePath);
     assert.match(developmentOutput, /⚠️ Stripe billing disabled\./);
     assert.match(developmentOutput, /Local development mode\./);

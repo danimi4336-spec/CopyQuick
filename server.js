@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 const { getDatabaseStorage, getDb } = require('./db/database');
 const { safeStorageDiagnostics } = require('./lib/databasePath');
-const { initializeDatabase } = require('./db/init');
+const { initializeDatabaseRuntime } = require('./db/init');
 const { router: authRoutes, requireAuth } = require('./routes/auth');
 const dashboardRoutes = require('./routes/generations');
 const pricingRoutes = require('./routes/pricing');
@@ -30,6 +30,8 @@ const { createProductionWorker } = require('./lib/productionWorker');
 const { DEFAULT_LEASE_MS, acquireRuntimeLock, startRuntimeLockHeartbeat } = require('./lib/databaseRuntimeLock');
 const { createOffsiteBackupScheduler } = require('./lib/offsiteBackupScheduler');
 const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
+const { requireCompatibleMigrationState } = require('./lib/migrationStartupGate');
+const { startApplicationAfterMigrationGate } = require('./lib/applicationStartup');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -187,20 +189,40 @@ process.once('SIGTERM', () => { shutdown('SIGTERM'); });
 process.once('SIGINT', () => { shutdown('SIGINT'); });
 
 async function startApplication() {
-  await initializeDatabase({ db: getDb(), env: process.env });
-  console.log(databaseStorage.existedBeforeStartup
-    ? 'Existing SQLite database opened without reset.'
-    : 'New SQLite database initialized at the configured storage location. Existing data was not migrated automatically.');
-  if (shuttingDown) return;
-  server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+  const started = await startApplicationAfterMigrationGate({
+    databaseExists: databaseStorage.existedBeforeStartup,
+    getDatabase: getDb,
+    gateMigrationState: (db, { databaseExists }) => requireCompatibleMigrationState({
+      db,
+      databaseExists
+    }),
+    initializeRuntimeDatabase: db => initializeDatabaseRuntime({ db }),
+    shouldStop: () => shuttingDown,
+    startHttp: () => app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server is running on http://0.0.0.0:${PORT}`);
+    }),
+    startProductionWorker: db => {
+      const worker = createProductionWorker({ db });
+      worker.start();
+      return worker;
+    },
+    startOffsiteBackupScheduler: () => {
+      const scheduler = createOffsiteBackupScheduler();
+      scheduler.start();
+      return scheduler;
+    },
+    startBackupHealthWatcher: db => {
+      const watcher = createBackupHealthWatcher({ db });
+      watcher.start();
+      return watcher;
+    }
   });
-  productionWorker = createProductionWorker({ db: getDb() });
-  productionWorker.start();
-  offsiteBackupScheduler = createOffsiteBackupScheduler();
-  offsiteBackupScheduler.start();
-  backupHealthWatcher = createBackupHealthWatcher({ db: getDb() });
-  backupHealthWatcher.start();
+  if (started.stoppedBeforeServices) return;
+  server = started.server;
+  productionWorker = started.productionWorker;
+  offsiteBackupScheduler = started.offsiteBackupScheduler;
+  backupHealthWatcher = started.backupHealthWatcher;
+  console.log('Existing SQLite database opened without reset.');
 }
 
 startApplication().catch(error => {

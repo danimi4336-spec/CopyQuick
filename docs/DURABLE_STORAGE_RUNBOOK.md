@@ -41,14 +41,21 @@ Use these operator commands:
 
 ```sh
 npm run migrations:status
+npm run migrations:check
 npm run migrate:database
 ```
 
 `migrations:status` is read-only and reports only the current version,
-supported range, baseline state, pending count, and compatibility. The migrate
-command uses the same migration engine as application startup and therefore
-requires exclusive runtime ownership; it must not be run while the web service
-is active.
+supported range, baseline state, pending count, and compatibility.
+`migrations:check` is the fail-closed, read-only deployment gate: it exits zero
+only when the current application can safely start without changing schema.
+`MIGRATION_REQUIRED`, `MIGRATION_INCOMPATIBLE`, and
+`MIGRATION_HISTORY_INVALID` all return nonzero.
+
+Normal `node server.js` startup performs the same compatibility gate and never
+executes pending migrations. `migrate:database` is the separate explicit
+execution path. It uses the versioned migration engine, requires exclusive
+runtime ownership, and must not be run while the web service is active.
 
 The V1 framework accepts only additive migration definitions. Automatic down
 migrations and destructive DDL are intentionally unsupported. A code rollback
@@ -59,11 +66,14 @@ code rollback mechanism.
 ### First production rollout of the migration framework
 
 Release A contains no business-schema migration. After taking and verifying an
-off-site backup, deploy Release A. Startup will structurally validate every
-required table, column, foreign key, unique constraint, and named index in the
-existing database. Only if that exact pre-ledger baseline is approved will it
-transactionally create the migration ledger and record version 1. It does not
-rewrite business rows or recreate business tables.
+off-site backup, use `migrations:status` to confirm that the database is eligible
+for baseline adoption. With the web application offline, run the explicit
+`migrate:database` command. It structurally validates every required table,
+column, foreign key, unique constraint, and named index. Only if that exact
+pre-ledger baseline is approved will it transactionally create the migration
+ledger and record version 1. It does not rewrite business rows or recreate
+business tables. Starting the web application before this explicit step returns
+`MIGRATION_REQUIRED`.
 
 After deployment:
 
@@ -80,7 +90,10 @@ ledger row, modify schema, or restore automatically. Preserve the database,
 inspect it offline using a verified snapshot, and reconcile the unexpected
 structure deliberately.
 
-When a future real migration is pending in production, lock order is always:
+When a future real migration is pending, normal startup reports
+`MIGRATION_REQUIRED` and exits before HTTP, the Production Worker, backup
+scheduling, or backup-health monitoring starts. After backup health is verified,
+an operator must execute the migration deliberately. Lock order is always:
 
 1. database runtime ownership;
 2. backup-operation lease while producing the verified pre-migration backup;
@@ -90,6 +103,15 @@ When a future real migration is pending in production, lock order is always:
 Manual backups never acquire the runtime lock, so there is no reverse lock
 order. A failed backup prevents migration. A failed migration rolls back that
 migration, stops startup, and never triggers an automatic restore.
+
+After explicit migration, run `npm run migrations:check`, start the application,
+verify `/healthz`, then verify storage health and production-worker progress.
+If an older application reports `MIGRATION_INCOMPATIBLE` because the database is
+newer than its supported maximum, do not retry startup, downgrade schema, reset
+the database, or automatically restore an older backup. Deploy compatible code
+or follow the deliberate disaster-recovery process only when an actual recovery
+decision has been made. Application rollback is not necessarily database
+rollback.
 
 ## Existing ephemeral data
 

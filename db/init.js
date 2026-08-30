@@ -1,5 +1,10 @@
 const { getDb } = require('./database');
-const { MigrationError, initializeDatabaseForStartup, inspectMigrationStatus, runMigrationEngine } = require('./migrations');
+const {
+  MigrationError,
+  executeMigrationsWithProductionBackup,
+  inspectMigrationStatus,
+  runMigrationEngine
+} = require('./migrations');
 
 function configureRuntimeDatabase(db) {
   db.pragma('foreign_keys = ON');
@@ -15,9 +20,19 @@ function safeMigrationLogger(entry) {
   }));
 }
 
-// Isolated tests and local tooling can use this synchronous entry point. The
-// production server uses initializeDatabase(), which requires a verified backup
-// before applying any real pending migration.
+function initializeDatabaseRuntime(options = {}) {
+  const db = options.db || getDb();
+  configureRuntimeDatabase(db);
+  const integrity = db.pragma('quick_check', { simple: true });
+  if (integrity !== 'ok') {
+    throw new MigrationError('SQLite integrity validation failed.', 'SQLITE_INTEGRITY_FAILED');
+  }
+  console.log('Database runtime initialized successfully.');
+  return { integrity };
+}
+
+// Isolated tests and explicit local tooling can use this synchronous migration
+// entry point. Normal server startup never calls it.
 function initDb(options = {}) {
   const db = options.db || getDb();
   const env = options.env || process.env;
@@ -41,7 +56,7 @@ function initDb(options = {}) {
 async function initializeDatabase(options = {}) {
   const db = options.db || getDb();
   configureRuntimeDatabase(db);
-  const result = await initializeDatabaseForStartup(db, {
+  const result = await executeMigrationsWithProductionBackup(db, {
     ...options,
     env: options.env || process.env,
     logger: options.logger || safeMigrationLogger
@@ -59,4 +74,9 @@ if (require.main === module) {
   });
 }
 
-module.exports = { configureRuntimeDatabase, initDb, initializeDatabase };
+module.exports = {
+  configureRuntimeDatabase,
+  initDb,
+  initializeDatabase,
+  initializeDatabaseRuntime
+};

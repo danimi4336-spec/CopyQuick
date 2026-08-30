@@ -9,7 +9,7 @@ const {
   BASELINE_MIGRATION,
   LEDGER_TABLE,
   MigrationError,
-  initializeDatabaseForStartup,
+  executeMigrationsWithProductionBackup,
   inspectMigrationStatus,
   migrationChecksum,
   runMigrationEngine,
@@ -207,7 +207,7 @@ async function run() {
       runMigrationEngine(value.db, { logger: () => {} });
       let backups = 0;
       const events = [];
-      await initializeDatabaseForStartup(value.db, {
+      await executeMigrationsWithProductionBackup(value.db, {
         env: { NODE_ENV: 'production' }, registry: [BASELINE_MIGRATION, v2], minVersion: 1, maxVersion: 2,
         createBackup: async () => {
           backups += 1;
@@ -229,7 +229,7 @@ async function run() {
     try {
       runMigrationEngine(current.db, { logger: () => {} });
       let backups = 0;
-      await initializeDatabaseForStartup(current.db, {
+      await executeMigrationsWithProductionBackup(current.db, {
         env: { NODE_ENV: 'production' }, createBackup: async () => { backups += 1; }
       });
       assert.strictEqual(backups, 0);
@@ -238,7 +238,7 @@ async function run() {
     const blocked = fixture();
     try {
       runMigrationEngine(blocked.db, { logger: () => {} });
-      await assert.rejects(() => initializeDatabaseForStartup(blocked.db, {
+      await assert.rejects(() => executeMigrationsWithProductionBackup(blocked.db, {
         env: { NODE_ENV: 'production' }, registry: [BASELINE_MIGRATION, v2], minVersion: 1, maxVersion: 2,
         createBackup: async () => { throw Object.assign(new Error('private backup detail'), { code: 'BACKUP_FAILED' }); }
       }), error => error.code === 'BACKUP_FAILED');
@@ -274,7 +274,7 @@ async function run() {
       runMigrationEngine(value.db, { logger: () => {} });
       const { acquireRuntimeLock } = require('../lib/databaseRuntimeLock');
       releaseRuntime = acquireRuntimeLock(value.databasePath);
-      await initializeDatabaseForStartup(value.db, {
+      await executeMigrationsWithProductionBackup(value.db, {
         env: {
           NODE_ENV: 'production',
           DATABASE_PATH: value.databasePath,
@@ -333,12 +333,12 @@ async function run() {
     } finally { closeFixture(value); }
   }
 
-  // Startup constructs no normal service before migration success.
+  // Startup constructs no normal service before migration compatibility passes.
   {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-    assert.ok(source.indexOf('await initializeDatabase') < source.indexOf('app.listen'));
-    assert.ok(source.indexOf('app.listen') < source.indexOf('productionWorker.start()'));
-    assert.match(source, /acquireRuntimeLock[\s\S]+initializeDatabase/);
+    assert.ok(source.indexOf('requireCompatibleMigrationState') < source.indexOf('app.listen'));
+    assert.ok(source.indexOf('startHttp:') < source.indexOf('startProductionWorker:'));
+    assert.match(source, /acquireRuntimeLock[\s\S]+requireCompatibleMigrationState/);
   }
 
   console.log('Story 3.18 versioned migration tests passed');
