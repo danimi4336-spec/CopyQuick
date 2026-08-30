@@ -10,6 +10,7 @@ const express = require('express');
 const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const {
   BASELINE_MIGRATION,
+  BILLING_RECONCILIATION_MIGRATION,
   LEDGER_TABLE,
   runMigrationEngine
 } = require('../db/migrations');
@@ -32,9 +33,9 @@ function closeFixture(value) {
   fs.rmSync(value.directory, { recursive: true, force: true });
 }
 
-function additiveV2() {
+function additiveV3() {
   return {
-    version: 2,
+    version: 3,
     name: 'add_gate_probe',
     kind: 'migration',
     policy: 'additive',
@@ -43,15 +44,15 @@ function additiveV2() {
   };
 }
 
-function initializeV1(db) {
+function initializeCurrent(db) {
   return runMigrationEngine(db, { logger: () => {} });
 }
 
-function initializeV2(db) {
+function initializeNewer(db) {
   return runMigrationEngine(db, {
-    registry: [BASELINE_MIGRATION, additiveV2()],
+    registry: [BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION, additiveV3()],
     minVersion: 1,
-    maxVersion: 2,
+    maxVersion: 3,
     logger: () => {}
   });
 }
@@ -85,16 +86,16 @@ async function run() {
   {
     const value = fixture();
     try {
-      initializeV1(value.db);
+      initializeCurrent(value.db);
       const logs = [];
       const status = gate(value.db, {}, entry => logs.push(entry));
-      assert.strictEqual(status.currentVersion, 1);
+      assert.strictEqual(status.currentVersion, 2);
       assert.strictEqual(status.pendingCount, 0);
       assert.deepStrictEqual(logs, [{
         event: 'migration_compatibility_ok',
-        currentVersion: 1,
+        currentVersion: 2,
         minSupportedVersion: 1,
-        maxSupportedVersion: 1,
+        maxSupportedVersion: 2,
         pendingCount: 0
       }]);
     } finally { closeFixture(value); }
@@ -104,7 +105,7 @@ async function run() {
   {
     const value = fixture();
     try {
-      initializeV2(value.db);
+      initializeNewer(value.db);
       const beforeRows = value.db.prepare(`SELECT * FROM ${LEDGER_TABLE} ORDER BY version`).all();
       const beforeTables = value.db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all();
       const logs = [];
@@ -119,13 +120,13 @@ async function run() {
   // A schema below this build's minimum is incompatible; a pending additive migration is required, never implicit.
   {
     const value = fixture();
-    const registry = [BASELINE_MIGRATION, additiveV2()];
+    const registry = [BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION, additiveV3()];
     try {
-      initializeV1(value.db);
-      expectBlocked(() => gate(value.db, { registry, minVersion: 2, maxVersion: 2 }), 'MIGRATION_INCOMPATIBLE');
-      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: 2 }), 'MIGRATION_REQUIRED');
+      initializeCurrent(value.db);
+      expectBlocked(() => gate(value.db, { registry, minVersion: 3, maxVersion: 3 }), 'MIGRATION_INCOMPATIBLE');
+      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: 3 }), 'MIGRATION_REQUIRED');
       assert.strictEqual(value.db.prepare("SELECT 1 FROM sqlite_master WHERE name='gate_probe'").get(), undefined);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 1);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
     } finally { closeFixture(value); }
   }
 
@@ -150,7 +151,7 @@ async function run() {
   {
     const changed = fixture();
     try {
-      initializeV1(changed.db);
+      initializeCurrent(changed.db);
       changed.db.prepare(`UPDATE ${LEDGER_TABLE} SET checksum=? WHERE version=1`).run('0'.repeat(64));
       expectBlocked(() => gate(changed.db), 'MIGRATION_HISTORY_INVALID');
       assert.strictEqual(changed.db.prepare(`SELECT checksum FROM ${LEDGER_TABLE} WHERE version=1`).get().checksum, '0'.repeat(64));
@@ -158,7 +159,7 @@ async function run() {
 
     const malformed = fixture();
     try {
-      initializeV1(malformed.db);
+      initializeCurrent(malformed.db);
       malformed.db.exec(`ALTER TABLE ${LEDGER_TABLE} ADD COLUMN unexpected_metadata TEXT`);
       expectBlocked(() => gate(malformed.db), 'MIGRATION_HISTORY_INVALID');
       assert.ok(malformed.db.pragma(`table_info(${LEDGER_TABLE})`).some(column => column.name === 'unexpected_metadata'));
@@ -198,7 +199,7 @@ async function run() {
   {
     const safe = fixture();
     try {
-      initializeV1(safe.db);
+      initializeCurrent(safe.db);
       safe.db.close();
       const beforeHash = fileHash(safe.databasePath);
       const result = spawnSync(process.execPath, ['scripts/migration-check.js'], {
@@ -215,7 +216,7 @@ async function run() {
 
     const unsafe = fixture();
     try {
-      initializeV2(unsafe.db);
+      initializeNewer(unsafe.db);
       unsafe.db.close();
       const beforeHash = fileHash(unsafe.databasePath);
       const result = spawnSync(process.execPath, ['scripts/migration-check.js'], {
@@ -227,7 +228,7 @@ async function run() {
       assert.match(result.stderr, /"condition":"MIGRATION_INCOMPATIBLE"/);
       assert.strictEqual(fileHash(unsafe.databasePath), beforeHash);
       unsafe.db = new Database(unsafe.databasePath);
-      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
+      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
     } finally { closeFixture(unsafe); }
   }
 
@@ -235,7 +236,7 @@ async function run() {
   {
     const value = fixture();
     try {
-      initializeV2(value.db);
+      initializeNewer(value.db);
       value.db.close();
       const result = spawnSync(process.execPath, ['server.js'], {
         cwd: projectRoot,
@@ -255,7 +256,7 @@ async function run() {
       assert.doesNotMatch(result.stdout + result.stderr, new RegExp(value.directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       assert.strictEqual(fs.existsSync(`${value.databasePath}.runtime-lock`), false);
       value.db = new Database(value.databasePath);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
     } finally { closeFixture(value); }
   }
 

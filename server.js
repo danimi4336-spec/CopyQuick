@@ -32,6 +32,7 @@ const { createOffsiteBackupScheduler } = require('./lib/offsiteBackupScheduler')
 const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
 const { requireCompatibleMigrationState } = require('./lib/migrationStartupGate');
 const { startApplicationAfterMigrationGate } = require('./lib/applicationStartup');
+const { createBillingReconciliationScheduler } = require('./lib/billingReconciliationScheduler');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -164,6 +165,7 @@ let server = null;
 let productionWorker = null;
 let offsiteBackupScheduler = null;
 let backupHealthWatcher = null;
+let billingReconciliationScheduler = null;
 let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -172,7 +174,8 @@ async function shutdown(signal) {
   await Promise.all([
     productionWorker?.stop(),
     offsiteBackupScheduler?.stop(),
-    backupHealthWatcher?.stop()
+    backupHealthWatcher?.stop(),
+    billingReconciliationScheduler?.stop()
   ]);
   const finish = () => {
     stopRuntimeLockHeartbeat();
@@ -215,6 +218,11 @@ async function startApplication() {
       const watcher = createBackupHealthWatcher({ db });
       watcher.start();
       return watcher;
+    },
+    startBillingReconciliationScheduler: db => {
+      const scheduler = createBillingReconciliationScheduler({ db });
+      scheduler.start();
+      return scheduler;
     }
   });
   if (started.stoppedBeforeServices) return;
@@ -222,6 +230,7 @@ async function startApplication() {
   productionWorker = started.productionWorker;
   offsiteBackupScheduler = started.offsiteBackupScheduler;
   backupHealthWatcher = started.backupHealthWatcher;
+  billingReconciliationScheduler = started.billingReconciliationScheduler;
   console.log('Existing SQLite database opened without reset.');
 }
 

@@ -56,9 +56,9 @@ async function run() {
     const value = fixture();
     try {
       const result = runMigrationEngine(value.db, { logger: () => {} });
-      assert.strictEqual(result.currentVersion, 1);
+      assert.strictEqual(result.currentVersion, 2);
       assert.strictEqual(result.pendingCount, 0);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 1);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
       assert.strictEqual(verifyBaselineStructure(value.db), true);
     } finally { closeFixture(value); }
   }
@@ -75,7 +75,7 @@ async function run() {
       assert.strictEqual(migrated.status, 0, migrated.stderr);
       assert.match(migrated.stdout, /"event":"database_migration_complete"/);
       const db = new Database(databasePath, { readonly: true, fileMustExist: true });
-      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 1);
+      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 2);
       db.close();
       assert.strictEqual(fs.existsSync(`${databasePath}.runtime-lock`), false);
     } finally {
@@ -96,7 +96,7 @@ async function run() {
       runMigrationEngine(value.db, { logger: () => {} });
       const after = value.db.prepare('SELECT * FROM users WHERE email = ?').get('baseline@example.com');
       assert.deepStrictEqual(after, before);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 1);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
     } finally { closeFixture(value); }
   }
 
@@ -145,7 +145,7 @@ async function run() {
   {
     const value = fixture();
     try {
-      runMigrationEngine(value.db, { logger: () => {} });
+      runMigrationEngine(value.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       value.db.prepare(`UPDATE ${LEDGER_TABLE} SET checksum = ? WHERE version = 1`).run('0'.repeat(64));
       assertCode(() => inspectMigrationStatus(value.db), 'MIGRATION_CHECKSUM_MISMATCH');
       assert.notStrictEqual(migrationChecksum(BASELINE_MIGRATION), '0'.repeat(64));
@@ -180,13 +180,13 @@ async function run() {
   {
     const old = fixture();
     try {
-      runMigrationEngine(old.db, { logger: () => {} });
+      runMigrationEngine(old.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       assertCode(() => inspectMigrationStatus(old.db, { registry, minVersion: 2, maxVersion: 3 }), 'SCHEMA_VERSION_TOO_OLD');
     } finally { closeFixture(old); }
 
     const newer = fixture();
     try {
-      runMigrationEngine(newer.db, { registry: [BASELINE_MIGRATION, v2], minVersion: 1, maxVersion: 2, logger: () => {} });
+      runMigrationEngine(newer.db, { registry, minVersion: 1, maxVersion: 3, logger: () => {} });
       assertCode(() => inspectMigrationStatus(newer.db), 'SCHEMA_VERSION_TOO_NEW');
     } finally { closeFixture(newer); }
   }
@@ -204,7 +204,7 @@ async function run() {
   {
     const value = fixture();
     try {
-      runMigrationEngine(value.db, { logger: () => {} });
+      runMigrationEngine(value.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       let backups = 0;
       const events = [];
       await executeMigrationsWithProductionBackup(value.db, {
@@ -237,7 +237,7 @@ async function run() {
 
     const blocked = fixture();
     try {
-      runMigrationEngine(blocked.db, { logger: () => {} });
+      runMigrationEngine(blocked.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       await assert.rejects(() => executeMigrationsWithProductionBackup(blocked.db, {
         env: { NODE_ENV: 'production' }, registry: [BASELINE_MIGRATION, v2], minVersion: 1, maxVersion: 2,
         createBackup: async () => { throw Object.assign(new Error('private backup detail'), { code: 'BACKUP_FAILED' }); }
@@ -251,7 +251,7 @@ async function run() {
   {
     const value = fixture();
     try {
-      runMigrationEngine(value.db, { logger: () => {} });
+      runMigrationEngine(value.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       const { initDb } = require('../db/init');
       assertCode(() => initDb({
         db: value.db,
@@ -271,7 +271,7 @@ async function run() {
     const value = fixture();
     let releaseRuntime;
     try {
-      runMigrationEngine(value.db, { logger: () => {} });
+      runMigrationEngine(value.db, { registry: [BASELINE_MIGRATION], minVersion: 1, maxVersion: 1, logger: () => {} });
       const { acquireRuntimeLock } = require('../lib/databaseRuntimeLock');
       releaseRuntime = acquireRuntimeLock(value.databasePath);
       await executeMigrationsWithProductionBackup(value.db, {

@@ -223,6 +223,10 @@ async function run() {
   const server = await listen(app);
 
   try {
+    subscriptionStates.set('sub_checkout', makeStripeSubscription({
+      id: 'sub_checkout',
+      customer: 'cus_checkout'
+    }));
     const checkout = checkoutEvent({
       id: 'evt_checkout_once',
       created: 100,
@@ -279,6 +283,20 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(eventCount(db, 'evt_fail_then_retry'), 1);
     assert.strictEqual(getUser(db, 'fail@example.com').plan_tier, 'pro');
+
+    const beforeIncomplete = getUser(db, 'fail@example.com');
+    const incomplete = subscriptionEvent({
+      id: 'evt_incomplete_authority',
+      created: 175,
+      customer: 'cus_fail',
+      subscription: 'sub_fail'
+    });
+    incomplete.data.object.items = { data: [] };
+    response = await request(server, incomplete);
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.deepStrictEqual(getUser(db, 'fail@example.com'), beforeIncomplete,
+      'incomplete Stripe authority must not partially mutate entitlement');
+    assert.strictEqual(db.prepare('SELECT status FROM stripe_webhook_events WHERE event_id = ?').get('evt_incomplete_authority').status, 'invalid');
 
     response = await request(server, subscriptionEvent({
       id: 'evt_stale_active',

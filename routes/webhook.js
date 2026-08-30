@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { stripe, isBillingEnabled } = require('../lib/stripe');
 const { getDb } = require('../db/database');
-const { getPlanConfigFromPriceId, getSubscriptionSyncIssues, syncSubscriptionRecord } = require('../lib/subscriptions');
+const { syncSubscriptionRecord } = require('../lib/subscriptions');
+const { BillingPolicyError, evaluateStripeEntitlement } = require('../lib/billingEntitlement');
 
 function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
   let user = null;
@@ -21,10 +22,6 @@ function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
   }
 
   return user;
-}
-
-function warnSkippedSync(context, details) {
-  console.warn(`Skipping local subscription sync for ${context}: ${details.join(', ')}`);
 }
 
 function getEventCreated(event) {
@@ -97,8 +94,9 @@ function runWebhookTransaction(db, event, processEvent) {
   })();
 }
 
-function syncSubscriptionRecordForEvent(event, params) {
+function syncSubscriptionRecordForEvent(db, event, params) {
   return syncSubscriptionRecord({
+    db,
     ...params,
     latestStripeEventCreated: requireEventCreated(event),
     latestStripeEventId: event.id
@@ -107,10 +105,6 @@ function syncSubscriptionRecordForEvent(event, params) {
 
 function hasProcessedWebhookEvent(db, eventId) {
   return Boolean(db.prepare('SELECT event_id FROM stripe_webhook_events WHERE event_id = ?').get(eventId));
-}
-
-function getSubscriptionPriceId(subscription) {
-  return subscription?.items?.data?.[0]?.price?.id || null;
 }
 
 function isMissingStripeSubscriptionError(err) {
@@ -135,46 +129,48 @@ function shouldDowngradeForSubscriptionState(subscriptionState) {
   return !subscriptionState?.found || subscriptionState.subscription?.status === 'canceled';
 }
 
-function applySubscriptionRecord(db, event, user, subscription, context) {
-  const stripeCustomerId = subscription.customer;
-  const stripeSubscriptionId = subscription.id;
-  const priceId = getSubscriptionPriceId(subscription);
-  const { planTier, monthlyLimit } = getPlanConfigFromPriceId(priceId);
-
-  db.prepare(`
-    UPDATE users
-    SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ?
-    WHERE id = ?
-  `).run(planTier, monthlyLimit, stripeCustomerId, user.id);
-
-  const syncIssues = getSubscriptionSyncIssues({
-    stripeCustomerId,
-    stripeSubscriptionId,
-    status: subscription.status,
-    priceId,
-    currentPeriodStart: subscription.current_period_start,
-    currentPeriodEnd: subscription.current_period_end
-  });
-
-  if (syncIssues.length > 0) {
-    warnSkippedSync(context, syncIssues);
-    return;
+function existingPastDueSince(db, subscriptionId, status, event) {
+  if (status !== 'past_due') return null;
+  const existing = db.prepare(`
+    SELECT status, past_due_since FROM subscriptions WHERE stripe_subscription_id = ?
+  `).get(subscriptionId);
+  if (existing?.status === 'past_due' && existing.past_due_since) return existing.past_due_since;
+  const previousStatus = event?.data?.previous_attributes?.status;
+  if (typeof previousStatus === 'string' && previousStatus !== 'past_due') {
+    return new Date(requireEventCreated(event) * 1000).toISOString();
   }
+  return null;
+}
 
-  syncSubscriptionRecordForEvent(event, {
-    userId: user.id,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    status: subscription.status,
-    planTier,
-    priceId,
-    currentPeriodStart: subscription.current_period_start,
-    currentPeriodEnd: subscription.current_period_end,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    canceledAt: subscription.canceled_at,
-    endedAt: subscription.ended_at,
-    monthlyLimit
+function applyValidatedSubscription(db, event, user, subscription) {
+  const pastDueSince = existingPastDueSince(db, subscription?.id, subscription?.status, event);
+  const decision = evaluateStripeEntitlement(subscription, {
+    expectedCustomerId: user.stripe_customer_id || undefined,
+    expectedSubscriptionId: subscription?.id,
+    pastDueSince
   });
+  if (decision.issueCode) {
+    console.warn(JSON.stringify({ event: 'stripe_subscription_sync_issue', code: decision.issueCode }));
+  }
+  syncSubscriptionRecordForEvent(db, event, {
+    userId: user.id,
+    stripeCustomerId: decision.customerId,
+    stripeSubscriptionId: decision.id,
+    status: decision.status,
+    planTier: decision.plan.planTier,
+    priceId: decision.priceId,
+    currentPeriodStart: decision.currentPeriodStart,
+    currentPeriodEnd: decision.currentPeriodEnd,
+    cancelAtPeriodEnd: decision.cancelAtPeriodEnd,
+    canceledAt: decision.canceledAt,
+    endedAt: decision.endedAt,
+    monthlyLimit: decision.plan.monthlyLimit,
+    pastDueSince: decision.pastDueSince
+  });
+  db.prepare(`
+    UPDATE users SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ? WHERE id = ?
+  `).run(decision.planTier, decision.monthlyLimit, decision.customerId, user.id);
+  return decision;
 }
 
 function downgradeUserForSubscription(db, user, stripeCustomerId) {
@@ -201,8 +197,7 @@ function applyAuthoritativeSubscriptionState(db, event, {
   }
 
   if (currentSubscription && currentSubscription.status === 'canceled') {
-    applySubscriptionRecord(db, event, user, currentSubscription, context);
-    downgradeUserForSubscription(db, user, effectiveCustomerId);
+    applyValidatedSubscription(db, event, user, currentSubscription);
     return;
   }
 
@@ -211,7 +206,18 @@ function applyAuthoritativeSubscriptionState(db, event, {
     return;
   }
 
-  applySubscriptionRecord(db, event, user, currentSubscription, context);
+  applyValidatedSubscription(db, event, user, currentSubscription);
+}
+
+function safelyApplySubscription(db, event, user, subscription) {
+  try {
+    applyValidatedSubscription(db, event, user, subscription);
+    return { status: 'processed' };
+  } catch (error) {
+    if (!(error instanceof BillingPolicyError)) throw error;
+    console.warn(JSON.stringify({ event: 'stripe_subscription_sync_rejected', code: error.code }));
+    return { status: 'invalid' };
+  }
 }
 
 // Use express.raw() for webhook route to verify signature
@@ -247,7 +253,6 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
 
         const lineItems = await stripe.checkout.sessions.listLineItems(session.id);
         const priceId = lineItems.data[0]?.price?.id || null;
-        const { planTier, monthlyLimit } = getPlanConfigFromPriceId(priceId);
         let subscription = null;
 
         if (stripeSubscriptionId) {
@@ -259,47 +264,13 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
             return { status: 'stale' };
           }
 
-          db.prepare(`
-            UPDATE users
-            SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ?
-            WHERE email = ?
-          `).run(planTier, monthlyLimit, stripeCustomerId, customerEmail);
-
           const user = db.prepare('SELECT * FROM users WHERE email = ?').get(customerEmail);
-          if (user && stripeSubscriptionId) {
-            const syncIssues = getSubscriptionSyncIssues({
-              stripeCustomerId,
-              stripeSubscriptionId,
-              status: subscription?.status,
-              priceId,
-              currentPeriodStart: subscription?.current_period_start,
-              currentPeriodEnd: subscription?.current_period_end
-            });
-
-            if (syncIssues.length > 0) {
-              warnSkippedSync('checkout.session.completed', syncIssues);
-              return { status: 'processed' };
-            }
-
-            syncSubscriptionRecordForEvent(event, {
-              userId: user.id,
-              stripeCustomerId,
-              stripeSubscriptionId,
-              status: subscription.status,
-              planTier,
-              priceId,
-              currentPeriodStart: subscription.current_period_start,
-              currentPeriodEnd: subscription.current_period_end,
-              cancelAtPeriodEnd: subscription.cancel_at_period_end,
-              canceledAt: subscription.canceled_at,
-              endedAt: subscription.ended_at,
-              monthlyLimit
-            });
-          } else if (user && !stripeSubscriptionId) {
-            warnSkippedSync('checkout.session.completed', ['missing stripe_subscription_id']);
+          if (!user || !stripeSubscriptionId || !subscription || subscription.customer !== stripeCustomerId ||
+              subscription.items?.data?.[0]?.price?.id !== priceId) {
+            console.warn(JSON.stringify({ event: 'stripe_subscription_sync_rejected', code: 'STRIPE_RECORD_INCOMPLETE' }));
+            return { status: 'invalid' };
           }
-
-          return { status: 'processed' };
+          return safelyApplySubscription(db, event, user, subscription);
         });
         break;
       }
@@ -340,8 +311,7 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
             return { status: 'processed' };
           }
 
-          applySubscriptionRecord(db, event, user, subscriptionEvent, 'customer.subscription.updated');
-          return { status: 'processed' };
+          return safelyApplySubscription(db, event, user, subscriptionEvent);
         });
         break;
       }
@@ -382,12 +352,10 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
             return { status: 'processed' };
           }
 
-          applySubscriptionRecord(db, event, user, {
+          return safelyApplySubscription(db, event, user, {
             ...subscription,
             status: subscription.status || 'canceled'
-          }, 'customer.subscription.deleted');
-          downgradeUserForSubscription(db, user, stripeCustomerId);
-          return { status: 'processed' };
+          });
         });
         break;
       }

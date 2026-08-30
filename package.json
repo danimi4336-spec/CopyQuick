@@ -15,7 +15,9 @@
     "restore:database": "node scripts/restore-database.js",
     "migrations:status": "node scripts/migration-status.js",
     "migrations:check": "node scripts/migration-check.js",
-    "migrate:database": "node scripts/migrate-database.js"
+    "migrate:database": "node scripts/migrate-database.js",
+    "billing:status": "node scripts/billing-status.js",
+    "billing:reconcile": "node scripts/reconcile-billing.js"
   },
   "keywords": [],
   "author": "",

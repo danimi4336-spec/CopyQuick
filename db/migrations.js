@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 1;
+const MAX_SUPPORTED_SCHEMA_VERSION = 2;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -34,7 +34,58 @@ const BASELINE_MIGRATION = Object.freeze({
   statements: Object.freeze([BASELINE_SCHEMA_SQL])
 });
 
-const MIGRATIONS = Object.freeze([BASELINE_MIGRATION]);
+const BILLING_RECONCILIATION_MIGRATION = Object.freeze({
+  version: 2,
+  name: 'billing_reconciliation_state',
+  kind: 'migration',
+  policy: 'additive',
+  // The physical change is additive, but the v1 application deliberately
+  // rejects an unknown v2 ledger entry. Code rollback therefore requires a
+  // v2-aware application build; it is not declared compatible with v1.
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    'ALTER TABLE subscriptions ADD COLUMN past_due_since TEXT',
+    `CREATE TABLE billing_reconciliation_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mode TEXT NOT NULL CHECK(mode IN ('dry_run', 'apply')),
+      status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed')),
+      started_at TEXT NOT NULL,
+      completed_at TEXT,
+      inspected_count INTEGER NOT NULL DEFAULT 0,
+      drift_count INTEGER NOT NULL DEFAULT 0,
+      repaired_count INTEGER NOT NULL DEFAULT 0,
+      unresolved_count INTEGER NOT NULL DEFAULT 0,
+      failure_code TEXT,
+      duration_ms INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE billing_reconciliation_issues (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reconciliation_run_id INTEGER NOT NULL REFERENCES billing_reconciliation_runs(id),
+      issue_type TEXT NOT NULL,
+      user_reference TEXT,
+      subscription_reference TEXT,
+      desired_entitlement TEXT,
+      resolution_status TEXT NOT NULL CHECK(resolution_status IN ('detected', 'repaired', 'unresolved')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'CREATE INDEX idx_billing_reconciliation_runs_started ON billing_reconciliation_runs(started_at DESC)',
+    'CREATE INDEX idx_billing_reconciliation_issues_run ON billing_reconciliation_issues(reconciliation_run_id, resolution_status)'
+  ]),
+  validate(db) {
+    const requiredTables = ['billing_reconciliation_runs', 'billing_reconciliation_issues'];
+    for (const table of requiredTables) {
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) {
+        throw new MigrationError('Billing reconciliation migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+      }
+    }
+    if (!db.pragma('table_info(subscriptions)').some(column => column.name === 'past_due_since')) {
+      throw new MigrationError('Billing reconciliation migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
+const MIGRATIONS = Object.freeze([BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION]);
 
 function migrationChecksum(migration) {
   const material = JSON.stringify({
@@ -422,6 +473,7 @@ async function executeMigrationsWithProductionBackup(db, options = {}) {
 
 module.exports = {
   BASELINE_MIGRATION,
+  BILLING_RECONCILIATION_MIGRATION,
   LEDGER_SQL,
   LEDGER_TABLE,
   MAX_SUPPORTED_SCHEMA_VERSION,
