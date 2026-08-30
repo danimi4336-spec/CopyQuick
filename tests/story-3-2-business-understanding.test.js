@@ -106,6 +106,59 @@ async function run() {
   });
   assert(withUnsureChannel.unknowns.includes('salesChannel'));
 
+  for (const [conceptMaturity, launchStage, label] of [
+    ['idea_only', 'idea', 'Idea or early concept'],
+    ['direction_no_formula', 'idea', 'Idea or early concept'],
+    ['in_development', 'development', 'In development']
+  ]) {
+    const derived = await understandBusiness({
+      objective: 'launch_product',
+      answer: 'An herbal supplement',
+      existingUnderstanding: {
+        conceptMaturity: { value: conceptMaturity, label: conceptMaturity, confidence: 1, source: 'user_confirmed' }
+      }
+    });
+    assert.strictEqual(derived.understanding.launchStage.value, launchStage);
+    assert.strictEqual(derived.understanding.launchStage.label, label);
+    assert.strictEqual(derived.understanding.launchStage.source, 'inference');
+    assert(derived.understanding.launchStage.confidence > 0.7);
+    assert(!derived.unknowns.includes('launchStage'));
+  }
+
+  for (const conceptMaturity of ['formula_in_mind', 'finalized', 'unsure', 'A custom maturity description']) {
+    const notDerived = await understandBusiness({
+      objective: 'launch_product',
+      answer: 'An herbal supplement',
+      existingUnderstanding: {
+        conceptMaturity: { value: conceptMaturity, label: conceptMaturity, confidence: 1, source: 'user_confirmed' }
+      }
+    });
+    assert.strictEqual(notDerived.understanding.launchStage, undefined);
+    assert(notDerived.unknowns.includes('launchStage'));
+  }
+
+  const explicitSelling = await understandBusiness({
+    objective: 'launch_product',
+    answer: 'An herbal supplement',
+    existingUnderstanding: {
+      conceptMaturity: { value: 'idea_only', label: 'Product idea only', confidence: 1, source: 'user_confirmed' },
+      launchStage: { value: 'selling', label: 'Already selling', confidence: 1, source: 'user_confirmed' }
+    }
+  });
+  assert.deepStrictEqual(explicitSelling.understanding.launchStage, {
+    value: 'selling', label: 'Already selling', confidence: 1, source: 'user_confirmed'
+  });
+
+  const settledExisting = await understandBusiness({
+    objective: 'launch_product',
+    answer: 'An herbal supplement',
+    existingUnderstanding: {
+      conceptMaturity: { value: 'idea_only', label: 'Product idea only', confidence: 1, source: 'user_confirmed' },
+      launchStage: { value: 'development', label: 'In development', confidence: 0.85, source: 'inference' }
+    }
+  });
+  assert.strictEqual(settledExisting.understanding.launchStage.value, 'development');
+
   console.log('Story 3.2 Business Understanding Engine tests passed');
 }
 

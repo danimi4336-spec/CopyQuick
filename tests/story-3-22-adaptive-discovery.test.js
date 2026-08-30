@@ -4,8 +4,11 @@ const http = require('http');
 const path = require('path');
 const session = require('express-session');
 const { createCsrfProtection } = require('../lib/csrf');
+const { understandBusiness } = require('../lib/businessUnderstanding');
+const { buildBusinessReflection } = require('../lib/businessReflection');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { validateApprovedProductionSession } = require('../lib/productionInitialization');
+const { buildStrategy } = require('../lib/strategyEngine');
 const discoveryRoutes = require('../routes/discovery');
 
 function listen(app) {
@@ -77,6 +80,75 @@ async function run() {
   assert.strictEqual(inferredOnly.nextQuestion.id, 'supplement_intended_outcome');
   assert.strictEqual(inferredOnly.planningReadiness.ready, false);
 
+  function known(value, label = value) {
+    return { value, label, confidence: 1, source: 'user_confirmed' };
+  }
+
+  const establishedSupplement = {
+    businessType: known('physical_product', 'Physical Product'),
+    category: known('dietary_supplement', 'Dietary Supplement'),
+    intendedOutcome: known('digestive_wellness', 'Digestive health'),
+    targetAudience: known('adults', 'Adults'),
+    salesChannel: known('amazon', 'Amazon'),
+    competitiveDifferentiation: known('unsure', "I'm not sure yet")
+  };
+  for (const conceptMaturity of ['formula_in_mind', 'finalized']) {
+    const ambiguous = analyzeDiscovery({
+      objective: 'launch_product',
+      understanding: { ...establishedSupplement, conceptMaturity: known(conceptMaturity) },
+      answers: {}
+    });
+    assert.strictEqual(ambiguous.nextQuestion.id, 'supplement_launch_stage');
+    assert.strictEqual(ambiguous.nextQuestion.prompt, 'Where are you in the launch process?');
+    assert.strictEqual(
+      ambiguous.nextQuestion.explanation,
+      'This is about preparing to sell the product, separate from how far the product or formula has been developed.'
+    );
+  }
+
+  const nonSupplement = analyzeDiscovery({
+    objective: 'launch_product',
+    understanding: {
+      businessType: known('physical_product', 'Physical Product'),
+      customerMotivation: known('solve_problem', 'It solves a clear problem'),
+      targetAudience: known('consumers', 'Individual consumers'),
+      salesChannel: known('amazon', 'Amazon')
+    },
+    answers: {}
+  });
+  assert.strictEqual(nonSupplement.nextQuestion.id, 'launch_stage');
+  assert.strictEqual(nonSupplement.nextQuestion.prompt, 'What stage is the product in today?');
+
+  for (const [maturity, expectedStage, expectedApproach] of [
+    ['idea_only', 'idea', 'Validate Demand Before Scaling'],
+    ['in_development', 'development', 'Build Proof and Audience Before Release']
+  ]) {
+    const derived = await understandBusiness({
+      objective: 'launch_product',
+      answer: 'An herbal supplement for adults sold on Amazon',
+      existingUnderstanding: {
+        intendedOutcome: known('digestive_wellness', 'Digestive health'),
+        conceptMaturity: known(maturity),
+        targetAudience: known('adults', 'Adults')
+      }
+    });
+    assert.strictEqual(derived.understanding.launchStage.value, expectedStage);
+    const strategy = buildStrategy({
+      objective: 'launch_product',
+      understanding: derived.understanding,
+      answers: { initial_description: 'An herbal supplement for adults sold on Amazon' }
+    });
+    assert.strictEqual(strategy.strategy.launchApproach.value, expectedApproach);
+    const reflection = buildBusinessReflection({
+      answers: {}, understanding: derived.understanding, planningReadiness: {}
+    });
+    const launchField = reflection.groups
+      .flatMap((group) => group.fields)
+      .find((field) => field.key === 'launchStage');
+    assert.strictEqual(launchField.value, derived.understanding.launchStage.label);
+    assert.notStrictEqual(launchField.confidenceMessage, 'You confirmed this.');
+  }
+
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
@@ -126,9 +198,11 @@ async function run() {
     await answerCurrent(blocked, 'idea_only');
     assert.strictEqual((await sessionState(blocked)).nextQuestion.id, 'target_audience');
     await answerCurrent(blocked, 'consumers');
-    assert.strictEqual((await sessionState(blocked)).nextQuestion.id, 'launch_stage');
-    await answerCurrent(blocked, 'idea');
-    assert.strictEqual((await sessionState(blocked)).nextQuestion.id, 'sales_channel');
+    state = await sessionState(blocked);
+    assert.strictEqual(state.understanding.launchStage.value, 'idea');
+    assert.strictEqual(state.understanding.launchStage.label, 'Idea or early concept');
+    assert.strictEqual(state.understanding.launchStage.source, 'inference');
+    assert.strictEqual(state.nextQuestion.id, 'sales_channel');
     const completed = await answerCurrent(blocked, 'amazon');
     assert.strictEqual(completed.res.headers.location, '/discovery/reflection');
     state = await sessionState(blocked);
@@ -141,6 +215,10 @@ async function run() {
     const reflection = await request(blocked, 'GET', '/discovery/reflection');
     assert.strictEqual(reflection.res.statusCode, 200);
     assert.match(reflection.body, /Intended Customer Outcome/);
+    assert.match(reflection.body, /Concept \/ Formulation Stage/);
+    assert.match(reflection.body, /Launch Stage/);
+    assert.match(reflection.body, /Idea or early concept/);
+    assert.match(reflection.body, /I’m highly confident in this understanding\./);
     assert.match(reflection.body, /important decision is still open/);
     assert.doesNotMatch(reflection.body, /We know enough to build a useful strategy/);
     assert.match(reflection.body, /disabled aria-disabled="true"/);
@@ -174,7 +252,6 @@ async function run() {
     assert.strictEqual(state.nextQuestion.id, 'supplement_concept_maturity');
     await answerCurrent(ready, 'direction_no_formula');
     await answerCurrent(ready, 'consumers');
-    await answerCurrent(ready, 'idea');
     await answerCurrent(ready, 'amazon');
     state = await sessionState(ready);
     assert.strictEqual(state.nextQuestion.id, 'competitive_differentiation');
@@ -182,6 +259,7 @@ async function run() {
     assert.strictEqual(readyRedirect.res.headers.location, '/discovery/reflection');
     state = await sessionState(ready);
     assert.strictEqual(state.planningReadiness.ready, true, 'nonessential differentiation uncertainty must not block planning');
+    assert(state.planningReadiness.knownRequirements.includes('launch_stage'));
     assert(state.planningReadiness.unresolvedNonBlockingRequirements.some((item) => item.id === 'competitive_context'));
     assert.strictEqual(state.understanding.ingredients, undefined);
     assert.strictEqual(state.understanding.claimsEvidence, undefined);
