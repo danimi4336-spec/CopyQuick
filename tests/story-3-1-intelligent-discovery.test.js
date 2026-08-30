@@ -150,6 +150,35 @@ async function run() {
     assert.strictEqual(emptyOther.res.statusCode, 400);
     assert.match(emptyOther.body, /Tell us a little more about your/);
 
+    const unsureSubmission = await request(authenticated, 'POST', '/discovery', {
+      _csrf: targetToken,
+      questionId: 'customer_motivation',
+      choice: 'unsure'
+    });
+    assert.strictEqual(unsureSubmission.res.statusCode, 303);
+    assert.strictEqual(unsureSubmission.res.headers.location, '/discovery');
+    const afterUnsure = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
+    assert.strictEqual(afterUnsure.answers.customer_motivation, 'unsure');
+    assert.strictEqual(afterUnsure.understanding.customerMotivation.value, 'unsure');
+    assert(afterUnsure.completedQuestions.includes('customer_motivation'));
+    assert.notStrictEqual(afterUnsure.nextQuestion.id, 'customer_motivation');
+    assert.strictEqual(afterUnsure.nextQuestion.id, 'sales_channel');
+    assert(afterUnsure.remainingKnowledgeGaps.includes('Value Proposition'));
+
+    const salesPage = await request(authenticated, 'GET', '/discovery');
+    const salesToken = salesPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const validOther = await request(authenticated, 'POST', '/discovery', {
+      _csrf: salesToken,
+      questionId: 'sales_channel',
+      choice: 'other',
+      otherAnswer: 'Independent wellness stores'
+    });
+    assert.strictEqual(validOther.res.statusCode, 303);
+    const afterOther = JSON.parse((await request(authenticated, 'GET', '/test/session')).body);
+    assert.deepStrictEqual(afterOther.answers.sales_channel, { value: 'other', detail: 'Independent wellness stores' });
+    assert.strictEqual(afterOther.understanding.salesChannel.value, 'Independent wellness stores');
+    assert.notStrictEqual(afterOther.nextQuestion.id, 'sales_channel');
+
     console.log('Story 3.1 Intelligent Discovery tests passed');
   } finally {
     server.close();

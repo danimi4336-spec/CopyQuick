@@ -212,12 +212,14 @@ async function run() {
     });
     assert.strictEqual(madeUncertain.res.statusCode, 303);
 
-    const blockedPage = await request(authenticated, 'GET', '/discovery/reflection');
-    assert.match(blockedPage.body, /A few essentials still need attention\./);
-    assert.match(blockedPage.body, /disabled aria-disabled="true"/);
-    const blockedToken = blockedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
-    const blockedPlan = await request(authenticated, 'POST', '/discovery/reflection/plan', { _csrf: blockedToken });
-    assert.strictEqual(blockedPlan.res.statusCode, 409);
+    const unresolvedPage = await request(authenticated, 'GET', '/discovery/reflection');
+    assert.match(unresolvedPage.body, /I&#39;m not sure yet/);
+    assert.match(unresolvedPage.body, /remains unresolved and can be refined later/);
+    assert.match(unresolvedPage.body, /Unresolved areas will remain clearly marked instead of being guessed/);
+    assert.doesNotMatch(unresolvedPage.body, /disabled aria-disabled="true"/);
+    const unresolvedToken = unresolvedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const unresolvedPlan = await request(authenticated, 'POST', '/discovery/reflection/plan', { _csrf: unresolvedToken });
+    assert.strictEqual(unresolvedPlan.res.statusCode, 303);
 
     console.log('Story 3.4 Business Reflection tests passed');
   } finally {

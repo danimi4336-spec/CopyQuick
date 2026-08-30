@@ -43,7 +43,7 @@
                 <% if (understandingSummary.length) { %>
                     <ul class="discovery-understanding-list" aria-label="Business understanding">
                         <% understandingSummary.forEach(function(field) { %>
-                            <li><span aria-hidden="true">✓</span><%= field.label %></li>
+                            <li><span aria-hidden="true"><%= field.value === 'unsure' ? '?' : '✓' %></span><%= field.label %></li>
                         <% }); %>
                     </ul>
                 <% } else { %>

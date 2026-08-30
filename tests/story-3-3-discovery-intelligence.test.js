@@ -130,7 +130,52 @@ async function run() {
     answers: { target_audience: 'unsure' }
   });
   assert(answeredUnknown.remainingKnowledgeGaps.includes('Customer'));
-  assert.strictEqual(answeredUnknown.nextQuestion.id, 'target_audience');
+  assert.notStrictEqual(answeredUnknown.nextQuestion?.id, 'target_audience');
+  assert(answeredUnknown.planningReadiness.unresolvedRequiredDomains.includes('Customer'));
+
+  const requiredUncertaintyCases = [
+    ['business_type', 'businessType', 'Product'],
+    ['target_audience', 'targetAudience', 'Customer'],
+    ['customer_motivation', 'customerMotivation', 'Value Proposition'],
+    ['sales_channel', 'salesChannel', 'Sales Channel'],
+    ['competitive_differentiation', 'competitiveDifferentiation', 'Competitive Positioning'],
+    ['launch_stage', 'launchStage', 'Launch Stage']
+  ];
+  requiredUncertaintyCases.forEach(function([questionId, field, domain]) {
+    const understanding = completeUnderstanding();
+    understanding[field] = known('unsure', "I'm not sure yet");
+    const result = analyzeDiscovery({
+      objective: 'launch_product',
+      understanding,
+      unknowns: [field],
+      answers: { [questionId]: 'unsure' }
+    });
+    assert.notStrictEqual(result.nextQuestion?.id, questionId, `${questionId} must not repeat`);
+    assert(result.remainingKnowledgeGaps.includes(domain));
+    assert(result.planningReadiness.unresolvedRequiredDomains.includes(domain));
+  });
+
+  const allRequiredUncertain = analyzeDiscovery({
+    objective: 'launch_product',
+    understanding: Object.fromEntries(requiredUncertaintyCases.map(function([, field]) {
+      return [field, known('unsure', "I'm not sure yet")];
+    })),
+    unknowns: requiredUncertaintyCases.map(function([, field]) { return field; }),
+    answers: Object.fromEntries(requiredUncertaintyCases.map(function([questionId]) { return [questionId, 'unsure']; }))
+  });
+  assert.strictEqual(allRequiredUncertain.nextQuestion, null);
+  assert.strictEqual(allRequiredUncertain.planningReadiness.ready, true);
+  assert.deepStrictEqual(allRequiredUncertain.planningReadiness.unsatisfiedRequiredDomains, []);
+  assert.strictEqual(allRequiredUncertain.planningReadiness.unresolvedRequiredDomains.length, 6);
+
+  const otherAnswer = analyzeDiscovery({
+    objective: 'launch_product',
+    understanding: { ...completeUnderstanding(), customerMotivation: known('reduce daily friction', 'Reduce daily friction') },
+    unknowns: [],
+    answers: { customer_motivation: { value: 'other', detail: 'Reduce daily friction' } }
+  });
+  assert.notStrictEqual(otherAnswer.nextQuestion?.id, 'customer_motivation');
+  assert(!otherAnswer.remainingKnowledgeGaps.includes('Value Proposition'));
 
   const app = express();
   app.set('view engine', 'ejs');

@@ -57,7 +57,11 @@
             <% if (planningReadiness.ready) { %>
                 <div>
                     <h2>Your business foundation is ready.</h2>
-                    <p>The required areas are understood well enough to begin personalized planning.</p>
+                    <% if (planningReadiness.unresolvedRequiredDomains && planningReadiness.unresolvedRequiredDomains.length) { %>
+                        <p>You answered every essential question. Unresolved areas will remain clearly marked instead of being guessed: <%= planningReadiness.unresolvedRequiredDomains.join(', ') %>.</p>
+                    <% } else { %>
+                        <p>The required areas are understood well enough to begin personalized planning.</p>
+                    <% } %>
                 </div>
             <% } else { %>
                 <div>
