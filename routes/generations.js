@@ -5,6 +5,8 @@ const { requireAuth } = require('./auth');
 const generator = require('../lib/generator');
 const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
+const { getProductionContract } = require('../lib/productionContracts');
+const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 const {
@@ -650,13 +652,32 @@ router.get('/generation/:id', requireAuth, (req, res) => {
   if (!gen) return res.status(404).render('error', { title: 'Not Found - CopyQuick', message: 'Generation not found.' });
 
   const results = JSON.parse(gen.results);
+  let productionDeliverable = null;
+  if (gen.generation_type === 'production' && gen.production_job_id) {
+    const production = db.prepare(`
+      SELECT production_runs.id AS run_id, production_jobs.title AS job_title
+      FROM production_jobs JOIN production_runs ON production_runs.id = production_jobs.production_run_id
+      WHERE production_jobs.id = ? AND production_jobs.generation_id = ? AND production_runs.user_id = ?
+    `).get(gen.production_job_id, gen.id, userId);
+    const contract = getProductionContract(gen.deliverable_id);
+    let output = null;
+    try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
+    const quality = validateCustomerReadyOutput(output, contract);
+    productionDeliverable = {
+      runId: production?.run_id || null,
+      title: production?.job_title || gen.title,
+      customerReady: quality.valid,
+      sections: quality.valid ? contract.presentationSections(output) : []
+    };
+  }
 
   res.render('generation', {
     title: `${gen.title || 'Generation'} - CopyQuick`,
     gen,
     results,
     contentTypes: getContentTypes(),
-    currentPage: 'history'
+    currentPage: 'history',
+    productionDeliverable
   });
 });
 
@@ -668,7 +689,6 @@ router.post('/generation/:id/favorite', requireAuth, (req, res) => {
 
   const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
   if (!gen) return res.status(404).json({ error: 'Not found' });
-
   const newVal = gen.favorite ? 0 : 1;
   db.prepare('UPDATE generations SET favorite = ? WHERE id = ? AND user_id = ? AND is_deleted = 0').run(newVal, genId, userId);
 
@@ -723,6 +743,7 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
 
   const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
   if (!gen) return res.status(404).json({ error: 'Not found' });
+  if (gen.generation_type === 'production') return res.status(409).json({ error: 'Production deliverables are regenerated through Production Studio.' });
 
   const user = res.locals.user;
   const usageSnapshot = getCurrentUsageSnapshot(db, user);
@@ -786,6 +807,19 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
 
   const results = JSON.parse(gen.results);
   let content = '';
+  if (gen.generation_type === 'production') {
+    const contract = getProductionContract(gen.deliverable_id);
+    let output = null;
+    try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
+    if (!validateCustomerReadyOutput(output, contract).valid) return res.status(409).send('This deliverable needs review before export.');
+    const sections = contract.presentationSections(output);
+    if (format === 'txt') content = sections.map(section => `${section.label}\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
+    else if (format === 'md') content = `# ${gen.title}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
+    else return res.status(400).send('Unsupported format');
+    res.setHeader('Content-Type', format === 'md' ? 'text/markdown' : 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="copyquick-deliverable-${gen.id}.${format}"`);
+    return res.send(content);
+  }
 
   if (format === 'txt') {
     content = results.map((r, i) => `--- Variation ${i + 1} (${r.tone}) ---\n${r.text}`).join('\n\n');

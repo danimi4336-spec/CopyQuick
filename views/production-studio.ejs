@@ -28,10 +28,10 @@
                                 <div>
                                     <h3><%= job.title %></h3>
                                     <p><%= job.strategic_direction %></p>
-                                    <% if (job.dependencies.length) { %><small>Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
+                                    <% if (job.status === 'waiting_dependency' && job.dependencies.length) { %><small class="production-dependency-state">Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
                                     <% if (job.error_message) { %><small class="production-job-error"><%= job.error_message %></small><% } %>
                                     <% if (job.status === 'recovery_required') { %><small class="production-job-recovery">CopyQuick will not regenerate this item until its prior attempt can be verified safely.</small><% } %>
-                                    <% if (job.status === 'completed' && job.generation_id) { %><a class="production-result-link" href="/generation/<%= job.generation_id %>">View result</a><% } %>
+                                    <span class="production-result-actions"><% if (job.status === 'completed' && job.generation_id) { %><a class="production-result-link" href="/generation/<%= job.generation_id %>">View Deliverable →</a><% } %></span>
                                 </div>
                                 <span class="production-job-status status-<%= job.status %>"><%= job.status.replace(/_/g, ' ') %></span>
                             </li>
@@ -75,6 +75,21 @@
                 var status = row.querySelector('.production-job-status');
                 status.className = 'production-job-status status-' + job.status;
                 status.textContent = label(job.status);
+                var dependencyState = row.querySelector('.production-dependency-state');
+                if (job.status !== 'waiting_dependency' && dependencyState) dependencyState.remove();
+                var actions = row.querySelector('.production-result-actions');
+                var resultLink = actions && actions.querySelector('.production-result-link');
+                if (job.resultUrl && actions) {
+                    if (!resultLink) {
+                        resultLink = document.createElement('a');
+                        resultLink.className = 'production-result-link';
+                        actions.appendChild(resultLink);
+                    }
+                    resultLink.href = job.resultUrl;
+                    resultLink.textContent = 'View Deliverable →';
+                } else if (resultLink) {
+                    resultLink.remove();
+                }
             });
             if (!terminal.includes(state.runStatus)) window.setTimeout(refreshProduction, 3000);
         } catch (err) {

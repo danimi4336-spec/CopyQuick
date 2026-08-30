@@ -2,7 +2,7 @@
     <nav class="breadcrumb fade-in">
         <a href="/dashboard">Dashboard</a>
         <span>/</span>
-        <a href="/history">History</a>
+        <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>">Production Plan</a><% } else { %><a href="/history">History</a><% } %>
         <span>/</span>
         <span><%= gen.title || gen.input_text.substring(0, 30) %></span>
     </nav>
@@ -14,20 +14,32 @@
                 <h1 class="gen-detail-title" id="genTitle"><%= gen.title || gen.input_text.substring(0, 50) %></h1>
                 <div class="gen-detail-actions-top">
                     <button class="icon-btn <%= gen.favorite ? 'active' : '' %>" id="favBtn" onclick="toggleFav()" title="Favorite">⭐</button>
-                    <button class="icon-btn" onclick="deleteGen()" title="Delete">🗑️</button>
+                    <% if (!productionDeliverable) { %><button class="icon-btn" onclick="deleteGen()" title="Delete">🗑️</button><% } %>
                 </div>
             </div>
 
-            <!-- Prompt -->
+            <% if (!productionDeliverable) { %>
             <div class="detail-card">
                 <h3>Prompt</h3>
                 <p class="detail-prompt"><%= gen.input_text %></p>
             </div>
+            <% } %>
 
             <!-- Results -->
             <div class="detail-card">
-                <h3>Generated Content</h3>
+                <h3><%= productionDeliverable ? 'Production Deliverable' : 'Generated Content' %></h3>
                 <div class="detail-results">
+                    <% if (productionDeliverable && !productionDeliverable.customerReady) { %>
+                        <div class="alert" role="status">This historical deliverable needs a safe quality review before it can be shown.</div>
+                    <% } else if (productionDeliverable) { %>
+                        <% productionDeliverable.sections.forEach(function(section, i) { %>
+                            <section class="production-deliverable-section">
+                                <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
+                                <% if (section.isList) { %><ul class="result-text" id="deliverable-<%= i %>"><% section.value.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
+                                <% } else { %><p class="result-text" id="deliverable-<%= i %>"><%= section.value %></p><% } %>
+                            </section>
+                        <% }); %>
+                    <% } else { %>
                     <% var resultsList = typeof results === 'string' ? JSON.parse(results) : results; %>
                     <% if (resultsList && resultsList.length) { %>
                         <% resultsList.forEach(function(r, i) { %>
@@ -40,15 +52,17 @@
                             </div>
                         <% }); %>
                     <% } %>
+                    <% } %>
                 </div>
             </div>
 
             <!-- Actions -->
             <div class="detail-actions-card">
-                <button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button>
+                <% if (!productionDeliverable) { %><button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button><% } %>
+                <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>" class="btn btn-primary">← Back to Production Plan</a><% } %>
                 <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
                 <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
-                <button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button>
+                <% if (!productionDeliverable || productionDeliverable.customerReady) { %><button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button><% } %>
             </div>
         </div>
 

@@ -182,10 +182,11 @@ async function run() {
   assert.strictEqual(second.outcome, 'completed');
   assert.strictEqual(second.dependencyOutputs.length, 1);
   assert.deepStrictEqual(second.dependencyOutputs[0].result, JSON.parse(firstGeneration.results));
-  assert.match(calls[1].productDescription, /Completed prerequisite outputs/);
-  assert.match(calls[1].productDescription, /Persisted output 1/);
-  assert.match(calls[1].productDescription, /Strategic direction:/);
-  assert.match(calls[1].productDescription, /Approved strategy:/);
+  assert.match(calls[1].productDescription, /Customer Profile:/);
+  assert.doesNotMatch(calls[1].productDescription, /Completed prerequisite outputs|\{"/);
+  assert.match(calls[1].productDescription, /Primary Customer:/);
+  assert.match(calls[1].productDescription, /Purpose:/);
+  assert.match(calls[1].productDescription, /Approved source context:/);
   assert(calls[1].targetAudience);
 
   const secondJob = db.prepare('SELECT * FROM production_jobs WHERE id = ?').get(second.jobId);
@@ -295,7 +296,7 @@ async function run() {
     assert.strictEqual(executed.res.headers.location, `/production/${routeRunId}`);
     const studioAfter = await request(owner, 'GET', `/production/${routeRunId}`);
     assert.match(studioAfter.body, /1 of \d+ completed/);
-    assert.match(studioAfter.body, /View result/);
+    assert.match(studioAfter.body, /View Deliverable/);
     assert.match(studioAfter.body, /completed/);
   } finally {
     server.close();
