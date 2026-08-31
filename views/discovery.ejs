@@ -62,12 +62,24 @@
                             <div class="discovery-choice-grid">
                                 <% nextQuestion.options.forEach(function(option) { %>
                                     <label class="discovery-choice">
-                                        <input type="radio" name="choice" value="<%= option.value %>" <%= selectedChoice === option.value ? 'checked' : '' %> required>
+                                        <% if (nextQuestion.type === 'multi_choice') { %>
+                                            <input type="checkbox" name="choices" value="<%= option.value %>" <%= selectedChoices.includes(option.value) ? 'checked' : '' %>>
+                                        <% } else { %>
+                                            <input type="radio" name="choice" value="<%= option.value %>" <%= selectedChoice === option.value ? 'checked' : '' %> required>
+                                        <% } %>
                                         <span><%= option.label %></span>
                                     </label>
                                 <% }); %>
                             </div>
                         </fieldset>
+
+                        <% if (nextQuestion.allowsAdditionalDetail) { %>
+                            <div class="form-group">
+                                <label for="additionalDetail">Anything else you want this product to have or do?</label>
+                                <p class="discovery-additional-detail-helper">Tell us about ingredients, format, special characteristics, or anything else you have in mind.</p>
+                                <textarea id="additionalDetail" name="additionalDetail" rows="3" maxlength="2000" placeholder="Tell us anything else you want CopyQuick to explore."><%= additionalDetail %></textarea>
+                            </div>
+                        <% } %>
 
                         <div class="form-group discovery-other-field <%= selectedChoice === 'other' ? 'visible' : '' %>" id="discoveryOtherField">
                             <label for="otherAnswer">Tell us more</label>
@@ -119,5 +131,18 @@
   }
   choices.forEach(function(choice){ choice.addEventListener('change', updateOtherField); });
   updateOtherField();
+
+  var multiChoices = document.querySelectorAll('input[name="choices"]');
+  multiChoices.forEach(function(choice) {
+    choice.addEventListener('change', function() {
+      if (!choice.checked) return;
+      if (choice.value === 'unsure') {
+        multiChoices.forEach(function(other) { if (other !== choice) other.checked = false; });
+      } else {
+        var unsure = document.querySelector('input[name="choices"][value="unsure"]');
+        if (unsure) unsure.checked = false;
+      }
+    });
+  });
 })();
 </script>

@@ -14,10 +14,24 @@
                 <section class="reflection-group" aria-labelledby="reflection-domain-<%= group.domain.replace(/\s+/g, '-').toLowerCase() %>">
                     <div class="reflection-group-header">
                         <h2 id="reflection-domain-<%= group.domain.replace(/\s+/g, '-').toLowerCase() %>"><%= group.domain %></h2>
-                        <span><%= group.required ? 'Planning essential' : 'Optional context' %></span>
+                        <span><%= group.statusLabel %></span>
                     </div>
                     <div class="reflection-fields">
                         <% group.fields.forEach(function(field) { %>
+                            <% if (field.editable === false) { %>
+                            <div class="reflection-field">
+                                <span class="reflection-field-copy">
+                                    <span class="reflection-field-label"><%= field.label %></span>
+                                    <% if (field.values && field.values.length) { %>
+                                        <ul><% field.values.forEach(function(value) { %><li><%= value %></li><% }); %></ul>
+                                    <% } else { %>
+                                        <strong><%= field.value %></strong>
+                                    <% } %>
+                                    <% if (field.additionalDetail) { %><span><strong>Additional idea:</strong> <%= field.additionalDetail %></span><% } %>
+                                    <% if (field.semanticNote) { %><small><%= field.semanticNote %></small><% } %>
+                                </span>
+                            </div>
+                            <% } else { %>
                             <details class="reflection-field">
                                 <summary>
                                     <span class="reflection-field-copy">
@@ -37,6 +51,7 @@
                                     </div>
                                 </form>
                             </details>
+                            <% } %>
                         <% }); %>
                     </div>
                 </section>

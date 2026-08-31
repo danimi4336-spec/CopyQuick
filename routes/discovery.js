@@ -43,7 +43,9 @@ function renderDiscovery(req, res, options = {}) {
     currentPage: 'discovery',
     answer: options.answer ?? getInitialAnswer(req),
     selectedChoice: options.selectedChoice || '',
+    selectedChoices: options.selectedChoices || [],
     otherAnswer: options.otherAnswer || '',
+    additionalDetail: options.additionalDetail || '',
     error: options.error || null,
     examplePrompts: EXAMPLE_PROMPTS,
     discoverySession,
@@ -211,6 +213,80 @@ router.post('/discovery', requireAuth, async (req, res) => {
   const currentQuestion = discoverySession?.nextQuestion;
   if (!currentQuestion || currentQuestion.id !== questionId) {
     return validationError(req, res, 'That discovery question is no longer active. Please answer the question shown below.');
+  }
+
+  if (currentQuestion.type === 'multi_choice') {
+    const submitted = Array.isArray(req.body.choices)
+      ? req.body.choices
+      : typeof req.body.choices === 'string' ? [req.body.choices] : [];
+    const submittedSet = new Set(submitted);
+    const selectedOptions = currentQuestion.options.filter(function(option) {
+      return submittedSet.has(option.value);
+    });
+    const selectedChoices = selectedOptions.map(function(option) { return option.value; });
+    const additionalDetail = typeof req.body.additionalDetail === 'string'
+      ? req.body.additionalDetail
+      : '';
+    const invalidSelection = submitted.some(function(value) {
+      return !currentQuestion.options.some(function(option) { return option.value === value; });
+    });
+    const renderMultiError = function(message) {
+      return validationError(req, res, message, { selectedChoices, additionalDetail });
+    };
+    if (invalidSelection) return renderMultiError('Choose only the product directions shown below.');
+    if (!selectedChoices.length) return renderMultiError('Choose at least one direction to continue.');
+    if (selectedChoices.length > currentQuestion.maxSelections) {
+      return renderMultiError(`Choose no more than ${currentQuestion.maxSelections} directions.`);
+    }
+    if (selectedChoices.includes('unsure') && selectedChoices.length > 1) {
+      return renderMultiError('Choose “I’m not sure yet” by itself, or select the directions you want to explore.');
+    }
+    if (additionalDetail.length > MAX_ANSWER_LENGTH) {
+      return renderMultiError(`Keep your additional idea under ${MAX_ANSWER_LENGTH} characters.`);
+    }
+
+    const unsure = selectedChoices.length === 1 && selectedChoices[0] === 'unsure';
+    const labels = selectedOptions.map(function(option) { return option.label; });
+    const confirmedUnderstanding = {
+      ...discoverySession.understanding,
+      [currentQuestion.understandingField]: {
+        value: unsure ? 'unsure' : selectedChoices,
+        label: labels.join('; '),
+        labels,
+        additionalDetail,
+        confidence: 1,
+        source: 'user_confirmed',
+        semanticRole: 'exploration_intent'
+      }
+    };
+    const updatedAnswers = {
+      ...discoverySession.answers,
+      [currentQuestion.id]: { values: selectedChoices, additionalDetail }
+    };
+    const understandingResult = await understandBusiness({
+      objective: discoverySession.objective,
+      answer: discoverySession.answers.initial_description,
+      existingUnderstanding: confirmedUnderstanding
+    });
+    const intelligenceResult = analyzeDiscovery({
+      objective: discoverySession.objective,
+      understanding: understandingResult.understanding,
+      unknowns: understandingResult.unknowns,
+      answers: updatedAnswers
+    });
+    discoverySession.answers = updatedAnswers;
+    discoverySession.understanding = understandingResult.understanding;
+    discoverySession.unknowns = understandingResult.unknowns;
+    discoverySession.completedQuestions = Array.from(new Set(
+      discoverySession.completedQuestions.concat(currentQuestion.id)
+    ));
+    applyIntelligenceResult(discoverySession, intelligenceResult);
+    discoverySession.updatedAt = new Date().toISOString();
+    if (intelligenceResult.discoveryCompleteForNow) {
+      discoverySession.reflectionStartedAt = new Date().toISOString();
+      return res.redirect(303, '/discovery/reflection');
+    }
+    return res.redirect(303, '/discovery');
   }
 
   const selectedChoice = typeof req.body.choice === 'string' ? req.body.choice : '';

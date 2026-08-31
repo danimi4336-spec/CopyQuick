@@ -77,6 +77,7 @@ body {
 .discovery-error { margin-bottom: 1.5rem; }
 .discovery-form .form-group { margin-bottom: 1.5rem; }
 .discovery-form .form-group label { margin-bottom: .65rem; color: #172033; font-size: 1rem; }
+.discovery-form .discovery-additional-detail-helper { max-width: none; margin: 0 0 .65rem; font-size: .9rem; line-height: 1.55; }
 .discovery-form textarea { min-height: 150px; padding: 1rem 1.1rem; resize: vertical; font-size: 1rem; line-height: 1.6; }
 .discovery-examples > span { display: block; margin-bottom: .65rem; color: var(--secondary); font-size: .82rem; font-weight: 600; }
 .discovery-example-list { display: flex; flex-wrap: wrap; gap: .55rem; }

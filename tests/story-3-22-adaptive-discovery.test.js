@@ -20,7 +20,12 @@ function listen(app) {
 
 function request(agent, method, url, body) {
   return new Promise((resolve, reject) => {
-    const payload = body ? new URLSearchParams(body).toString() : '';
+    const parameters = new URLSearchParams();
+    Object.entries(body || {}).forEach(function([key, value]) {
+      if (Array.isArray(value)) value.forEach(function(item) { parameters.append(key, item); });
+      else parameters.append(key, value);
+    });
+    const payload = parameters.toString();
     const headers = {};
     if (payload) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -56,14 +61,14 @@ async function answerCurrent(agent, choice, otherAnswer) {
   });
 }
 
-async function begin(agent) {
+async function begin(agent, description = 'an herbal supplement') {
   await request(agent, 'GET', '/test/authenticate');
   const page = await request(agent, 'GET', '/discovery');
   const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
   await request(agent, 'POST', '/discovery', {
     _csrf: token,
     questionId: 'initial_description',
-    whatBuilding: 'an herbal supplement'
+    whatBuilding: description
   });
   return sessionState(agent);
 }
@@ -92,6 +97,26 @@ async function run() {
     salesChannel: known('amazon', 'Amazon'),
     competitiveDifferentiation: known('unsure', "I'm not sure yet")
   };
+  const maturityCases = ['direction_no_formula', 'formula_in_mind', 'in_development', 'finalized', 'unsure'];
+  maturityCases.forEach(function(conceptMaturity) {
+    const result = analyzeDiscovery({
+      objective: 'launch_product',
+      understanding: { ...establishedSupplement, conceptMaturity: known(conceptMaturity), launchStage: known('idea', 'Idea or early concept') },
+      answers: {}
+    });
+    assert.notStrictEqual(result.nextQuestion?.id, 'supplement_digestive_product_exploration');
+  });
+  const nonDigestiveIdea = analyzeDiscovery({
+    objective: 'launch_product',
+    understanding: {
+      ...establishedSupplement,
+      intendedOutcome: known('energy_focus', 'Energy & focus'),
+      conceptMaturity: known('idea_only'),
+      launchStage: known('idea', 'Idea or early concept')
+    },
+    answers: {}
+  });
+  assert.notStrictEqual(nonDigestiveIdea.nextQuestion?.id, 'supplement_digestive_product_exploration');
   for (const conceptMaturity of ['formula_in_mind', 'finalized']) {
     const ambiguous = analyzeDiscovery({
       objective: 'launch_product',
@@ -227,6 +252,125 @@ async function run() {
     assert.strictEqual((await request(blocked, 'GET', '/discovery/strategy')).res.headers.location, '/discovery/reflection');
     assert.strictEqual((await request(blocked, 'GET', '/discovery/build-plan')).res.headers.location, '/discovery/reflection');
     assert.strictEqual(validateApprovedProductionSession(state).valid, false);
+
+    const explorer = { server, cookie: '' };
+    await begin(explorer, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');
+    await answerCurrent(explorer, 'digestive_wellness');
+    await answerCurrent(explorer, 'idea_only');
+    state = await sessionState(explorer);
+    assert.strictEqual(state.nextQuestion.id, 'supplement_digestive_product_exploration');
+    assert.strictEqual(state.nextQuestion.type, 'multi_choice');
+    assert.strictEqual(state.nextQuestion.prompt, 'What should this digestive supplement focus on?');
+    assert.strictEqual(state.understanding.productExplorationDirections, undefined);
+    assert.deepStrictEqual(state.nextQuestion.options.map((option) => option.value), [
+      'microbiome_support', 'digestive_balance', 'bloating_comfort',
+      'everyday_digestive_wellness', 'food_specific_digestion', 'fiber_support',
+      'occasional_digestive_discomfort', 'explore_digestive_enzyme_support', 'unsure'
+    ]);
+    const explorationPage = await request(explorer, 'GET', '/discovery');
+    assert.match(explorationPage.body, /type="checkbox" name="choices"/);
+    assert.match(explorationPage.body, /Anything else you want this product to have or do\?/);
+    assert.match(explorationPage.body, /Select everything that fits your idea\. If you&#39;re still deciding, choose the directions you want CopyQuick to explore with you\./);
+    const explorationToken = explorationPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+
+    const tampered = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: ['bloating_comfort', 'tampered_value'],
+      additionalDetail: 'Herbal capsule idea'
+    });
+    assert.strictEqual(tampered.res.statusCode, 400);
+    assert.match(tampered.body, /Choose only the product directions shown below/);
+    assert.match(tampered.body, /value="bloating_comfort" checked/);
+    assert.match(tampered.body, /Herbal capsule idea/);
+
+    const conflicting = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: ['unsure', 'digestive_balance']
+    });
+    assert.strictEqual(conflicting.res.statusCode, 400);
+    assert.match(conflicting.body, /by itself/);
+
+    const emptyExploration = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      additionalDetail: 'Text alone does not replace a selection'
+    });
+    assert.strictEqual(emptyExploration.res.statusCode, 400);
+
+    const oversizedDetail = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: 'digestive_balance',
+      additionalDetail: 'x'.repeat(2001)
+    });
+    assert.strictEqual(oversizedDetail.res.statusCode, 400);
+    assert.match(oversizedDetail.body, /under 2000 characters/);
+
+    const extraIdea = 'Herbal capsule using ginger and traditional botanicals.';
+    const explored = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: ['digestive_balance', 'bloating_comfort', 'digestive_balance'],
+      additionalDetail: extraIdea
+    });
+    assert.strictEqual(explored.res.statusCode, 303);
+    assert.strictEqual(explored.res.headers.location, '/discovery/reflection');
+    state = await sessionState(explorer);
+    assert.deepStrictEqual(state.answers.supplement_digestive_product_exploration, {
+      values: ['digestive_balance', 'bloating_comfort'], additionalDetail: extraIdea
+    });
+    assert.deepStrictEqual(state.understanding.productExplorationDirections.value, [
+      'digestive_balance', 'bloating_comfort'
+    ]);
+    assert.strictEqual(state.understanding.productExplorationDirections.additionalDetail, extraIdea);
+    assert.strictEqual(state.understanding.productExplorationDirections.semanticRole, 'exploration_intent');
+    assert.strictEqual(state.understanding.productExplorationDirections.source, 'user_confirmed');
+    assert.strictEqual(state.planningReadiness.ready, true);
+    assert(state.planningReadiness.knownRequirements.includes('product_exploration'));
+    assert(state.planningReadiness.optionalKnowledgeGaps.includes('Competitive Context'));
+    assert(!state.answers.competitive_differentiation);
+
+    const explorationReflection = await request(explorer, 'GET', '/discovery/reflection');
+    assert.match(explorationReflection.body, /Product Exploration/);
+    assert.match(explorationReflection.body, /Guided exploration/);
+    assert.match(explorationReflection.body, /Regularity &amp; digestive balance/);
+    assert.match(explorationReflection.body, /Bloating &amp; digestive comfort/);
+    assert.match(explorationReflection.body, /Herbal capsule using ginger and traditional botanicals\./);
+    assert.match(explorationReflection.body, /not confirmed formulation details or product claims/);
+    assert.doesNotMatch(explorationReflection.body, /name="field" value="productExplorationDirections"/);
+    assert.doesNotMatch(explorationReflection.body, /digestive_balance/);
+    const explorationPlanToken = explorationReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    await request(explorer, 'POST', '/discovery/reflection/plan', { _csrf: explorationPlanToken });
+    state = await sessionState(explorer);
+    assert(state.strategyResult.recommendations.some((item) => /Explore a digestive-wellness concept/.test(item.recommendation)));
+    assert(state.strategyResult.assumptions.some((item) => /directions to investigate/.test(item)));
+    assert(!JSON.stringify(state.strategyResult).includes('contains digestive enzymes'));
+    assert(!JSON.stringify(state.strategyResult).includes('clinically proven'));
+
+    const uncertainExplorer = { server, cookie: '' };
+    await begin(uncertainExplorer, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');
+    await answerCurrent(uncertainExplorer, 'digestive_wellness');
+    await answerCurrent(uncertainExplorer, 'idea_only');
+    const uncertainPage = await request(uncertainExplorer, 'GET', '/discovery');
+    const uncertainToken = uncertainPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const uncertainResult = await request(uncertainExplorer, 'POST', '/discovery', {
+      _csrf: uncertainToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: 'unsure'
+    });
+    assert.strictEqual(uncertainResult.res.headers.location, '/discovery/reflection');
+    state = await sessionState(uncertainExplorer);
+    assert.strictEqual(state.understanding.productExplorationDirections.value, 'unsure');
+    assert.strictEqual(state.planningReadiness.ready, true);
+    assert.strictEqual(state.nextQuestion, null);
+    assert(state.planningReadiness.unresolvedNonBlockingRequirements.some((item) => item.id === 'product_exploration'));
+    const uncertainReflection = await request(uncertainExplorer, 'GET', '/discovery/reflection');
+    const uncertainPlanToken = uncertainReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    await request(uncertainExplorer, 'POST', '/discovery/reflection/plan', { _csrf: uncertainPlanToken });
+    state = await sessionState(uncertainExplorer);
+    assert(state.strategyResult.recommendations.some((item) => /Define the digestive product direction/.test(item.recommendation)));
 
     const customOutcome = { server, cookie: '' };
     await begin(customOutcome);

@@ -135,6 +135,8 @@ async function run() {
   assert(reflection.groups.some((group) => group.domain === 'Product'));
   assert(reflection.groups.flatMap((group) => group.fields).every((field) => field.key && field.confidenceMessage));
   assert(reflection.groups.flatMap((group) => group.fields).every((field) => !field.confidenceMessage.includes('%')));
+  assert.strictEqual(reflection.groups.find((group) => group.domain === 'Product').statusLabel, 'Planning essential');
+  assert.strictEqual(reflection.groups.find((group) => group.domain === 'Sales Channel').statusLabel, 'Optional context');
 
   const edit = applyReflectionEdit({
     answers: { initial_description: 'Original product' },
@@ -174,6 +176,8 @@ async function run() {
     assert.match(page.body, /Physical Product/);
     assert.match(page.body, /Areas I'd still like to improve/);
     assert.match(page.body, /Build My Personalized Plan/);
+    assert.match(page.body, /Planning essential/);
+    assert.match(page.body, /Optional context/);
     assert.doesNotMatch(page.body, /\d+%/);
     assert.match(page.body, /name="field" value="initial_description"/);
     assert.match(page.body, /name="field" value="targetAudience"/);
