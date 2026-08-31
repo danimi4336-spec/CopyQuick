@@ -82,6 +82,21 @@ async function run() {
   assert(profileOutput.needs.length >= 2);
   assert(profileOutput.objections.length >= 2);
 
+  const conceptContract = getProductionContract('product_concept_brief');
+  const conceptContext = {
+    ...placeholderContext,
+    strategicDirection: `${placeholderContext.strategicDirection} · Exploration intent: Gut microbiome support; Bloating & digestive comfort; Digestive enzyme support`,
+    dependencyOutputs: [{ deliverableId: 'customer_profile', title: 'Customer Profile', output: profileOutput }]
+  };
+  const conceptOutput = conceptContract.generateOutput(conceptContext);
+  assert.strictEqual(conceptContract.validateOutput(conceptOutput), true);
+  assert.deepStrictEqual(conceptOutput.directionsToExplore, [
+    'Gut microbiome support', 'Bloating & digestive comfort', 'Digestive enzyme support'
+  ]);
+  assert.match(conceptOutput.conceptSummary, /working product concept/i);
+  assert.match(JSON.stringify(conceptOutput), /not confirmed product characteristics/i);
+  assert.doesNotMatch(JSON.stringify(conceptOutput), /contains digestive enzymes|clinically proven|search volume:\s*\d/i);
+
   const valueContract = getProductionContract('value_proposition');
   const valueOutput = valueContract.generateOutput({
     ...placeholderContext,
@@ -93,6 +108,21 @@ async function run() {
   assert.strictEqual(valueContract.validateOutput(valueOutput), true);
   assert.doesNotMatch(JSON.stringify(valueOutput), /To be confirmed|Use confirmed product capabilities/i);
   assert(valueOutput.reasonsToBelieve.length >= 3);
+
+  const validationContract = getProductionContract('validation_plan');
+  const validationOutput = validationContract.generateOutput({
+    ...placeholderContext,
+    dependencyOutputs: [
+      { deliverableId: 'customer_profile', title: 'Customer Profile', output: profileOutput },
+      { deliverableId: 'product_concept_brief', title: 'Product Concept Brief', output: conceptOutput },
+      { deliverableId: 'product_positioning', title: 'Product Positioning', output: placeholderPositioning },
+      { deliverableId: 'value_proposition', title: 'Value Proposition', output: valueOutput }
+    ]
+  });
+  assert.strictEqual(validationContract.validateOutput(validationOutput), true);
+  assert.match(validationOutput.validationObjective, /Determine whether Adults recognize/i);
+  assert.match(JSON.stringify(validationOutput), /evidence separately from assumptions/i);
+  assert.doesNotMatch(JSON.stringify(validationOutput), /clinically proven|monthly searches|market size:\s*\d/i);
 
   const messagingContract = getProductionContract('core_messaging');
   const messagingOutput = messagingContract.generateOutput({
@@ -168,6 +198,28 @@ async function run() {
   assert(liveMessagingOutput.messagePillars.length >= 3);
   assert(liveMessagingOutput.proofThemes.length >= 2);
   assert.doesNotMatch(JSON.stringify(liveMessagingOutput), /To be confirmed|approved source context|completed prerequisite/i);
+
+  const validationBoundary = createRun(db, [
+    { id: 'customer_profile', title: 'Customer Profile' },
+    { id: 'product_concept_brief', title: 'Product Concept Brief', dependencies: ['customer_profile'] },
+    { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile', 'product_concept_brief'] },
+    { id: 'value_proposition', title: 'Value Proposition', dependencies: ['customer_profile', 'product_positioning'] },
+    { id: 'validation_plan', title: 'Validation Plan', dependencies: ['customer_profile', 'product_concept_brief', 'product_positioning', 'value_proposition'] }
+  ]);
+  for (let index = 0; index < 5; index += 1) {
+    assert.strictEqual((await executeNextProductionJob({ db, userId: validationBoundary.userId, productionRunId: validationBoundary.runId })).outcome, 'completed');
+  }
+  const validationGenerations = db.prepare(`
+    SELECT production_jobs.deliverable_id, generations.structured_result
+    FROM production_jobs JOIN generations ON generations.id = production_jobs.generation_id
+    WHERE production_jobs.production_run_id = ?
+  `).all(validationBoundary.runId);
+  assert.strictEqual(validationGenerations.length, 5);
+  for (const generation of validationGenerations) {
+    const contract = getProductionContract(generation.deliverable_id);
+    assert.strictEqual(validateCustomerReadyOutput(JSON.parse(generation.structured_result), contract).valid, true);
+  }
+  assert.doesNotMatch(JSON.stringify(validationGenerations), /clinically proven|contains digestive enzymes|monthly searches/i);
 
   const invalid = createRun(db, [{ id: 'customer_profile', title: 'Customer Profile' }, { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }]);
   const leakingGenerator = { generateCopy: () => [{ text: 'bad', tone: 'professional', structuredOutput: customerProfile({ summary: 'Completed prerequisite outputs (structured): {"needs":["growth"]}' }) }] };

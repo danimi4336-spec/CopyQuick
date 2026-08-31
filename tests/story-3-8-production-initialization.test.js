@@ -316,7 +316,7 @@ async function run() {
       }
     });
     assert.deepStrictEqual(validateState.approvedProductionSet.productionOrder, [
-      'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+      'customer_profile', 'product_concept_brief', 'product_positioning', 'value_proposition', 'validation_plan', 'amazon_keyword_guidance'
     ]);
     const validateStart = initializeProduction({
       db,

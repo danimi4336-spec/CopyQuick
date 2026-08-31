@@ -176,19 +176,27 @@ async function run() {
   assert.strictEqual(validatePlan.planningStage, 'validate');
   assert.deepStrictEqual(validatePlan.phases.map((phase) => phase.title), ['Define & Validate', 'Explore Market Entry']);
   assert.deepStrictEqual(ids(validatePlan), [
-    'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+    'customer_profile', 'product_concept_brief', 'product_positioning', 'value_proposition', 'validation_plan', 'amazon_keyword_guidance'
   ]);
-  assert.strictEqual(validatePlan.summary.deliverableCount, 4);
+  assert.strictEqual(validatePlan.summary.deliverableCount, 6);
   assert.match(validatePlan.summary.whyThisPlan, /validates the opportunity before launch execution/i);
   assert.match(validatePlan.summary.whyThisPlan, /search directions worth investigating/i);
   const validateItems = deliverables(validatePlan);
   assert.strictEqual(validateItems.find((item) => item.id === 'customer_profile').recommendationLevel, 'essential');
+  const conceptBrief = validateItems.find((item) => item.id === 'product_concept_brief');
+  assert.strictEqual(conceptBrief.recommendationLevel, 'essential');
+  assert.deepStrictEqual(conceptBrief.dependencies, ['customer_profile']);
+  assert.match(conceptBrief.strategicDirection, /Exploration intent: Gut microbiome support; Bloating & digestive comfort; Digestive enzyme support/);
   assert.strictEqual(validateItems.find((item) => item.id === 'product_positioning').recommendationLevel, 'recommended');
   assert.match(validateItems.find((item) => item.id === 'product_positioning').reason, /provisional|hypothesis/i);
+  assert.deepStrictEqual(validateItems.find((item) => item.id === 'product_positioning').dependencies, ['customer_profile', 'product_concept_brief']);
   assert.strictEqual(validateItems.find((item) => item.id === 'value_proposition').recommendationLevel, 'recommended');
   assert.match(validateItems.find((item) => item.id === 'value_proposition').reason, /hypothesis/i);
+  const validationPlan = validateItems.find((item) => item.id === 'validation_plan');
+  assert.strictEqual(validationPlan.recommendationLevel, 'recommended');
+  assert.deepStrictEqual(validationPlan.dependencies, ['customer_profile', 'product_concept_brief', 'product_positioning', 'value_proposition']);
   const validateKeyword = validateItems.find((item) => item.id === 'amazon_keyword_guidance');
-  assert.deepStrictEqual(validateKeyword.dependencies, ['product_positioning']);
+  assert.deepStrictEqual(validateKeyword.dependencies, ['product_concept_brief', 'product_positioning']);
   assert.match(validateKeyword.reason, /hypotheses to investigate/i);
   assert.match(validateKeyword.strategicDirection, /not measured demand or competition data/i);
   assert.match(validateKeyword.strategicDirection, /Recommended market direction: Natural Digestive Wellness Direction/);
@@ -207,7 +215,7 @@ async function run() {
   });
   assert.strictEqual(validateApproval.valid, true);
   assert.deepStrictEqual(validateApproval.productionSet.productionOrder, [
-    'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+    'customer_profile', 'product_concept_brief', 'product_positioning', 'value_proposition', 'validation_plan', 'amazon_keyword_guidance'
   ]);
   assert(validateApproval.productionSet.selectedDeliverables.every((item) =>
     item.dependencies.every((dependency) => validateSelection.selectedDeliverableIds.includes(dependency))
