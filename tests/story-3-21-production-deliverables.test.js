@@ -120,7 +120,7 @@ async function run() {
     ]
   });
   assert.strictEqual(validationContract.validateOutput(validationOutput), true);
-  assert.match(validationOutput.validationObjective, /Determine whether Adults recognize/i);
+  assert.match(validationOutput.validationObjective, /current audience \(Adults\).*intended outcome \(Digestive health\)/i);
   assert.match(JSON.stringify(validationOutput), /evidence separately from assumptions/i);
   assert.doesNotMatch(JSON.stringify(validationOutput), /clinically proven|monthly searches|market size:\s*\d/i);
 
