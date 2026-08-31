@@ -94,6 +94,24 @@ async function run() {
   assert.doesNotMatch(JSON.stringify(valueOutput), /To be confirmed|Use confirmed product capabilities/i);
   assert(valueOutput.reasonsToBelieve.length >= 3);
 
+  const messagingContract = getProductionContract('core_messaging');
+  const messagingOutput = messagingContract.generateOutput({
+    ...placeholderContext,
+    dependencyOutputs: [
+      { deliverableId: 'customer_profile', title: 'Customer Profile', output: profileOutput },
+      { deliverableId: 'product_positioning', title: 'Product Positioning', output: placeholderPositioning },
+      { deliverableId: 'value_proposition', title: 'Value Proposition', output: valueOutput }
+    ]
+  });
+  assert.strictEqual(messagingContract.validateOutput(messagingOutput), true);
+  assert.doesNotMatch(JSON.stringify(messagingOutput), /To be confirmed|Invite the customer to take the next appropriate step/i);
+  assert.match(messagingOutput.coreMessage, /Digestive health/i);
+  assert(messagingOutput.messagePillars.length >= 3);
+  assert(messagingOutput.supportingPoints.length >= 2);
+  assert(messagingOutput.proofThemes.length >= 2);
+  assert(messagingOutput.callsToAction.length >= 2);
+  assert.strictEqual(messagingContract.validateOutput({ ...messagingOutput, supportingPoints: ['To be confirmed'] }), false);
+
   const keywordContract = getProductionContract('amazon_keyword_guidance');
   const keywordOutput = keywordContract.generateOutput(placeholderContext);
   assert.strictEqual(keywordContract.validateOutput(keywordOutput), true);
@@ -130,6 +148,26 @@ async function run() {
   assert(liveOutput.messagingImplications.length >= 3);
   assert.doesNotMatch(JSON.stringify(livePresented), /approved source context|completed prerequisite|produce the customer-facing/i);
   assert.strictEqual(validateCustomerReadyOutput(liveOutput, positioningContract).valid, true);
+
+  const messagingBoundary = createRun(db, [
+    { id: 'customer_profile', title: 'Customer Profile' },
+    { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] },
+    { id: 'value_proposition', title: 'Value Proposition', dependencies: ['customer_profile', 'product_positioning'] },
+    { id: 'core_messaging', title: 'Core Messaging', dependencies: ['customer_profile', 'product_positioning', 'value_proposition'] }
+  ]);
+  for (let index = 0; index < 4; index += 1) {
+    assert.strictEqual((await executeNextProductionJob({ db, userId: messagingBoundary.userId, productionRunId: messagingBoundary.runId })).outcome, 'completed');
+  }
+  const liveMessaging = db.prepare(`
+    SELECT generations.structured_result
+    FROM generations JOIN production_jobs ON production_jobs.generation_id = generations.id
+    WHERE production_jobs.production_run_id = ? AND production_jobs.deliverable_id = 'core_messaging'
+  `).get(messagingBoundary.runId);
+  const liveMessagingOutput = JSON.parse(liveMessaging.structured_result);
+  assert.strictEqual(validateCustomerReadyOutput(liveMessagingOutput, messagingContract).valid, true);
+  assert(liveMessagingOutput.messagePillars.length >= 3);
+  assert(liveMessagingOutput.proofThemes.length >= 2);
+  assert.doesNotMatch(JSON.stringify(liveMessagingOutput), /To be confirmed|approved source context|completed prerequisite/i);
 
   const invalid = createRun(db, [{ id: 'customer_profile', title: 'Customer Profile' }, { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }]);
   const leakingGenerator = { generateCopy: () => [{ text: 'bad', tone: 'professional', structuredOutput: customerProfile({ summary: 'Completed prerequisite outputs (structured): {"needs":["growth"]}' }) }] };
