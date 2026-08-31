@@ -53,7 +53,24 @@ async function run() {
   assert.match(recommendationPrompt, /Inferred Primary Customer: Adults/);
   assert.doesNotMatch(recommendationPrompt, /Premium Natural Wellness/);
   const normalizedPositioning = positioningContract.normalizeOutput([{ text: 'Positioning draft' }], recommendationContext);
-  assert.match(normalizedPositioning.positioningStatement, /using the recommended natural digestive wellness direction/i);
+  assert.match(normalizedPositioning.positioningStatement, /recommended positioning direction/i);
+  assert.match(normalizedPositioning.marketPosition, /recommended direction to validate/i);
+  assert.doesNotMatch(JSON.stringify(normalizedPositioning), /To be confirmed/i);
+  assert(normalizedPositioning.proofPoints.length >= 3);
+  assert(normalizedPositioning.messagingImplications.length >= 3);
+  assert.doesNotMatch(JSON.stringify(normalizedPositioning), /completed prerequisite|approved source context|dependencyOutputs/i);
+
+  const placeholderContext = {
+    ...recommendationContext,
+    strategySnapshot: {
+      ...recommendationContext.strategySnapshot,
+      customerMotivation: { value: 'Digestive health', semanticRole: 'confirmed_fact' }
+    },
+    dependencyOutputs: [{ deliverableId: 'customer_profile', title: 'Customer Profile', output: customerProfile({ needs: ['To be confirmed'] }) }]
+  };
+  const placeholderPositioning = positioningContract.generateOutput(placeholderContext);
+  assert.match(placeholderPositioning.positioningStatement, /Digestive health/i);
+  assert.doesNotMatch(JSON.stringify(placeholderPositioning), /To be confirmed/i);
 
   assert.strictEqual(validateCustomerReadyOutput(customerProfile(), profileContract).valid, true);
   assert.strictEqual(validateCustomerReadyOutput(customerProfile({ summary: 'Create the approved Customer Profile deliverable.' }), profileContract).code, 'PRODUCTION_QUALITY_INTERNAL_CONTEXT_LEAK');
@@ -63,6 +80,26 @@ async function run() {
   const validResult = await executeNextProductionJob({ db, userId: valid.userId, productionRunId: valid.runId, generatorApi: { generateCopy: () => [{ text: 'Customer profile', tone: 'professional', structuredOutput: customerProfile() }] } });
   assert.strictEqual(validResult.outcome, 'completed');
   assert.strictEqual(db.prepare('SELECT status FROM production_jobs WHERE production_run_id = ?').get(valid.runId).status, 'completed');
+
+  const liveBoundary = createRun(db, [
+    { id: 'customer_profile', title: 'Customer Profile' },
+    { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }
+  ]);
+  assert.strictEqual((await executeNextProductionJob({ db, userId: liveBoundary.userId, productionRunId: liveBoundary.runId })).outcome, 'completed');
+  assert.strictEqual((await executeNextProductionJob({ db, userId: liveBoundary.userId, productionRunId: liveBoundary.runId })).outcome, 'completed');
+  const liveGeneration = db.prepare(`
+    SELECT generations.results, generations.structured_result
+    FROM generations JOIN production_jobs ON production_jobs.generation_id = generations.id
+    WHERE production_jobs.production_run_id = ? AND production_jobs.deliverable_id = 'product_positioning'
+  `).get(liveBoundary.runId);
+  const liveOutput = JSON.parse(liveGeneration.structured_result);
+  const livePresented = JSON.parse(liveGeneration.results);
+  assert.match(liveOutput.positioningStatement, /positioning hypothesis|recommended positioning direction/i);
+  assert(liveOutput.proofPoints.length >= 3);
+  assert(liveOutput.positioningPillars.length >= 3);
+  assert(liveOutput.messagingImplications.length >= 3);
+  assert.doesNotMatch(JSON.stringify(livePresented), /approved source context|completed prerequisite|produce the customer-facing/i);
+  assert.strictEqual(validateCustomerReadyOutput(liveOutput, positioningContract).valid, true);
 
   const invalid = createRun(db, [{ id: 'customer_profile', title: 'Customer Profile' }, { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }]);
   const leakingGenerator = { generateCopy: () => [{ text: 'bad', tone: 'professional', structuredOutput: customerProfile({ summary: 'Completed prerequisite outputs (structured): {"needs":["growth"]}' }) }] };
