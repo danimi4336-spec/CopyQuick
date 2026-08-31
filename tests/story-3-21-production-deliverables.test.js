@@ -36,6 +36,24 @@ async function run() {
   initDb();
   const db = getDb();
   const profileContract = getProductionContract('customer_profile');
+  const positioningContract = getProductionContract('product_positioning');
+
+  const recommendationContext = {
+    title: 'Product Positioning',
+    strategicDirection: 'Recommended market direction: Natural Digestive Wellness Direction',
+    strategySnapshot: {
+      marketPosition: { value: 'Natural Digestive Wellness Direction', semanticRole: 'strategic_recommendation' },
+      primaryCustomer: { value: 'Adults', semanticRole: 'inferred_fact' },
+      competitiveApproach: { value: 'Trust, Quality, and Proof', semanticRole: 'strategic_recommendation' }
+    },
+    dependencyOutputs: [{ deliverableId: 'customer_profile', title: 'Customer Profile', output: customerProfile() }]
+  };
+  const recommendationPrompt = positioningContract.buildPrompt(recommendationContext);
+  assert.match(recommendationPrompt, /Recommended Market Position: Natural Digestive Wellness Direction/);
+  assert.match(recommendationPrompt, /Inferred Primary Customer: Adults/);
+  assert.doesNotMatch(recommendationPrompt, /Premium Natural Wellness/);
+  const normalizedPositioning = positioningContract.normalizeOutput([{ text: 'Positioning draft' }], recommendationContext);
+  assert.match(normalizedPositioning.positioningStatement, /using the recommended natural digestive wellness direction/i);
 
   assert.strictEqual(validateCustomerReadyOutput(customerProfile(), profileContract).valid, true);
   assert.strictEqual(validateCustomerReadyOutput(customerProfile({ summary: 'Create the approved Customer Profile deliverable.' }), profileContract).code, 'PRODUCTION_QUALITY_INTERNAL_CONTEXT_LEAK');

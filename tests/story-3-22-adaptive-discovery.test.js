@@ -189,6 +189,10 @@ async function run() {
     req.session.discoverySession.planningReadiness = { ready: true };
     res.sendStatus(204);
   });
+  app.get('/test/stale-strategy', (req, res) => {
+    req.session.discoverySession.strategyResult.policyVersion = 1;
+    res.sendStatus(204);
+  });
   app.use(discoveryRoutes);
   const server = await listen(app);
 
@@ -344,10 +348,22 @@ async function run() {
     const explorationPlanToken = explorationReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     await request(explorer, 'POST', '/discovery/reflection/plan', { _csrf: explorationPlanToken });
     state = await sessionState(explorer);
+    assert.strictEqual(state.strategyResult.strategy.marketPosition.value, 'Natural Digestive Wellness Direction');
+    assert.strictEqual(state.strategyResult.strategy.marketPosition.semanticRole, 'strategic_recommendation');
+    assert.strictEqual(state.strategyResult.strategy.primaryCustomer.value, 'Adults');
+    assert.strictEqual(state.strategyResult.strategy.primaryCustomer.semanticRole, 'inferred_fact');
+    assert.strictEqual(state.strategyResult.status, 'Strategy Ready — Open Decisions');
+    assert(state.strategyResult.recommendations.some((item) => /Further segment the primary customer/.test(item.recommendation)));
     assert(state.strategyResult.recommendations.some((item) => /Explore a digestive-wellness concept/.test(item.recommendation)));
     assert(state.strategyResult.assumptions.some((item) => /directions to investigate/.test(item)));
     assert(!JSON.stringify(state.strategyResult).includes('contains digestive enzymes'));
     assert(!JSON.stringify(state.strategyResult).includes('clinically proven'));
+
+    await request(explorer, 'GET', '/test/stale-strategy');
+    assert.strictEqual((await request(explorer, 'GET', '/discovery/strategy')).res.headers.location, '/discovery/reflection');
+    state = await sessionState(explorer);
+    assert.strictEqual(state.strategyResult, null);
+    assert.strictEqual(state.buildPlan, null);
 
     const uncertainExplorer = { server, cookie: '' };
     await begin(uncertainExplorer, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');

@@ -37,7 +37,7 @@ function discoveryState() {
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
     competitiveDifferentiation: confirmed('partial', 'Different in a few ways'),
-    launchStage: confirmed('development', 'In development'),
+    launchStage: confirmed('ready', 'Ready to launch'),
     brand: confirmed('new', 'New')
   };
   const answers = { initial_description: 'Organic turmeric supplement' };

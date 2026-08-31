@@ -165,6 +165,7 @@ body {
 .strategy-card-heading h2 { margin: 0; color: #334155; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; }
 .strategy-card-heading span { flex: none; color: var(--secondary); font-size: .7rem; font-weight: 600; }
 .strategy-value { max-width: none; margin: 0 0 1rem; color: #172033; font-size: 1.15rem; font-weight: 700; }
+.strategy-semantic-role { display: inline-flex; margin: -.35rem 0 1rem; padding: .25rem .55rem; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: .68rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; }
 .strategy-why { padding-top: .85rem; border-top: 1px solid var(--border); }
 .strategy-why strong { color: #475569; font-size: .72rem; text-transform: uppercase; }
 .strategy-why p { max-width: none; margin: .25rem 0 0; font-size: .82rem; line-height: 1.55; }

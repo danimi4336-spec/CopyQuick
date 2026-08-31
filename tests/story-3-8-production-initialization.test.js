@@ -17,14 +17,14 @@ const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
 const { createApprovedProductionSet, createDefaultSelection, planFingerprint } = require('../lib/buildPlanApproval');
 const { calculateProductionCost } = require('../lib/productionCost');
-const { getProductionReview } = require('../lib/productionInitialization');
+const { getProductionReview, initializeProduction } = require('../lib/productionInitialization');
 const productionRoutes = require('../routes/production');
 
 function confirmed(value, label = value) {
   return { value, label, confidence: 1, source: 'user_confirmed' };
 }
 
-function understanding() {
+function understanding(overrides = {}) {
   return {
     businessType: confirmed('physical_product', 'Physical Product'),
     industry: confirmed('health_wellness', 'Health & Wellness'),
@@ -35,13 +35,14 @@ function understanding() {
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
     competitiveDifferentiation: confirmed('partial', 'It is different in a few ways'),
-    launchStage: confirmed('development', 'In development'),
-    brand: confirmed('established', 'Established')
+    launchStage: confirmed('ready', 'Ready to launch'),
+    brand: confirmed('established', 'Established'),
+    ...overrides
   };
 }
 
-function createDiscoveryState(mode = 'valid') {
-  const facts = understanding();
+function createDiscoveryState(mode = 'valid', overrides = {}) {
+  const facts = understanding(overrides);
   const answers = { initial_description: 'Organic turmeric supplement' };
   const strategyResult = buildStrategy({
     objective: 'launch_product', understanding: facts, confirmedUnderstanding: facts, answers
@@ -132,6 +133,7 @@ async function run() {
   const insufficientUserId = createUser(db, 2);
   const failureUserId = createUser(db, 50);
   const otherUserId = createUser(db, 50);
+  const validateUserId = createUser(db, 50);
 
   const approved = createDiscoveryState().approvedProductionSet;
   const units = approved.selectedDeliverables.length;
@@ -301,6 +303,31 @@ async function run() {
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations').get().count, 0);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM brand_brain').get().count, 0);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM subscriptions').get().count, 0);
+
+    const validateState = createDiscoveryState('valid', {
+      intendedOutcome: confirmed('digestive_wellness', 'Digestive health'),
+      conceptMaturity: confirmed('idea_only', 'I only have the product idea'),
+      launchStage: { value: 'idea', label: 'Idea or early concept', confidence: 0.85, source: 'inference' },
+      targetAudience: { value: 'adults', label: 'Adults', confidence: 0.85, source: 'inference' },
+      competitiveDifferentiation: undefined,
+      productExplorationDirections: {
+        value: ['bloating_comfort'], label: 'Bloating & digestive comfort', confidence: 1,
+        source: 'user_confirmed', semanticRole: 'exploration_intent'
+      }
+    });
+    assert.deepStrictEqual(validateState.approvedProductionSet.productionOrder, [
+      'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+    ]);
+    const validateStart = initializeProduction({
+      db,
+      user: db.prepare('SELECT * FROM users WHERE id = ?').get(validateUserId),
+      discoverySession: validateState
+    });
+    assert.strictEqual(validateStart.valid, true);
+    assert.deepStrictEqual(
+      db.prepare('SELECT deliverable_id FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order').all(validateStart.productionRunId).map((job) => job.deliverable_id),
+      validateState.approvedProductionSet.productionOrder
+    );
 
     console.log('Story 3.8 Production Initialization tests passed');
   } finally {

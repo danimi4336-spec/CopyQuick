@@ -107,7 +107,17 @@ async function readySession(confirmedReflection) {
 
 async function run() {
   const amazon = build();
-  assert.strictEqual(amazon.strategy.marketPosition.value, 'Premium Natural Wellness');
+  assert.strictEqual(amazon.strategy.marketPosition.value, 'Everyday Wellness Direction');
+  assert.strictEqual(amazon.strategy.marketPosition.semanticRole, 'strategic_recommendation');
+  assert.strictEqual(amazon.strategy.primaryCustomer.semanticRole, 'confirmed_fact');
+  assert.strictEqual(amazon.strategy.competitiveApproach.semanticRole, 'strategic_recommendation');
+  assert.strictEqual(amazon.strategy.communicationStyle.semanticRole, 'strategic_recommendation');
+  assert.strictEqual(amazon.strategy.marketingFocus.semanticRole, 'strategic_recommendation');
+  assert.strictEqual(amazon.strategy.launchApproach.semanticRole, 'strategic_recommendation');
+  assert.strictEqual(amazon.strategy.risks.semanticRole, 'derived_risk');
+  assert.strictEqual(amazon.strategy.pricingPosition.semanticRole, 'unresolved');
+  assert.strictEqual(amazon.status, 'Strategy Ready — Open Decisions');
+  assert.notStrictEqual(amazon.confidence, 'High Confidence');
   assert.strictEqual(amazon.strategy.communicationStyle.value, 'Evidence-Based and Reassuring');
   assert.match(amazon.strategy.marketingFocus.value, /Marketplace/);
   assert(Object.values(amazon.strategy).every((item) => item.explanation));
@@ -115,6 +125,57 @@ async function run() {
   assert(amazon.assumptions.some((item) => item.includes('Amazon')));
   assert(amazon.recommendations.length > 0);
   assert(amazon.recommendations.every((item) => item.recommendation && item.reason));
+
+  const acceptanceUnderstanding = completeUnderstanding({
+    intendedOutcome: confirmed('digestive_wellness', 'Digestive health'),
+    conceptMaturity: confirmed('idea_only', 'I only have the product idea'),
+    targetAudience: { value: 'adults', label: 'Adults', confidence: 0.82, source: 'inference' },
+    salesChannel: { value: 'amazon', label: 'Amazon', confidence: 0.95, source: 'inference' },
+    competitiveDifferentiation: undefined,
+    launchStage: { value: 'idea', label: 'Idea or early concept', confidence: 0.9, source: 'inference' },
+    productExplorationDirections: {
+      value: ['microbiome_support', 'bloating_comfort', 'explore_digestive_enzyme_support'],
+      labels: ['Gut microbiome support', 'Bloating & digestive comfort', 'Digestive enzyme support'],
+      confidence: 1, source: 'user_confirmed', semanticRole: 'exploration_intent'
+    }
+  });
+  const acceptance = build({
+    understanding: acceptanceUnderstanding,
+    answers: { initial_description: 'An herbal dietary supplement for adults that I plan to sell on Amazon.' }
+  });
+  assert.strictEqual(acceptance.strategy.marketPosition.value, 'Natural Digestive Wellness Direction');
+  assert.strictEqual(acceptance.strategy.marketPosition.semanticRole, 'strategic_recommendation');
+  assert.doesNotMatch(acceptance.strategy.marketPosition.value, /premium/i);
+  assert.strictEqual(acceptance.strategy.pricingPosition.value, 'Unknown');
+  assert.strictEqual(acceptance.strategy.primaryCustomer.value, 'Adults');
+  assert.strictEqual(acceptance.strategy.primaryCustomer.semanticRole, 'inferred_fact');
+  assert.match(acceptance.strategy.primaryCustomer.explanation, /inferred/i);
+  assert.strictEqual(acceptance.strategy.primarySalesChannel.semanticRole, 'inferred_fact');
+  assert.match(acceptance.strategy.primarySalesChannel.explanation, /inferred/i);
+  assert.strictEqual(acceptance.status, 'Strategy Ready — Open Decisions');
+  assert(acceptance.recommendations.some((item) => /Further segment the primary customer/.test(item.recommendation)));
+  assert(!JSON.stringify(acceptance).includes('health-conscious adults'));
+  assert.strictEqual(acceptance.strategy.launchApproach.value, 'Validate Demand Before Scaling');
+
+  for (const audience of ['adults over 50', 'busy working parents', 'recreational runners', 'women experiencing menopause', 'independent retailers serving local families']) {
+    const specific = build({ understanding: completeUnderstanding({ targetAudience: confirmed(audience) }) });
+    assert(!specific.recommendations.some((item) => /Further segment the primary customer/.test(item.recommendation)), audience);
+  }
+
+  const explicitPosition = build({ understanding: completeUnderstanding({
+    marketPosition: confirmed('Accessible Everyday Wellness', 'Accessible Everyday Wellness'),
+    pricingPosition: confirmed('Value', 'Value')
+  }) });
+  assert.strictEqual(explicitPosition.strategy.marketPosition.value, 'Accessible Everyday Wellness');
+  assert.strictEqual(explicitPosition.strategy.marketPosition.semanticRole, 'confirmed_fact');
+  assert.strictEqual(explicitPosition.strategy.pricingPosition.value, 'Value');
+  assert.strictEqual(explicitPosition.strategy.pricingPosition.semanticRole, 'confirmed_fact');
+  assert(!explicitPosition.strategy.risks.value.some((risk) => /pricing position/.test(risk)));
+  assert(!explicitPosition.recommendations.some((item) => /pricing position/.test(item.recommendation)));
+
+  const explicitPremium = build({ answers: { initial_description: 'A premium organic turmeric supplement' } });
+  assert.strictEqual(explicitPremium.strategy.pricingPosition.value, 'Premium');
+  assert.strictEqual(explicitPremium.strategy.pricingPosition.semanticRole, 'inferred_fact');
 
   const websiteUnderstanding = completeUnderstanding({
     salesChannel: confirmed('own_website', 'Shopify / my own website')
@@ -147,7 +208,7 @@ async function run() {
   assert.strictEqual(unknown.strategy.marketPosition.value, 'Unknown');
   assert.strictEqual(unknown.strategy.primaryCustomer.value, 'Unknown');
   assert.strictEqual(unknown.strategy.primarySalesChannel.value, 'Unknown');
-  assert.strictEqual(unknown.confidence, 'Needs Confirmation');
+  assert.strictEqual(unknown.status, 'More Understanding Needed');
 
   const app = express();
   app.set('view engine', 'ejs');
@@ -192,13 +253,15 @@ async function run() {
     const stored = JSON.parse((await request(ready, 'GET', '/test/session')).body);
     assert(stored.planningConfirmedAt);
     assert.strictEqual(stored.confirmedUnderstanding.salesChannel.value, 'amazon');
-    assert.strictEqual(stored.strategyResult.strategy.marketPosition.value, 'Premium Natural Wellness');
+    assert.strictEqual(stored.strategyResult.strategy.marketPosition.value, 'Everyday Wellness Direction');
 
     await request(confirmedAgent, 'GET', '/test/authenticate-confirmed');
     const page = await request(confirmedAgent, 'GET', '/discovery/strategy');
     assert.strictEqual(page.res.statusCode, 200);
     assert.match(page.body, /Recommended Business Strategy/);
-    assert.match(page.body, /Premium Natural Wellness/);
+    assert.match(page.body, /Everyday Wellness Direction/);
+    assert.match(page.body, /Recommended Direction/);
+    assert.match(page.body, /Strategy Ready — Open Decisions/);
     assert.match(page.body, /Evidence-Based and Reassuring/);
     assert.match(page.body, /Areas that may improve your strategy/);
     assert.match(page.body, /Edit Business Understanding/);

@@ -4,7 +4,7 @@
             <span class="strategy-eyebrow">Strategic Foundation</span>
             <h1>Recommended Business Strategy</h1>
             <p>Built from the business understanding you confirmed. This foundation will guide future planning and recommendations.</p>
-            <span class="strategy-confidence"><%= strategyResult.confidence %></span>
+            <span class="strategy-confidence"><%= strategyResult.status || strategyResult.confidence %></span>
         </header>
 
         <% if (error) { %><div class="alert alert-error strategy-alert" role="alert"><%= error %></div><% } %>
@@ -34,6 +34,9 @@
                         </ul>
                     <% } else { %>
                         <p class="strategy-value"><%= item.value %></p>
+                    <% } %>
+                    <% if (item.semanticRole === 'strategic_recommendation') { %>
+                        <span class="strategy-semantic-role"><%= entry[0] === 'marketPosition' ? 'Recommended Direction' : 'Strategic Recommendation' %></span>
                     <% } %>
                     <div class="strategy-why">
                         <strong>Why</strong>

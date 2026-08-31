@@ -4,7 +4,7 @@ const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { DISCOVERY_POLICY_VERSION, isMeaningfullyReady } = require('../lib/discoveryRequirements');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
-const { buildStrategy } = require('../lib/strategyEngine');
+const { STRATEGY_POLICY_VERSION, buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
 const {
   buildApprovalView,
@@ -97,6 +97,11 @@ function refreshDiscoveryPolicy(discoverySession) {
   });
   applyIntelligenceResult(discoverySession, intelligenceResult);
   if (previousVersion !== DISCOVERY_POLICY_VERSION && !isMeaningfullyReady(intelligenceResult.planningReadiness)) {
+    clearUnapprovedPlanningArtifacts(discoverySession);
+  }
+  if (discoverySession.strategyResult
+    && discoverySession.strategyResult.policyVersion !== STRATEGY_POLICY_VERSION
+    && !discoverySession.approvedProductionSet) {
     clearUnapprovedPlanningArtifacts(discoverySession);
   }
 }

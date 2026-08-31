@@ -5,7 +5,9 @@ const path = require('path');
 const session = require('express-session');
 const { createCsrfProtection } = require('../lib/csrf');
 const { buildStrategy } = require('../lib/strategyEngine');
-const { buildPlan } = require('../lib/buildPlanEngine');
+const { buildPlan, derivePlanningStage } = require('../lib/buildPlanEngine');
+const { createApprovedProductionSet, createDefaultSelection } = require('../lib/buildPlanApproval');
+const { getProductionContract } = require('../lib/productionContracts');
 const discoveryRoutes = require('../routes/discovery');
 
 function confirmed(value, label = value) {
@@ -23,7 +25,7 @@ function understanding(overrides = {}) {
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
     competitiveDifferentiation: confirmed('partial', 'It is different in a few ways'),
-    launchStage: confirmed('development', 'In development'),
+    launchStage: confirmed('ready', 'Ready to launch'),
     ...overrides
   };
 }
@@ -110,6 +112,18 @@ function sessionState(mode) {
 }
 
 async function run() {
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'idea_only', launchStage: 'idea' }), 'validate');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'direction_no_formula', launchStage: 'idea' }), 'validate');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'in_development', launchStage: 'development' }), 'develop');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'finalized', launchStage: 'ready' }), 'prepare_launch');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'finalized', launchStage: 'selling' }), 'optimize');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'finalized', launchStage: 'idea' }), 'validate');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'idea_only', launchStage: 'ready' }), 'validate');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'in_development', launchStage: 'ready' }), 'develop');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'formula_in_mind', launchStage: 'ready' }), 'prepare_launch');
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'unsure', launchStage: 'ready' }), null);
+  assert.strictEqual(derivePlanningStage({ conceptMaturity: 'formula_in_mind', launchStage: null }), null);
+
   const amazonFacts = understanding();
   const amazonPlan = planFor(amazonFacts);
   assert.strictEqual(amazonPlan.readiness.ready, true);
@@ -127,6 +141,8 @@ async function run() {
   assert(!amazonIds.includes('abandoned_cart_email'));
   assert(amazonPlan.exclusions.some((item) => item.id === 'ecommerce_product_page' && item.reason));
   assert(deliverables(amazonPlan).every((item) => item.reason && item.strategicDirection));
+  assert(deliverables(amazonPlan).some((item) => /Recommended market direction: Everyday Wellness Direction/.test(item.strategicDirection)));
+  assert(!JSON.stringify(amazonPlan).includes('Premium Natural Wellness'));
   assert(deliverables(amazonPlan).every((item) => ['essential', 'recommended', 'optional'].includes(item.recommendationLevel)));
 
   const foundation = amazonPlan.phases[0].deliverables;
@@ -137,6 +153,111 @@ async function run() {
   assert.deepStrictEqual(foundation.find((item) => item.id === 'core_messaging').dependencies, [
     'customer_profile', 'product_positioning', 'value_proposition'
   ]);
+
+  const exploration = {
+    value: ['microbiome_support', 'bloating_comfort', 'explore_digestive_enzyme_support'],
+    label: 'Gut microbiome support; Bloating & digestive comfort; Digestive enzyme support',
+    confidence: 1,
+    source: 'user_confirmed',
+    semanticRole: 'exploration_intent'
+  };
+  const validateFacts = understanding({
+    intendedOutcome: confirmed('digestive_wellness', 'Digestive health'),
+    conceptMaturity: confirmed('idea_only', 'I only have the product idea'),
+    launchStage: { value: 'idea', label: 'Idea or early concept', confidence: 0.85, source: 'inference' },
+    targetAudience: { value: 'adults', label: 'Adults', confidence: 0.85, source: 'inference' },
+    competitiveDifferentiation: undefined,
+    brand: undefined,
+    productExplorationDirections: exploration
+  });
+  const validateStrategy = strategyFor(validateFacts, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');
+  const validatePlan = planFor(validateFacts, validateStrategy, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');
+  assert.strictEqual(validatePlan.readiness.ready, true);
+  assert.strictEqual(validatePlan.planningStage, 'validate');
+  assert.deepStrictEqual(validatePlan.phases.map((phase) => phase.title), ['Define & Validate', 'Explore Market Entry']);
+  assert.deepStrictEqual(ids(validatePlan), [
+    'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+  ]);
+  assert.strictEqual(validatePlan.summary.deliverableCount, 4);
+  assert.match(validatePlan.summary.whyThisPlan, /validates the opportunity before launch execution/i);
+  assert.match(validatePlan.summary.whyThisPlan, /search directions worth investigating/i);
+  const validateItems = deliverables(validatePlan);
+  assert.strictEqual(validateItems.find((item) => item.id === 'customer_profile').recommendationLevel, 'essential');
+  assert.strictEqual(validateItems.find((item) => item.id === 'product_positioning').recommendationLevel, 'recommended');
+  assert.match(validateItems.find((item) => item.id === 'product_positioning').reason, /provisional|hypothesis/i);
+  assert.strictEqual(validateItems.find((item) => item.id === 'value_proposition').recommendationLevel, 'recommended');
+  assert.match(validateItems.find((item) => item.id === 'value_proposition').reason, /hypothesis/i);
+  const validateKeyword = validateItems.find((item) => item.id === 'amazon_keyword_guidance');
+  assert.deepStrictEqual(validateKeyword.dependencies, ['product_positioning']);
+  assert.match(validateKeyword.reason, /hypotheses to investigate/i);
+  assert.match(validateKeyword.strategicDirection, /not measured demand or competition data/i);
+  assert.match(validateKeyword.strategicDirection, /Recommended market direction: Natural Digestive Wellness Direction/);
+  assert(!JSON.stringify(validatePlan).includes('Premium Natural Wellness'));
+  [
+    'core_messaging', 'amazon_listing', 'amazon_bullet_points', 'product_image_guidance',
+    'launch_announcement', 'educational_content', 'social_launch_campaign'
+  ].forEach((id) => assert(!ids(validatePlan).includes(id), `${id} must be deferred at validate stage`));
+  const validateSelection = createDefaultSelection(validatePlan);
+  assert.deepStrictEqual(validateSelection.selectedDeliverableIds, ids(validatePlan));
+  assert(!validateSelection.selectedDeliverableIds.includes('amazon_listing'));
+  const validateApproval = createApprovedProductionSet({
+    plan: validatePlan,
+    selection: validateSelection,
+    strategyResult: validateStrategy
+  });
+  assert.strictEqual(validateApproval.valid, true);
+  assert.deepStrictEqual(validateApproval.productionSet.productionOrder, [
+    'customer_profile', 'product_positioning', 'value_proposition', 'amazon_keyword_guidance'
+  ]);
+  assert(validateApproval.productionSet.selectedDeliverables.every((item) =>
+    item.dependencies.every((dependency) => validateSelection.selectedDeliverableIds.includes(dependency))
+  ));
+  assert.match(validateStrategy.strategy.launchApproach.value, /Validate Demand Before Scaling/);
+
+  const directionPlan = planFor(understanding({
+    conceptMaturity: confirmed('direction_no_formula', 'Direction, but no formula'),
+    launchStage: { value: 'idea', label: 'Idea or early concept', confidence: 0.85, source: 'inference' }
+  }));
+  assert.strictEqual(directionPlan.planningStage, 'validate');
+  assert(!ids(directionPlan).includes('amazon_listing'));
+
+  const developFacts = understanding({
+    conceptMaturity: confirmed('in_development', 'A formula or product is already being developed'),
+    launchStage: { value: 'development', label: 'In development', confidence: 0.85, source: 'inference' }
+  });
+  const developPlan = planFor(developFacts);
+  assert.strictEqual(developPlan.planningStage, 'develop');
+  assert.deepStrictEqual(ids(developPlan), [
+    'customer_profile', 'product_positioning', 'value_proposition', 'core_messaging', 'amazon_keyword_guidance'
+  ]);
+  assert.deepStrictEqual(deliverables(developPlan).find((item) => item.id === 'amazon_keyword_guidance').dependencies, ['product_positioning']);
+  assert(!ids(developPlan).includes('launch_announcement'));
+  assert(!ids(developPlan).includes('product_image_guidance'));
+
+  assert.strictEqual(amazonPlan.planningStage, 'prepare_launch');
+  const sellingPlan = planFor(understanding({ launchStage: confirmed('selling', 'Already selling') }));
+  assert.strictEqual(sellingPlan.planningStage, 'optimize');
+  assert(ids(sellingPlan).includes('amazon_listing'));
+  assert(ids(sellingPlan).includes('launch_announcement'));
+
+  const unresolvedFacts = understanding({ launchStage: confirmed('unsure', "I'm not sure yet") });
+  const unresolvedPlan = planFor(unresolvedFacts);
+  assert.strictEqual(unresolvedPlan.readiness.ready, false);
+  assert.deepStrictEqual(unresolvedPlan.phases, []);
+
+  const keywordContract = getProductionContract('amazon_keyword_guidance');
+  const keywordPrompt = keywordContract.buildPrompt({
+    title: 'Amazon Search & Keyword Guidance',
+    objective: 'launch_product',
+    strategySnapshot: validateStrategy.strategy,
+    strategicDirection: validateKeyword.strategicDirection,
+    dependencyOutputs: []
+  });
+  assert.match(keywordPrompt, /hypotheses to investigate/i);
+  assert.match(keywordPrompt, /do not claim or invent search volume/i);
+  assert.match(keywordPrompt, /competition levels, demand metrics, ranking difficulty, keyword scores/i);
+  assert.strictEqual(keywordContract.validateOutput({ summary: 'Themes to investigate', content: ['Digestive wellness'] }), true);
+  assert.strictEqual(keywordContract.validateOutput({ summary: 'Measured result', content: ['Search volume: 12000'] }), false);
 
   const shopifyFacts = understanding({ salesChannel: confirmed('own_website', 'Shopify / my own website') });
   const shopifyPlan = planFor(shopifyFacts);
