@@ -667,6 +667,7 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       runId: production?.run_id || null,
       title: production?.job_title || gen.title,
       customerReady: quality.valid,
+      generationMethod: 'Structured Production Engine',
       sections: quality.valid ? contract.presentationSections(output) : []
     };
   }

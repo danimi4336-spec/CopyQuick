@@ -73,7 +73,7 @@
                     <div class="meta-row"><span class="meta-label">Type</span><span class="meta-value"><%= gen.content_type.replace(/_/g, ' ') %></span></div>
                     <div class="meta-row"><span class="meta-label">Tone</span><span class="meta-value"><%= gen.tone %></span></div>
                     <div class="meta-row"><span class="meta-label">Words</span><span class="meta-value"><%= gen.word_count || 0 %></span></div>
-                    <div class="meta-row"><span class="meta-label">AI Model</span><span class="meta-value"><%= gen.ai_model || 'CopyQuick AI' %></span></div>
+                    <div class="meta-row"><span class="meta-label"><%= productionDeliverable ? 'Generation Method' : 'AI Model' %></span><span class="meta-value"><%= productionDeliverable ? productionDeliverable.generationMethod : (gen.ai_model || 'CopyQuick AI') %></span></div>
                     <div class="meta-row"><span class="meta-label">Created</span><span class="meta-value"><%= new Date(gen.created_at).toLocaleDateString() %></span></div>
                     <div class="meta-row"><span class="meta-label">Updated</span><span class="meta-value"><%= new Date(gen.updated_at || gen.created_at).toLocaleDateString() %></span></div>
                 </div>

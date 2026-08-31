@@ -71,6 +71,36 @@ async function run() {
   const placeholderPositioning = positioningContract.generateOutput(placeholderContext);
   assert.match(placeholderPositioning.positioningStatement, /Digestive health/i);
   assert.doesNotMatch(JSON.stringify(placeholderPositioning), /To be confirmed/i);
+  assert.match(placeholderPositioning.positioningStatement, /For Adults seeking Digestive health/);
+  assert.doesNotMatch(placeholderPositioning.positioningStatement, /requiring validation seeking|\. and|\.\./i);
+  assert.match(placeholderPositioning.proofPoints[0], /Adults prioritize Digestive health/);
+  assert.doesNotMatch(placeholderPositioning.proofPoints[0], /Adults prioritizes/);
+
+  const profileOutput = profileContract.generateOutput(placeholderContext);
+  assert.strictEqual(profileContract.validateOutput(profileOutput), true);
+  assert.doesNotMatch(JSON.stringify(profileOutput), /To be confirmed/i);
+  assert(profileOutput.needs.length >= 2);
+  assert(profileOutput.objections.length >= 2);
+
+  const valueContract = getProductionContract('value_proposition');
+  const valueOutput = valueContract.generateOutput({
+    ...placeholderContext,
+    dependencyOutputs: [
+      { deliverableId: 'customer_profile', title: 'Customer Profile', output: profileOutput },
+      { deliverableId: 'product_positioning', title: 'Product Positioning', output: placeholderPositioning }
+    ]
+  });
+  assert.strictEqual(valueContract.validateOutput(valueOutput), true);
+  assert.doesNotMatch(JSON.stringify(valueOutput), /To be confirmed|Use confirmed product capabilities/i);
+  assert(valueOutput.reasonsToBelieve.length >= 3);
+
+  const keywordContract = getProductionContract('amazon_keyword_guidance');
+  const keywordOutput = keywordContract.generateOutput(placeholderContext);
+  assert.strictEqual(keywordContract.validateOutput(keywordOutput), true);
+  assert.doesNotMatch(JSON.stringify(keywordOutput), /To be confirmed/i);
+  assert(keywordOutput.content.length >= 6);
+  assert.match(keywordOutput.summary, /not measured demand/i);
+  assert.strictEqual(profileContract.validateOutput(customerProfile({ needs: ['To be confirmed'] })), false);
 
   assert.strictEqual(validateCustomerReadyOutput(customerProfile(), profileContract).valid, true);
   assert.strictEqual(validateCustomerReadyOutput(customerProfile({ summary: 'Create the approved Customer Profile deliverable.' }), profileContract).code, 'PRODUCTION_QUALITY_INTERNAL_CONTEXT_LEAK');
@@ -133,11 +163,13 @@ async function run() {
 
   const productionHtml = await render('generation.ejs', {
     gen: { id: 7, title: 'Product Positioning', input_text: 'SECRET INTERNAL PROMPT', content_type: 'sales_message', tone: 'professional', favorite: 0, word_count: 20, created_at: new Date().toISOString() },
-    results: [], productionDeliverable: { runId: 1, customerReady: true, sections: [{ label: 'Positioning Statement', value: 'A clear position for retailers.', isList: false }] }
+    results: [], productionDeliverable: { runId: 1, customerReady: true, generationMethod: 'Structured Production Engine', sections: [{ label: 'Positioning Statement', value: 'A clear position for retailers.', isList: false }] }
   });
   assert.doesNotMatch(productionHtml, /SECRET INTERNAL PROMPT|<h3>Prompt<\/h3>/);
   assert.match(productionHtml, /Back to Production Plan|Production Plan/);
   assert.match(productionHtml, /Positioning Statement/);
+  assert.match(productionHtml, /Generation Method|Structured Production Engine/);
+  assert.doesNotMatch(productionHtml, /AI Model|CopyQuick AI/);
 
   const ordinaryHtml = await render('generation.ejs', {
     gen: { id: 8, title: 'Quick Copy', input_text: 'Ordinary customer prompt', content_type: 'social_post', tone: 'friendly', favorite: 0, word_count: 4, created_at: new Date().toISOString() },
