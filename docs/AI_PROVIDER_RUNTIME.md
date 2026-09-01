@@ -9,6 +9,11 @@ CopyQuick routes external production-generation adapters through one bounded run
 - `AI_PROVIDER_MAX_INPUT_BYTES` defaults to `32768` serialized bytes.
 - `AI_PROVIDER_MAX_OUTPUT_BYTES` defaults to `262144` serialized bytes.
 
+Operator overrides are accepted only within hard safety ceilings: 120 seconds per
+request, 8 concurrent requests per process, 262144 serialized input bytes, and
+1048576 serialized output bytes. Invalid or excessive values fall back to the
+defaults so configuration cannot silently disable cost and resource containment.
+
 All values must be positive integers. Invalid or absent values use the conservative defaults.
 
 Adapters receive an `AbortSignal` and should stop network work promptly when it is aborted. A timed-out adapter that ignores cancellation retains its concurrency slot until the invocation settles, preventing repeated timeouts from creating an unbounded provider-request storm.

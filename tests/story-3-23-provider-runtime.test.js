@@ -1,5 +1,13 @@
 const assert = require('assert');
 const {
+  DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_MAX_INPUT_BYTES,
+  DEFAULT_MAX_OUTPUT_BYTES,
+  DEFAULT_TIMEOUT_MS,
+  MAX_CONCURRENCY,
+  MAX_INPUT_BYTES,
+  MAX_OUTPUT_BYTES,
+  MAX_TIMEOUT_MS,
   ProviderRuntimeError,
   createProviderRuntime,
   normalizeProviderError
@@ -10,6 +18,31 @@ async function rejectsCode(promise, code) {
 }
 
 async function run() {
+  const validConfig = createProviderRuntime({
+    timeoutMs: MAX_TIMEOUT_MS,
+    maxConcurrency: MAX_CONCURRENCY,
+    maxInputBytes: MAX_INPUT_BYTES,
+    maxOutputBytes: MAX_OUTPUT_BYTES
+  }).config;
+  assert.deepStrictEqual(validConfig, {
+    timeoutMs: MAX_TIMEOUT_MS,
+    maxConcurrency: MAX_CONCURRENCY,
+    maxInputBytes: MAX_INPUT_BYTES,
+    maxOutputBytes: MAX_OUTPUT_BYTES
+  });
+  const excessiveConfig = createProviderRuntime({
+    timeoutMs: MAX_TIMEOUT_MS + 1,
+    maxConcurrency: MAX_CONCURRENCY + 1,
+    maxInputBytes: MAX_INPUT_BYTES + 1,
+    maxOutputBytes: MAX_OUTPUT_BYTES + 1
+  }).config;
+  assert.deepStrictEqual(excessiveConfig, {
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+    maxConcurrency: DEFAULT_MAX_CONCURRENCY,
+    maxInputBytes: DEFAULT_MAX_INPUT_BYTES,
+    maxOutputBytes: DEFAULT_MAX_OUTPUT_BYTES
+  });
+
   const events = [];
   const runtime = createProviderRuntime({
     timeoutMs: 100,
