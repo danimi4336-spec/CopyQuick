@@ -15,6 +15,7 @@ const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/bu
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
 const {
   getCurrentUsageSnapshot,
   getCurrentUsageSnapshotReadOnly,
@@ -226,7 +227,11 @@ router.get('/dashboard', requireAuth, (req, res) => {
         console.log('ℹ️ No brand_brain row for dashboard user.');
       }
     } catch(e) {
-      console.warn('Brand Brain query failed:', e.message);
+      writeOperationalEvent({
+        event: 'dashboard_brand_context_failed',
+        requestId: req.requestId,
+        code: 'DASHBOARD_BRAND_CONTEXT_FAILED'
+      });
     }
 
     const journey = {
@@ -263,8 +268,11 @@ router.get('/dashboard', requireAuth, (req, res) => {
       currentPage: 'dashboard'
     });
   } catch(err) {
-    console.error('❌ Dashboard route CRASHED:', err.message);
-    console.error('   Stack:', err.stack?.split('\\n').slice(0,3).join('\\n   '));
+    writeOperationalEvent({
+      event: 'dashboard_data_failed',
+      requestId: req.requestId,
+      code: 'DASHBOARD_DATA_FAILED'
+    });
     try {
       res.render('dashboard', {
         title: 'Dashboard - CopyQuick',
@@ -287,7 +295,11 @@ router.get('/dashboard', requireAuth, (req, res) => {
         currentPage: 'dashboard'
       });
     } catch(e2) {
-      console.error('💀 Even safe render failed:', e2.message);
+      writeOperationalEvent({
+        event: 'dashboard_render_failed',
+        requestId: req.requestId,
+        code: 'DASHBOARD_RENDER_FAILED'
+      });
       res.status(500).send('Dashboard error. Please check server logs.');
     }
   }
