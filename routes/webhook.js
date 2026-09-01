@@ -8,6 +8,7 @@ const { resolveCheckoutUser } = require('../lib/checkoutIdentity');
 const { clearSubscriptionCheckoutIntents } = require('../lib/subscriptionCheckoutIntent');
 const { STRIPE_WEBHOOK_BODY_LIMIT } = require('../lib/requestBodyLimits');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
+const { isStripeCustomerExclusivelyOwned } = require('../lib/billingCustomerOwnership');
 
 const MAX_SIBLING_SUBSCRIPTIONS = 5;
 
@@ -194,6 +195,9 @@ function applyValidatedSubscription(db, event, user, subscription, entitlementOv
     expectedSubscriptionId: subscription?.id,
     pastDueSince
   });
+  if (!isStripeCustomerExclusivelyOwned(db, { userId: user.id, customerId: decision.customerId })) {
+    throw new BillingPolicyError('CUSTOMER_SUBSCRIPTION_MISMATCH');
+  }
   if (decision.issueCode) {
     logWebhookEvent('stripe_subscription_sync_issue', decision.issueCode, 422, 'subscription_sync');
   }

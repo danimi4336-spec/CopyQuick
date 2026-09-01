@@ -364,9 +364,12 @@ async function run() {
       subscription: 'sub_bound_owner', status: 'active'
     }));
     assert.strictEqual(response.res.statusCode, 200);
-    assert.strictEqual(getUser(db, 'bound-owner@example.com').plan_tier, 'pro');
+    assert.strictEqual(getUser(db, 'bound-owner@example.com').plan_tier, 'free',
+      'a globally ambiguous customer must not grant entitlement even to the bound subscription');
     assert.strictEqual(getUser(db, 'cached-owner@example.com').plan_tier, 'free',
       'a duplicated cached customer ID must not override the exact subscription owner');
+    assert.strictEqual(db.prepare("SELECT user_id FROM subscriptions WHERE stripe_subscription_id='sub_bound_owner'").get().user_id, boundOwnerId,
+      'an ambiguous event must never transfer the existing subscription binding');
 
     response = await request(server, subscriptionEvent({
       id: 'evt_ambiguous_customer_only', created: 356, customer: 'cus_shared',
