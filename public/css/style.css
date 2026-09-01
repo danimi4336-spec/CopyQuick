@@ -50,6 +50,9 @@ body {
 .objective-card:focus-visible { outline: 3px solid rgba(79, 70, 229, .22); outline-offset: 3px; }
 .objective-choice-input:focus-visible + .objective-card { outline: 3px solid rgba(79, 70, 229, .22); outline-offset: 3px; }
 .objective-choice-input:checked + .objective-card { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, .14), 0 14px 32px rgba(30, 41, 59, .1); }
+.objective-choice-unavailable .objective-card { cursor: not-allowed; opacity: .62; }
+.objective-choice-unavailable .objective-card:hover { transform: none; border-color: #dbe2ea; box-shadow: none; }
+.objective-availability { display: inline-flex; margin-left: .55rem; padding: .15rem .45rem; border-radius: 999px; background: #e2e8f0; color: #475569; font-size: .65rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; vertical-align: .15rem; }
 .objective-icon { display: flex; width: 3.25rem; height: 3.25rem; align-items: center; justify-content: center; border: 1px solid #e2e8f0; border-radius: .85rem; background: #f8fafc; font-size: 1.55rem; }
 .objective-card-content { display: flex; min-width: 0; flex-direction: column; }
 .objective-card-title { color: #172033; font-size: 1.1rem; font-weight: 700; line-height: 1.35; }

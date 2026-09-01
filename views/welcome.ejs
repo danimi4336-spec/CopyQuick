@@ -12,16 +12,16 @@
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div class="objective-grid" aria-label="Business objectives">
                 <% objectives.forEach(function(objective) { %>
-                    <div class="objective-choice">
-                        <input class="objective-choice-input" type="radio" name="goal" id="objective-<%= objective.id %>" value="<%= objective.id %>" <%= selectedGoal === objective.id ? 'checked' : '' %> required>
+                    <div class="objective-choice <%= objective.available ? '' : 'objective-choice-unavailable' %>">
+                        <input class="objective-choice-input" type="radio" name="goal" id="objective-<%= objective.id %>" value="<%= objective.id %>" <%= selectedGoal === objective.id ? 'checked' : '' %> <%= objective.available ? 'required' : 'disabled' %>>
                         <label for="objective-<%= objective.id %>" class="objective-card" aria-describedby="objective-summary-<%= objective.id %> objective-outcome-<%= objective.id %>">
                         <span class="objective-icon" aria-hidden="true"><%= objective.icon %></span>
                         <span class="objective-card-content">
-                            <span class="objective-card-title"><%= objective.title %></span>
+                            <span class="objective-card-title"><%= objective.title %><% if (!objective.available) { %><span class="objective-availability">Planned</span><% } %></span>
                             <span class="objective-card-description" id="objective-summary-<%= objective.id %>"><%= objective.description %></span>
                             <span class="objective-card-outcome" id="objective-outcome-<%= objective.id %>"><%= objective.outcome %></span>
                         </span>
-                        <span class="objective-arrow" aria-hidden="true">→</span>
+                        <span class="objective-arrow" aria-hidden="true"><%= objective.available ? '→' : '—' %></span>
                         </label>
                     </div>
                 <% }); %>

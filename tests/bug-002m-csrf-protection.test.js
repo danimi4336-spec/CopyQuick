@@ -387,9 +387,9 @@ async function run() {
     valid = await request(agent, 'POST', '/welcome', {
       body: { goal: 'get_more_customers', _csrf: token }
     });
-    assert.strictEqual(valid.res.statusCode, 302);
-    assert.strictEqual(valid.res.headers.location, '/dashboard');
-    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'get_more_customers');
+    assert.strictEqual(valid.res.statusCode, 400);
+    assert.match(valid.body, /Choose an available business objective to continue/);
+    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');
 
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/dashboard/update-goal', {

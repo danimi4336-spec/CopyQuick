@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
-const { objectiveUniverse, getObjective } = require('../lib/businessJourneys');
+const { objectiveUniverse, getAvailableObjective } = require('../lib/businessJourneys');
 const { normalizeStoredBrandBrain, validateBrandBrain } = require('../lib/brandBrainValidation');
 
 function emptyBrandBrain(userId) {
@@ -29,7 +29,7 @@ router.get('/welcome', requireAuth, (req, res) => {
     title: 'Choose Your Business Objective - CopyQuick',
     currentPage: 'welcome',
     objectives: objectiveUniverse,
-    selectedGoal: getObjective(requestedGoal) ? requestedGoal : '',
+    selectedGoal: getAvailableObjective(requestedGoal) ? requestedGoal : '',
     error: null
   });
 });
@@ -37,13 +37,13 @@ router.get('/welcome', requireAuth, (req, res) => {
 router.post('/welcome', requireAuth, (req, res) => {
   const db = getDb();
   const goal = typeof req.body.goal === 'string' ? req.body.goal.trim() : '';
-  if (!getObjective(goal)) {
+  if (!getAvailableObjective(goal)) {
     return res.status(400).render('welcome', {
       title: 'Choose Your Business Objective - CopyQuick',
       currentPage: 'welcome',
       objectives: objectiveUniverse,
       selectedGoal: '',
-      error: 'Choose a valid business objective to continue.'
+      error: 'Choose an available business objective to continue.'
     });
   }
   db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
