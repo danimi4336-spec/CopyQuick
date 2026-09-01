@@ -1,6 +1,13 @@
 const assert = require('assert');
 const {
+  DEFAULT_EMAIL_ATTEMPT_TIMEOUT_MS,
+  DEFAULT_EMAIL_MAX_ATTEMPTS,
+  DEFAULT_EMAIL_RETRY_BASE_MS,
   EmailDeliveryError,
+  MAX_EMAIL_ATTEMPT_TIMEOUT_MS,
+  MAX_EMAIL_ATTEMPTS,
+  MAX_EMAIL_RETRY_BASE_MS,
+  boundedPositiveInteger,
   normalizedEmailFailure,
   sendContactFormEmails,
   sendEmailWithRetry
@@ -14,6 +21,12 @@ function contact() {
 }
 
 async function run() {
+  assert.strictEqual(boundedPositiveInteger('4', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), 4);
+  assert.strictEqual(boundedPositiveInteger('0', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
+  assert.strictEqual(boundedPositiveInteger('-1', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
+  assert.strictEqual(boundedPositiveInteger('invalid', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
+  assert.strictEqual(boundedPositiveInteger(String(MAX_EMAIL_ATTEMPTS + 1), DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
+
   const unavailableLogs = [];
   await assert.rejects(
     () => sendContactFormEmails(contact(), { resendClient: null, logger: event => unavailableLogs.push(event) }),
@@ -74,6 +87,26 @@ async function run() {
   assert.deepStrictEqual(timeoutLogs, [{
     event: 'email_delivery_failed', operation: 'password_reset', code: 'EMAIL_PROVIDER_UNAVAILABLE'
   }]);
+
+  let boundedCalls = 0;
+  const boundedDelays = [];
+  const boundedTimeouts = [];
+  await assert.rejects(() => sendEmailWithRetry({
+    client: { emails: { send: async () => {
+      boundedCalls += 1;
+      return { error: { statusCode: 500, name: 'internal_server_error' } };
+    } } },
+    payload: {}, idempotencyKey: 'bounded-key', operation: 'password_reset',
+    maxAttempts: MAX_EMAIL_ATTEMPTS + 1000,
+    retryBaseMs: MAX_EMAIL_RETRY_BASE_MS + 1000,
+    attemptTimeoutMs: MAX_EMAIL_ATTEMPT_TIMEOUT_MS + 1000,
+    sleep: async milliseconds => boundedDelays.push(milliseconds),
+    setTimeoutFn: (callback, milliseconds) => { boundedTimeouts.push(milliseconds); return 1; },
+    clearTimeoutFn: () => {}, logger: () => {}
+  }), error => error.code === 'EMAIL_PROVIDER_UNAVAILABLE');
+  assert.strictEqual(boundedCalls, DEFAULT_EMAIL_MAX_ATTEMPTS, 'excessive attempt overrides must fall back to the safe default');
+  assert.deepStrictEqual(boundedDelays, [DEFAULT_EMAIL_RETRY_BASE_MS, DEFAULT_EMAIL_RETRY_BASE_MS * 2]);
+  assert.deepStrictEqual(boundedTimeouts, Array(DEFAULT_EMAIL_MAX_ATTEMPTS).fill(DEFAULT_EMAIL_ATTEMPT_TIMEOUT_MS));
 
   const sent = [];
   const partialLogs = [];
