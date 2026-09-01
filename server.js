@@ -188,16 +188,16 @@ async function shutdown(signal) {
       offsite_backup_scheduler: offsiteBackupScheduler?.stop(),
       backup_health_watcher: backupHealthWatcher?.stop(),
       billing_reconciliation_scheduler: billingReconciliationScheduler?.stop(),
-      operational_health_watcher: operationalHealthWatcher?.stop(),
-      transactional_email: defaultEmailDeliveryTracker.drain()
+      operational_health_watcher: operationalHealthWatcher?.stop()
     },
+    afterHttpOperations: () => ({ transactional_email: defaultEmailDeliveryTracker.drain() }),
     logger: writeOperationalEvent
   });
   const componentShutdown = serviceShutdown.components;
   writeOperationalEvent({
     event: 'shutdown_components_completed',
-    drained: componentShutdown.drained,
-    failureCount: componentShutdown.failedComponents.length
+    drained: componentShutdown.drained && serviceShutdown.afterHttp.drained,
+    failureCount: componentShutdown.failedComponents.length + serviceShutdown.afterHttp.failedComponents.length
   });
   const httpShutdown = serviceShutdown.http;
   writeOperationalEvent({ event: 'http_shutdown_completed', drained: httpShutdown.drained, forced: httpShutdown.forced });

@@ -29,7 +29,8 @@ async function run() {
   completeHttp();
   assert.deepStrictEqual(await shutdown, {
     http: { drained: true, forced: false },
-    components: { drained: true, failedComponents: [] }
+    components: { drained: true, failedComponents: [] },
+    afterHttp: { drained: true, failedComponents: [] }
   });
   assert.deepStrictEqual(sequence, ['http_closed_to_new_requests', 'worker_drain_started', 'worker_drained']);
 
