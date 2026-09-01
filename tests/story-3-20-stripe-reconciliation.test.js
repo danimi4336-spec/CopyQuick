@@ -326,20 +326,48 @@ async function run() {
     }
   }
 
-  // The global work bound includes local orphan inspection, not only Stripe pages.
+  // A database failure during the repair batch rolls back earlier entitlement repairs.
   {
     const value = fixture();
     try {
-      insertRelationship(value.db);
-      value.db.prepare("INSERT INTO users(email, name, plan_tier, monthly_limit) VALUES ('bounded@example.com', 'Bounded', 'pro', 200)").run();
+      const first = insertRelationship(value.db, { customer: 'cus_1', subscription: 'sub_1' });
+      const second = insertRelationship(value.db, { customer: 'cus_2', subscription: 'sub_2' });
+      value.db.exec(`
+        CREATE TRIGGER fail_second_billing_repair
+        BEFORE UPDATE OF plan_tier ON users
+        WHEN OLD.id = ${second.userId} AND NEW.plan_tier = 'pro'
+        BEGIN SELECT RAISE(ABORT, 'forced billing repair rollback'); END;
+      `);
+      await assert.rejects(() => reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{ data: [
+          remote({ id: 'sub_1', customer: 'cus_1' }),
+          remote({ id: 'sub_2', customer: 'cus_2' })
+        ], has_more: false }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      }), error => error.code === 'RECONCILIATION_FAILED');
+      assert.strictEqual(value.db.prepare("SELECT COUNT(*) AS count FROM users WHERE id IN (?, ?) AND plan_tier = 'free'").get(first.userId, second.userId).count, 2);
+      assert.strictEqual(value.db.prepare("SELECT COUNT(*) AS count FROM billing_reconciliation_issues WHERE resolution_status = 'repaired'").get().count, 0);
+    } finally { closeFixture(value); }
+  }
+
+  // The global work bound includes local orphan inspection and a failed
+  // inventory cannot partially revoke entitlements in apply mode.
+  for (const mode of ['dry_run', 'apply']) {
+    const value = fixture();
+    try {
+      const relationship = insertRelationship(value.db, { userPlan: 'pro', userLimit: 200 });
+      const boundedUserId = Number(value.db.prepare("INSERT INTO users(email, name, plan_tier, monthly_limit) VALUES ('bounded@example.com', 'Bounded', 'pro', 200)").run().lastInsertRowid);
       await assert.rejects(
         () => reconcileBilling({
           db: value.db,
           stripeClient: fakeStripe([{ data: [], has_more: false }]),
-          mode: 'dry_run', env, maxRecords: 1, now: () => now, logger: () => {}
+          mode, env, maxRecords: 1, now: () => now, logger: () => {}
         }),
         error => error.code === 'RECONCILIATION_RECORD_LIMIT_EXCEEDED'
       );
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id = ?').get(relationship.userId).plan_tier, 'pro');
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id = ?').get(boundedUserId).plan_tier, 'pro');
     } finally { closeFixture(value); }
   }
 
