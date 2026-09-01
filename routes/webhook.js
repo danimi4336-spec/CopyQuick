@@ -9,6 +9,8 @@ const { clearSubscriptionCheckoutIntents } = require('../lib/subscriptionCheckou
 const { STRIPE_WEBHOOK_BODY_LIMIT } = require('../lib/requestBodyLimits');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
 
+const MAX_SIBLING_SUBSCRIPTIONS = 5;
+
 function logWebhookEvent(event, code, statusCode, operation) {
   const normalizedOperation = typeof operation === 'string' ? operation.replaceAll('.', '_') : 'unknown';
   writeOperationalEvent({ event, code, statusCode, operation: normalizedOperation });
@@ -134,6 +136,42 @@ async function retrieveCurrentSubscriptionState(stripeSubscriptionId) {
   }
 }
 
+function subscriptionMayRemoveEntitlement(subscription) {
+  return !['active', 'trialing'].includes(subscription?.status);
+}
+
+async function retrieveAuthoritativeSiblingEntitlement(db, user, excludedSubscriptionId) {
+  if (!user) return null;
+  const siblings = db.prepare(`
+    SELECT stripe_subscription_id, past_due_since
+    FROM subscriptions
+    WHERE user_id = ? AND stripe_subscription_id != ?
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(user.id, excludedSubscriptionId, MAX_SIBLING_SUBSCRIPTIONS + 1);
+  if (siblings.length > MAX_SIBLING_SUBSCRIPTIONS) {
+    throw new Error('Subscription relationship bound exceeded.');
+  }
+  const states = await Promise.all(siblings.map(sibling =>
+    retrieveCurrentSubscriptionState(sibling.stripe_subscription_id)
+  ));
+  let strongest = null;
+  for (let index = 0; index < siblings.length; index += 1) {
+    const sibling = siblings[index];
+    const state = states[index];
+    if (!state.found) continue;
+    const decision = evaluateStripeEntitlement(state.subscription, {
+      expectedCustomerId: user.stripe_customer_id || undefined,
+      expectedSubscriptionId: sibling.stripe_subscription_id,
+      pastDueSince: sibling.past_due_since
+    });
+    if (decision.entitled && (!strongest || decision.monthlyLimit > strongest.monthlyLimit)) {
+      strongest = decision;
+    }
+  }
+  return strongest;
+}
+
 function shouldDowngradeForSubscriptionState(subscriptionState) {
   return !subscriptionState?.found || subscriptionState.subscription?.status === 'canceled';
 }
@@ -151,7 +189,7 @@ function existingPastDueSince(db, subscriptionId, status, event) {
   return null;
 }
 
-function applyValidatedSubscription(db, event, user, subscription) {
+function applyValidatedSubscription(db, event, user, subscription, entitlementOverride = null) {
   const pastDueSince = existingPastDueSince(db, subscription?.id, subscription?.status, event);
   const decision = evaluateStripeEntitlement(subscription, {
     expectedCustomerId: user.stripe_customer_id || undefined,
@@ -176,9 +214,13 @@ function applyValidatedSubscription(db, event, user, subscription) {
     monthlyLimit: decision.plan.monthlyLimit,
     pastDueSince: decision.pastDueSince
   });
+  const effectiveDecision = entitlementOverride?.entitled ? entitlementOverride : decision;
+  if (entitlementOverride?.entitled && !decision.entitled) {
+    logWebhookEvent('stripe_sibling_entitlement_preserved', 'AUTHORITATIVE_SIBLING_ENTITLED', 200, 'subscription_sync');
+  }
   db.prepare(`
     UPDATE users SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ? WHERE id = ?
-  `).run(decision.planTier, decision.monthlyLimit, decision.customerId, user.id);
+  `).run(effectiveDecision.planTier, effectiveDecision.monthlyLimit, effectiveDecision.customerId, user.id);
   clearSubscriptionCheckoutIntents(db, { userId: user.id });
   return decision;
 }
@@ -196,7 +238,8 @@ function applyAuthoritativeSubscriptionState(db, event, {
   subscriptionState,
   stripeCustomerId,
   stripeSubscriptionId,
-  context
+  context,
+  siblingEntitlement = null
 }) {
   const currentSubscription = subscriptionState?.subscription || null;
   const effectiveCustomerId = currentSubscription?.customer || stripeCustomerId;
@@ -208,21 +251,26 @@ function applyAuthoritativeSubscriptionState(db, event, {
   }
 
   if (currentSubscription && currentSubscription.status === 'canceled') {
-    applyValidatedSubscription(db, event, user, currentSubscription);
+    applyValidatedSubscription(db, event, user, currentSubscription, siblingEntitlement);
     return;
   }
 
   if (shouldDowngradeForSubscriptionState(subscriptionState)) {
+    if (siblingEntitlement?.entitled) {
+      db.prepare(`UPDATE users SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ? WHERE id = ?`)
+        .run(siblingEntitlement.planTier, siblingEntitlement.monthlyLimit, siblingEntitlement.customerId, user.id);
+      return;
+    }
     downgradeUserForSubscription(db, user, effectiveCustomerId);
     return;
   }
 
-  applyValidatedSubscription(db, event, user, currentSubscription);
+  applyValidatedSubscription(db, event, user, currentSubscription, siblingEntitlement);
 }
 
-function safelyApplySubscription(db, event, user, subscription) {
+function safelyApplySubscription(db, event, user, subscription, entitlementOverride = null) {
   try {
-    applyValidatedSubscription(db, event, user, subscription);
+    applyValidatedSubscription(db, event, user, subscription, entitlementOverride);
     return { status: 'processed' };
   } catch (error) {
     if (!(error instanceof BillingPolicyError)) throw error;
@@ -301,46 +349,13 @@ router.post('/stripe/webhook', express.raw({
         const currentSubscriptionState = isEqualTimestamp
           ? await retrieveCurrentSubscriptionState(stripeSubscriptionId)
           : null;
-
-        runWebhookTransaction(db, event, () => {
-          if (isStaleSubscriptionEvent(db, event, stripeSubscriptionId)) {
-            return { status: 'stale' };
-          }
-
-          if (isEqualTimestampSubscriptionEvent(db, event, stripeSubscriptionId)) {
-            if (!currentSubscriptionState) {
-              throw new Error('Missing authoritative Stripe subscription state for equal-timestamp event');
-            }
-
-            applyAuthoritativeSubscriptionState(db, event, {
-              subscriptionState: currentSubscriptionState,
-              stripeCustomerId,
-              stripeSubscriptionId,
-              context: 'customer.subscription.updated'
-            });
-            return { status: 'processed' };
-          }
-
-          const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
-
-          if (!user) {
-            logWebhookEvent('stripe_webhook_user_unresolved', 'LOCAL_SUBSCRIPTION_MISSING', 200, event.type);
-            return { status: 'processed' };
-          }
-
-          return safelyApplySubscription(db, event, user, subscriptionEvent);
-        });
-        break;
-      }
-
-      case 'customer.subscription.deleted': {
-        requireEventCreated(event);
-        const subscription = event.data.object;
-        const stripeCustomerId = subscription.customer;
-        const stripeSubscriptionId = subscription.id;
-        const isEqualTimestamp = isEqualTimestampSubscriptionEvent(db, event, stripeSubscriptionId);
-        const currentSubscriptionState = isEqualTimestamp
-          ? await retrieveCurrentSubscriptionState(stripeSubscriptionId)
+        const eventUser = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
+        const effectiveSubscription = isEqualTimestamp
+          ? currentSubscriptionState?.subscription
+          : subscriptionEvent;
+        const siblingEntitlement = eventUser && !isStaleSubscriptionEvent(db, event, stripeSubscriptionId) &&
+          subscriptionMayRemoveEntitlement(effectiveSubscription)
+          ? await retrieveAuthoritativeSiblingEntitlement(db, eventUser, stripeSubscriptionId)
           : null;
 
         runWebhookTransaction(db, event, () => {
@@ -357,7 +372,58 @@ router.post('/stripe/webhook', express.raw({
               subscriptionState: currentSubscriptionState,
               stripeCustomerId,
               stripeSubscriptionId,
-              context: 'customer.subscription.deleted'
+              context: 'customer.subscription.updated',
+              siblingEntitlement
+            });
+            return { status: 'processed' };
+          }
+
+          const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
+
+          if (!user) {
+            logWebhookEvent('stripe_webhook_user_unresolved', 'LOCAL_SUBSCRIPTION_MISSING', 200, event.type);
+            return { status: 'processed' };
+          }
+
+          return safelyApplySubscription(db, event, user, subscriptionEvent, siblingEntitlement);
+        });
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        requireEventCreated(event);
+        const subscription = event.data.object;
+        const stripeCustomerId = subscription.customer;
+        const stripeSubscriptionId = subscription.id;
+        const isEqualTimestamp = isEqualTimestampSubscriptionEvent(db, event, stripeSubscriptionId);
+        const currentSubscriptionState = isEqualTimestamp
+          ? await retrieveCurrentSubscriptionState(stripeSubscriptionId)
+          : null;
+        const eventUser = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
+        const effectiveSubscription = isEqualTimestamp
+          ? currentSubscriptionState?.subscription
+          : subscription;
+        const siblingEntitlement = eventUser && !isStaleSubscriptionEvent(db, event, stripeSubscriptionId) &&
+          subscriptionMayRemoveEntitlement(effectiveSubscription)
+          ? await retrieveAuthoritativeSiblingEntitlement(db, eventUser, stripeSubscriptionId)
+          : null;
+
+        runWebhookTransaction(db, event, () => {
+          if (isStaleSubscriptionEvent(db, event, stripeSubscriptionId)) {
+            return { status: 'stale' };
+          }
+
+          if (isEqualTimestampSubscriptionEvent(db, event, stripeSubscriptionId)) {
+            if (!currentSubscriptionState) {
+              throw new Error('Missing authoritative Stripe subscription state for equal-timestamp event');
+            }
+
+            applyAuthoritativeSubscriptionState(db, event, {
+              subscriptionState: currentSubscriptionState,
+              stripeCustomerId,
+              stripeSubscriptionId,
+              context: 'customer.subscription.deleted',
+              siblingEntitlement
             });
             return { status: 'processed' };
           }
@@ -372,7 +438,7 @@ router.post('/stripe/webhook', express.raw({
           return safelyApplySubscription(db, event, user, {
             ...subscription,
             status: subscription.status || 'canceled'
-          });
+          }, siblingEntitlement);
         });
         break;
       }

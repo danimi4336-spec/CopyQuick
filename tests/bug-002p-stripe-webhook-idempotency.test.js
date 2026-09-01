@@ -233,6 +233,7 @@ async function run() {
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('other@example.com', 'Other User', 'cus_other');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('same@example.com', 'Same Second User', 'cus_same');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('null-order@example.com', 'Null Order User', 'cus_null');
+  db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('multi@example.com', 'Multi Subscription User', 'cus_multi');
 
   const app = express();
   app.use('/', webhookRoutes);
@@ -344,6 +345,55 @@ async function run() {
     }));
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(getUser(db, 'stale@example.com').plan_tier, 'pro');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_new_active', created: 360, customer: 'cus_multi',
+      subscription: 'sub_multi_new', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_old_active', created: 370, customer: 'cus_multi',
+      subscription: 'sub_multi_old', status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    subscriptionStates.set('sub_multi_new', makeStripeSubscription({
+      id: 'sub_multi_new', customer: 'cus_multi', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
+    }));
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_old_canceled', type: 'customer.subscription.deleted', created: 380,
+      customer: 'cus_multi', subscription: 'sub_multi_old', status: 'canceled'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'multi@example.com').plan_tier, 'unlimited',
+      'a terminal event for an older subscription must preserve an authoritative active sibling');
+    assert.strictEqual(db.prepare("SELECT status FROM subscriptions WHERE stripe_subscription_id='sub_multi_old'").get().status, 'canceled');
+
+    subscriptionStates.set('sub_multi_new', null);
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_old_terminal_again', created: 390,
+      customer: 'cus_multi', subscription: 'sub_multi_old', status: 'unpaid'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'multi@example.com').plan_tier, 'free',
+      'a missing sibling must not preserve stale local paid entitlement');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_new_restored', created: 400, customer: 'cus_multi',
+      subscription: 'sub_multi_new', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    subscriptionStates.set('sub_multi_new', makeStripeSubscription({
+      id: 'sub_multi_new', customer: 'cus_multi', status: 'active', price: 'price_unknown'
+    }));
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_ambiguous_sibling', created: 410, customer: 'cus_multi',
+      subscription: 'sub_multi_old', status: 'unpaid'
+    }));
+    assert.strictEqual(response.res.statusCode, 500);
+    assert.strictEqual(eventCount(db, 'evt_multi_ambiguous_sibling'), 0,
+      'ambiguous sibling authority must remain retryable');
+    assert.strictEqual(getUser(db, 'multi@example.com').plan_tier, 'unlimited',
+      'ambiguous sibling authority must not partially revoke entitlement');
 
     response = await request(server, subscriptionEvent({
       id: 'evt_stale_deleted',
