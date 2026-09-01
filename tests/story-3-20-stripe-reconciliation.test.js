@@ -55,7 +55,8 @@ function remote(overrides = {}) {
     current_period_end: overrides.currentPeriodEnd ?? 1769904000,
     cancel_at_period_end: false,
     canceled_at: overrides.canceledAt ?? null,
-    ended_at: overrides.endedAt ?? null
+    ended_at: overrides.endedAt ?? null,
+    metadata: overrides.metadata || {}
   };
 }
 
@@ -201,6 +202,71 @@ async function run() {
       assert.strictEqual(result.repairedCount, 1);
       assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(ids.userId).plan_tier, 'unlimited');
       for (const [table, digest] of Object.entries(before)) assert.strictEqual(tableDigest(value.db, table), digest, table);
+    } finally { closeFixture(value); }
+  }
+
+  // A permanently missed initial Checkout webhook can be adopted from Stripe's
+  // durable CopyQuick user binding, but only after complete authoritative validation.
+  {
+    const value = fixture();
+    try {
+      const userId = Number(value.db.prepare(`
+        INSERT INTO users(email, name, plan_tier, monthly_limit)
+        VALUES ('missed-checkout@example.com', 'Missed Checkout', 'free', 10)
+      `).run().lastInsertRowid);
+      const subscription = remote({ metadata: { copyquick_user_id: String(userId) } });
+      const protectedTables = ['usage_periods', 'usage_events', 'generations', 'production_jobs'];
+      const before = Object.fromEntries(protectedTables.map(table => [table, tableDigest(value.db, table)]));
+
+      let result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: [subscription], has_more: false }]), mode: 'dry_run', env, now: () => now, logger: () => {} });
+      assert.deepStrictEqual({ drift: result.driftCount, repaired: result.repairedCount }, { drift: 1, repaired: 0 });
+      assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscriptions').get().count, 0);
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(userId).plan_tier, 'free');
+
+      result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: [subscription], has_more: false }]), mode: 'apply', env, now: () => now, logger: () => {} });
+      assert.strictEqual(result.repairedCount, 1);
+      assert.deepStrictEqual(value.db.prepare('SELECT plan_tier, monthly_limit, stripe_customer_id FROM users WHERE id=?').get(userId), {
+        plan_tier: 'pro', monthly_limit: 200, stripe_customer_id: 'cus_1'
+      });
+      assert.deepStrictEqual(value.db.prepare('SELECT user_id, stripe_subscription_id, status, plan_tier FROM subscriptions').get(), {
+        user_id: userId, stripe_subscription_id: 'sub_1', status: 'active', plan_tier: 'pro'
+      });
+      result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: [subscription], has_more: false }]), mode: 'apply', env, now: () => now, logger: () => {} });
+      assert.strictEqual(result.repairedCount, 0);
+      for (const [table, digest] of Object.entries(before)) assert.strictEqual(tableDigest(value.db, table), digest, table);
+    } finally { closeFixture(value); }
+  }
+
+  // Missing, malformed, unknown, conflicting, or ambiguous identity bindings
+  // remain unresolved and never grant entitlement.
+  for (const setup of [
+    ({ db, userId }) => remote(),
+    ({ db, userId }) => remote({ metadata: { copyquick_user_id: 'invalid' } }),
+    ({ db, userId }) => remote({ metadata: { copyquick_user_id: String(userId + 9999) } }),
+    ({ db, userId }) => {
+      db.prepare("UPDATE users SET stripe_customer_id='cus_other' WHERE id=?").run(userId);
+      return remote({ metadata: { copyquick_user_id: String(userId) } });
+    },
+    ({ db, userId }) => [
+      remote({ id: 'sub_1', customer: 'cus_1', metadata: { copyquick_user_id: String(userId) } }),
+      remote({ id: 'sub_2', customer: 'cus_2', metadata: { copyquick_user_id: String(userId) } })
+    ],
+    ({ db, userId }) => [
+      remote({ id: 'sub_1', customer: 'cus_1', metadata: { copyquick_user_id: String(userId) } }),
+      remote({ id: 'sub_2', customer: 'cus_2', price: 'price_unknown', metadata: { copyquick_user_id: String(userId) } })
+    ]
+  ]) {
+    const value = fixture();
+    try {
+      const userId = Number(value.db.prepare("INSERT INTO users(email,name,plan_tier,monthly_limit) VALUES (?, 'Identity', 'free', 10)")
+        .run(`${Math.random()}@example.com`).lastInsertRowid);
+      const generated = setup({ db: value.db, userId });
+      const subscriptions = Array.isArray(generated) ? generated : [generated];
+      const result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: subscriptions, has_more: false }]), mode: 'apply', env, now: () => now, logger: () => {} });
+      assert.strictEqual(result.repairedCount, 0);
+      assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscriptions').get().count, 0);
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(userId).plan_tier, 'free');
+      assert(result.unresolvedCount >= 1);
     } finally { closeFixture(value); }
   }
 

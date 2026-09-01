@@ -13,6 +13,15 @@ CopyQuick currently uses Stripe Node SDK `22.2.2` without an application-level `
 
 The webhook path and reconciliation service use the same policy in `lib/billingEntitlement.js`. Validation completes before either the subscription row or user entitlement is changed.
 
+If the initial Checkout webhook is permanently missed, reconciliation may
+adopt the Stripe subscription only from its exact `copyquick_user_id`
+subscription metadata binding. The referenced local user must exist, the
+customer relationship must not conflict, no different local subscription may
+already belong to that user, and exactly one valid Stripe subscription may
+claim the user in the completed inventory. Missing, malformed, conflicting, or
+ambiguous bindings remain unresolved; reconciliation never falls back to email
+matching. Dry-run reports the proposed adoption without changing local state.
+
 ## Commands
 
 Read the latest sanitized operational summary:
