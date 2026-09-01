@@ -40,6 +40,7 @@ const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
+const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
@@ -184,7 +185,8 @@ async function shutdown(signal) {
     offsiteBackupScheduler?.stop(),
     backupHealthWatcher?.stop(),
     billingReconciliationScheduler?.stop(),
-    operationalHealthWatcher?.stop()
+    operationalHealthWatcher?.stop(),
+    defaultEmailDeliveryTracker.drain()
   ]);
   const finish = () => {
     stopRuntimeLockHeartbeat();

@@ -7,6 +7,7 @@ const { sendPasswordResetEmail } = require('../lib/email');
 const { createExpiringBucketStore } = require('../lib/authProtection');
 const { destroyAuthenticatedSession } = require('../lib/authSession');
 const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
+const { defaultEmailDeliveryTracker } = require('../lib/emailDeliveryTracker');
 
 const GENERIC_REQUEST_MESSAGE = 'If an account exists for that email, a password reset link has been sent.';
 const DEFAULT_REQUEST_RESPONSE_DELAY_MS = 750;
@@ -19,6 +20,7 @@ function createPasswordRecoveryRouter(options = {}) {
   const router = express.Router();
   const database = options.getDb || getDb;
   const sendResetEmail = options.sendPasswordResetEmail || sendPasswordResetEmail;
+  const emailDeliveryTracker = options.emailDeliveryTracker || defaultEmailDeliveryTracker;
   const responseDelayMs = Number.isFinite(options.responseDelayMs)
     ? Math.max(0, options.responseDelayMs)
     : DEFAULT_REQUEST_RESPONSE_DELAY_MS;
@@ -54,10 +56,11 @@ function createPasswordRecoveryRouter(options = {}) {
       if (user) {
         const token = createPasswordResetToken(user, { env: options.env || process.env });
         const origin = options.publicOrigin || getPublicAppOrigin({ env: options.env || process.env, req });
-        void Promise.resolve(sendResetEmail({
+        const delivery = Promise.resolve().then(() => sendResetEmail({
           email: user.email,
           resetUrl: `${origin}/reset-password?token=${encodeURIComponent(token)}`
-        }, options.emailOptions)).catch(() => {
+        }, options.emailOptions));
+        void emailDeliveryTracker.track('password_reset', delivery).catch(() => {
           console.warn('Password reset request could not be delivered.');
         });
       }
