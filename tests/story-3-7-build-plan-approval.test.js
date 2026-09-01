@@ -210,6 +210,22 @@ async function run() {
   assert.strictEqual(circular.valid, false);
   assert.match(circular.error, /circular dependency/);
 
+  const tampered = updateSelection({
+    plan,
+    currentSelection: defaults,
+    requestedDeliverableIds: defaults.selectedDeliverableIds.concat('operator_only_deliverable')
+  });
+  assert.strictEqual(tampered.valid, false);
+  assert.match(tampered.error, /current Build Plan/);
+  const malformed = updateSelection({ plan, currentSelection: defaults, requestedDeliverableIds: [{ id: 'customer_profile' }] });
+  assert.strictEqual(malformed.valid, false);
+  const oversized = updateSelection({
+    plan,
+    currentSelection: defaults,
+    requestedDeliverableIds: Array(plan.phases.reduce((count, phase) => count + phase.deliverables.length, 0) + 1).fill('customer_profile')
+  });
+  assert.strictEqual(oversized.valid, false);
+
   const approved = createApprovedProductionSet({ plan, selection: withOptional.selection, strategyResult: strategyFor(facts()) });
   assert.strictEqual(approved.valid, true);
   assert(approved.productionSet.approvedAt);
@@ -296,6 +312,13 @@ async function run() {
       selectedDeliverableIds: defaults.selectedDeliverableIds
     });
     assert.strictEqual(csrfDenied.res.statusCode, 403);
+
+    const tamperedSelection = await request(valid, 'POST', '/discovery/build-plan/selection', {
+      _csrf: token,
+      selectedDeliverableIds: defaults.selectedDeliverableIds.concat('operator_only_deliverable')
+    });
+    assert.strictEqual(tamperedSelection.res.statusCode, 409);
+    assert.match(tamperedSelection.body, /Choose only deliverables from the current Build Plan/);
 
     const selectedWithoutSocial = defaults.selectedDeliverableIds.filter((id) => id !== 'social_launch_campaign');
     const saved = await request(valid, 'POST', '/discovery/build-plan/selection', {
