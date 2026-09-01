@@ -13,6 +13,7 @@ const {
   establishAuthenticatedSession
 } = require('../lib/authSession');
 const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
+const { authSuccessPath, normalizeAuthReturnPath } = require('../lib/authReturnPath');
 
 const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
 
@@ -33,11 +34,12 @@ function createAuthRouter(options = {}) {
 
   // Signup
   authRouter.get('/signup', (req, res) => {
-    res.render('signup', { title: 'Sign Up - CopyQuick', error: null, currentPage: 'signup' });
+    res.render('signup', { title: 'Sign Up - CopyQuick', error: null, currentPage: 'signup', returnTo: normalizeAuthReturnPath(req.query.next) });
   });
 
   authRouter.post('/signup', signupLimiter, async (req, res) => {
     const { email, password, name } = req.authSignup;
+    const returnTo = normalizeAuthReturnPath(req.body.next);
     const db = getDatabase();
 
     try {
@@ -46,20 +48,21 @@ function createAuthRouter(options = {}) {
         .run(email, passwordHash, name);
 
       await establishAuthenticatedSession(req, result.lastInsertRowid);
-      res.redirect('/welcome');
+      res.redirect(authSuccessPath(null, returnTo));
     } catch (err) {
       console.error('Signup failed.');
-      res.render('signup', { title: 'Sign Up - CopyQuick', error: SIGNUP_FAILURE_ERROR, currentPage: 'signup' });
+      res.render('signup', { title: 'Sign Up - CopyQuick', error: SIGNUP_FAILURE_ERROR, currentPage: 'signup', returnTo });
     }
   });
 
   // Login
   authRouter.get('/login', (req, res) => {
-    res.render('login', { title: 'Login - CopyQuick', error: null, currentPage: 'login' });
+    res.render('login', { title: 'Login - CopyQuick', error: null, currentPage: 'login', returnTo: normalizeAuthReturnPath(req.query.next) });
   });
 
   authRouter.post('/login', loginLimiter.middleware, async (req, res) => {
     const { email, password } = req.authLogin;
+    const returnTo = normalizeAuthReturnPath(req.body.next);
     const db = getDatabase();
 
     try {
@@ -72,14 +75,14 @@ function createAuthRouter(options = {}) {
         await establishAuthenticatedSession(req, user.id);
         const db2 = getDatabase();
         const hasGoal = db2.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
-        res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
+        res.redirect(authSuccessPath(hasGoal, returnTo));
       } else {
         loginLimiter.recordFailure(req);
-        res.render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login' });
+        res.render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login', returnTo });
       }
     } catch (err) {
       console.error('Login failed.');
-      res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
+      res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login', returnTo });
     }
   });
 
@@ -112,6 +115,8 @@ router.get('/auth/google', (req, res, next) => {
   if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
     console.error(`❌ GOOGLE_CALLBACK_URL does NOT start with https:// — Google will reject this!`);
   }
+  const returnTo = normalizeAuthReturnPath(req.query.next);
+  if (returnTo) req.session.authReturnTo = returnTo;
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
@@ -131,16 +136,18 @@ router.get('/auth/google/callback',
         return res.redirect('/login');
       }
       console.log('✅ Google OAuth success.');
+      const returnTo = normalizeAuthReturnPath(req.session?.authReturnTo);
       req.logIn(user, (loginErr) => {
         if (loginErr) {
           console.error('❌ Passport login error.');
           return res.status(500).send('Session error. Please try again.');
         }
         req.session.userId = user.id;
+        delete req.session.authReturnTo;
         const dbCb = getDb();
         const hasGoal = dbCb.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
         console.log('✅ Session set after Google OAuth.');
-        return res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
+        return res.redirect(authSuccessPath(hasGoal, returnTo));
       });
     })(req, res, next);
   }

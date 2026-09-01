@@ -9,6 +9,7 @@
 
         <form action="/signup" method="POST">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <% if (returnTo) { %><input type="hidden" name="next" value="<%= returnTo %>"><% } %>
             <div class="form-group">
                 <label for="name">Full Name</label>
                 <input type="text" id="name" name="name" required placeholder="John Doe">
@@ -25,7 +26,7 @@
         </form>
         
         <p class="auth-footer">
-            Already have an account? <a href="/login">Log in</a>
+            Already have an account? <a href="/login<%= returnTo ? `?next=${encodeURIComponent(returnTo)}` : '' %>">Log in</a>
         </p>
     </div>
 </div>

@@ -19,6 +19,8 @@ assert.match(publicPricing, /200 generations \/ mo/);
 assert.match(publicPricing, /Unlimited monthly generation allowance/);
 assert.match(publicPricing, /Access to current creation workflows/);
 assert.match(publicPricing, /Saved generation history/);
+assert.match(publicPricing, /href="\/signup\?next=%2Fpricing"/);
+assert.doesNotMatch(publicPricing, /action="\/subscribe"/);
 
 for (const unsupportedBenefit of [
   'Tone customization',
