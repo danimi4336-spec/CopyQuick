@@ -157,7 +157,8 @@ function runServerStartupSmoke() {
       STRIPE_KEY: 'sk_test_bug_002o',
       STRIPE_WEBHOOK_SECRET: 'whsec_bug_002o',
       STRIPE_PRO_PRICE: 'price_bug_002o_pro',
-      STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited'
+      STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited',
+      RESEND_API_KEY: 're_bug_002o_not_real'
     };
     const migration = spawnSync(process.execPath, ['scripts/migrate-database.js'], {
       cwd: path.join(__dirname, '..'),

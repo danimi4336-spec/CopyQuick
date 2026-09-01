@@ -16,6 +16,7 @@ process.env.STRIPE_KEY = 'sk_test_bug_002u';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_bug_002u';
 process.env.STRIPE_PRO_PRICE = 'price_bug_002u_pro';
 process.env.STRIPE_UNLIMITED_PRICE = 'price_bug_002u_unlimited';
+process.env.RESEND_API_KEY = 're_bug_002u_not_real';
 
 for (const suffix of ['', '-wal', '-shm']) {
   try {

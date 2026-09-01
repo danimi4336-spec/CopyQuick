@@ -1,5 +1,10 @@
 # Transactional Email Delivery Integrity V1
 
+Production startup requires `RESEND_API_KEY`. CopyQuick refuses to start when
+customer password recovery and contact delivery would otherwise be silently
+disabled. Development remains usable without an email provider and reports the
+disabled state explicitly.
+
 The contact form reports success only after the support notification has been
 accepted by Resend. Missing provider configuration and exhausted provider
 failures return a contained error; CopyQuick no longer tells a customer that a
