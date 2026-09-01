@@ -198,6 +198,36 @@ async function run() {
       'gate', 'runtime', 'http', 'worker', 'scheduler', 'watcher',
       'billing-scheduler', 'operational-watcher'
     ]);
+
+    // A failure after HTTP admission unwinds every already-started service and
+    // never masks the original configuration/startup error.
+    const rollbackCalls = [];
+    const component = name => ({
+      stop: async () => {
+        rollbackCalls.push(`${name}:stop`);
+        if (name === 'watcher') throw new Error('contained cleanup failure');
+      }
+    });
+    const startupFailure = Object.assign(new Error('late startup failed'), { code: 'LATE_STARTUP_FAILED' });
+    await assert.rejects(() => startApplicationAfterMigrationGate({
+      databaseExists: true,
+      getDatabase: () => ({ marker: 'db' }),
+      gateMigrationState: () => ({ currentVersion: 4 }),
+      initializeRuntimeDatabase: () => {},
+      startHttp: () => ({
+        close: callback => { rollbackCalls.push('http:close'); callback(); },
+        closeIdleConnections: () => rollbackCalls.push('http:idle-close')
+      }),
+      startProductionWorker: () => component('worker'),
+      startOffsiteBackupScheduler: () => component('scheduler'),
+      startBackupHealthWatcher: () => component('watcher'),
+      startBillingReconciliationScheduler: () => component('billing'),
+      startOperationalHealthWatcher: () => { throw startupFailure; }
+    }), error => error === startupFailure);
+    assert.deepStrictEqual(rollbackCalls, [
+      'http:close', 'http:idle-close', 'billing:stop', 'watcher:stop',
+      'scheduler:stop', 'worker:stop'
+    ]);
   }
 
   // migrations:check is read-only, succeeds only for a safe state, and reports normalized failure.
