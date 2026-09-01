@@ -234,6 +234,19 @@ async function run() {
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('same@example.com', 'Same Second User', 'cus_same');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('null-order@example.com', 'Null Order User', 'cus_null');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('multi@example.com', 'Multi Subscription User', 'cus_multi');
+  const boundOwnerId = db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)')
+    .run('bound-owner@example.com', 'Bound Owner', 'cus_shared').lastInsertRowid;
+  db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)')
+    .run('cached-owner@example.com', 'Cached Owner', 'cus_shared');
+  db.prepare(`
+    INSERT INTO subscriptions(
+      user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+      price_id, current_period_start, current_period_end
+    ) VALUES (?, 'cus_shared', 'sub_bound_owner', 'active', 'pro', ?, ?, ?)
+  `).run(
+    boundOwnerId, process.env.STRIPE_PRO_PRICE,
+    '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'
+  );
 
   const app = express();
   app.use('/', webhookRoutes);
@@ -345,6 +358,24 @@ async function run() {
     }));
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(getUser(db, 'stale@example.com').plan_tier, 'pro');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_exact_binding_wins', created: 355, customer: 'cus_shared',
+      subscription: 'sub_bound_owner', status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'bound-owner@example.com').plan_tier, 'pro');
+    assert.strictEqual(getUser(db, 'cached-owner@example.com').plan_tier, 'free',
+      'a duplicated cached customer ID must not override the exact subscription owner');
+
+    response = await request(server, subscriptionEvent({
+      id: 'evt_ambiguous_customer_only', created: 356, customer: 'cus_shared',
+      subscription: 'sub_unbound_shared', status: 'active'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(db.prepare("SELECT COUNT(*) count FROM subscriptions WHERE stripe_subscription_id='sub_unbound_shared'").get().count, 0,
+      'an ambiguous customer-only relationship must fail closed');
+    assert.strictEqual(getUser(db, 'cached-owner@example.com').plan_tier, 'free');
 
     response = await request(server, subscriptionEvent({
       id: 'evt_multi_new_active', created: 360, customer: 'cus_multi',

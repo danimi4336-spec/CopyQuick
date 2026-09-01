@@ -17,22 +17,20 @@ function logWebhookEvent(event, code, statusCode, operation) {
 }
 
 function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
-  let user = null;
-
-  if (stripeCustomerId) {
-    user = db.prepare('SELECT * FROM users WHERE stripe_customer_id = ?').get(stripeCustomerId);
-  }
-
-  if (!user && stripeSubscriptionId) {
-    user = db.prepare(`
+  if (stripeSubscriptionId) {
+    const boundUser = db.prepare(`
       SELECT users.*
       FROM users
       JOIN subscriptions ON subscriptions.user_id = users.id
       WHERE subscriptions.stripe_subscription_id = ?
     `).get(stripeSubscriptionId);
+    if (boundUser) return boundUser;
   }
-
-  return user;
+  if (!stripeCustomerId) return null;
+  const customerUsers = db.prepare(`
+    SELECT * FROM users WHERE stripe_customer_id = ? ORDER BY id LIMIT 2
+  `).all(stripeCustomerId);
+  return customerUsers.length === 1 ? customerUsers[0] : null;
 }
 
 function getEventCreated(event) {
