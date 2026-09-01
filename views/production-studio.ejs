@@ -64,16 +64,32 @@
     var terminal = ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'];
     var latestRunStatus = <%- JSON.stringify(production.status) %>;
     var statusRequestTimeoutMs = 10000;
+    var retryDelayMs = 5000;
+    var maxRetryDelayMs = 60000;
+    var pollTimer = null;
+    var activeController = null;
+    var pollingStopped = false;
     function label(value) { return String(value || '').replace(/_/g, ' '); }
     function liveStatus(message) {
         var element = document.getElementById('production-live-status');
         if (element) element.textContent = message || '';
     }
+    function scheduleRefresh(delay) {
+        if (pollingStopped || terminal.includes(latestRunStatus)) return;
+        if (pollTimer) window.clearTimeout(pollTimer);
+        pollTimer = window.setTimeout(function () {
+            pollTimer = null;
+            refreshProduction();
+        }, delay);
+    }
     function retryProduction() {
-        if (!terminal.includes(latestRunStatus)) window.setTimeout(refreshProduction, 5000);
+        var delay = retryDelayMs;
+        retryDelayMs = Math.min(maxRetryDelayMs, retryDelayMs * 2);
+        scheduleRefresh(delay);
     }
     async function refreshProduction() {
         var controller = new AbortController();
+        activeController = controller;
         var requestTimeout = window.setTimeout(function () { controller.abort(); }, statusRequestTimeoutMs);
         try {
             var response = await fetch('/production/' + runId + '/status', {
@@ -83,6 +99,7 @@
             if (!response.ok) throw new Error('Production status request failed');
             var state = await response.json();
             latestRunStatus = state.runStatus;
+            retryDelayMs = 5000;
             liveStatus('');
             document.getElementById('production-progress').textContent = state.completedCount + ' of ' + state.totalCount + ' completed.';
             document.getElementById('production-run-status').textContent = label(state.runStatus);
@@ -108,14 +125,26 @@
                     resultLink.remove();
                 }
             });
-            if (!terminal.includes(state.runStatus)) window.setTimeout(refreshProduction, 3000);
+            scheduleRefresh(3000);
         } catch (err) {
             liveStatus('Live updates are temporarily unavailable. Retrying automatically…');
             retryProduction();
         } finally {
             window.clearTimeout(requestTimeout);
+            if (activeController === controller) activeController = null;
         }
     }
-    if (!terminal.includes(<%- JSON.stringify(production.status) %>)) window.setTimeout(refreshProduction, 3000);
+    window.addEventListener('pagehide', function () {
+        pollingStopped = true;
+        if (pollTimer) window.clearTimeout(pollTimer);
+        pollTimer = null;
+        if (activeController) activeController.abort();
+    });
+    window.addEventListener('pageshow', function (event) {
+        if (!event.persisted) return;
+        pollingStopped = false;
+        scheduleRefresh(0);
+    });
+    scheduleRefresh(3000);
 })();
 </script>
