@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 3;
+const MAX_SUPPORTED_SCHEMA_VERSION = 4;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -122,10 +122,47 @@ const GENERATION_IDEMPOTENCY_MIGRATION = Object.freeze({
   }
 });
 
+const SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION = Object.freeze({
+  version: 4,
+  name: 'subscription_checkout_intents',
+  kind: 'migration',
+  policy: 'additive',
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    `CREATE TABLE subscription_checkout_intents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      plan_tier TEXT NOT NULL CHECK(plan_tier IN ('pro', 'unlimited')),
+      price_id TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      stripe_checkout_session_id TEXT,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, plan_tier)
+    )`,
+    'CREATE UNIQUE INDEX idx_subscription_checkout_intents_key ON subscription_checkout_intents(idempotency_key)',
+    'CREATE UNIQUE INDEX idx_subscription_checkout_intents_session ON subscription_checkout_intents(stripe_checkout_session_id)',
+    'CREATE INDEX idx_subscription_checkout_intents_expiry ON subscription_checkout_intents(expires_at)'
+  ]),
+  validate(db) {
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='subscription_checkout_intents'").get()) {
+      throw new MigrationError('Subscription checkout intent migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+    const indexes = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='subscription_checkout_intents'").all().map(row => row.name));
+    if (!indexes.has('idx_subscription_checkout_intents_key') ||
+        !indexes.has('idx_subscription_checkout_intents_session') ||
+        !indexes.has('idx_subscription_checkout_intents_expiry')) {
+      throw new MigrationError('Subscription checkout intent migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
 const MIGRATIONS = Object.freeze([
   BASELINE_MIGRATION,
   BILLING_RECONCILIATION_MIGRATION,
-  GENERATION_IDEMPOTENCY_MIGRATION
+  GENERATION_IDEMPOTENCY_MIGRATION,
+  SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION
 ]);
 
 function migrationChecksum(migration) {
@@ -516,6 +553,7 @@ module.exports = {
   BASELINE_MIGRATION,
   BILLING_RECONCILIATION_MIGRATION,
   GENERATION_IDEMPOTENCY_MIGRATION,
+  SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION,
   LEDGER_SQL,
   LEDGER_TABLE,
   MAX_SUPPORTED_SCHEMA_VERSION,

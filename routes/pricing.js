@@ -1,12 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('./auth');
-const { isBillingEnabled, createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
+const {
+  isBillingEnabled,
+  createCheckoutSession,
+  createCustomerPortalSession,
+  retrieveCheckoutSession
+} = require('../lib/stripe');
 const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
 const { issueCheckoutKeys, validateCheckoutKey } = require('../lib/checkoutIdempotency');
 const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPolicy');
 const { getTrustedStripeRedirect } = require('../lib/stripeRedirect');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
+const { getDb } = require('../db/database');
+const {
+  acquireSubscriptionCheckoutIntent,
+  recordSubscriptionCheckoutSession
+} = require('../lib/subscriptionCheckoutIntent');
 
 function logBillingFailure(req, event, code, statusCode) {
   writeOperationalEvent({
@@ -65,20 +75,62 @@ router.post('/subscribe', requireAuth, async (req, res) => {
   }
 
   try {
+    const planTier = price === 'pro_price' ? 'pro' : price === 'unlimited_price' ? 'unlimited' : price;
+    const db = req.app.locals.copyquickDb || getDb();
+    let checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
+      userId: user.id,
+      planTier,
+      priceId
+    });
+    if (checkoutIntent.expired) {
+      if (!checkoutIntent.stripeCheckoutSessionId) {
+        logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 409);
+        return res.status(409).send('A previous billing request still needs review. Please contact support before trying again.');
+      }
+      const previousSession = await retrieveCheckoutSession(checkoutIntent.stripeCheckoutSessionId);
+      if (previousSession?.status === 'complete') {
+        return res.redirect(303, '/profile?billing=pending');
+      }
+      if (previousSession?.status === 'open') {
+        const previousRedirect = getTrustedStripeRedirect(previousSession.url, 'checkout');
+        if (!previousRedirect) {
+          logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
+          return res.status(502).send('Billing provider returned an invalid response. Please try again.');
+        }
+        return res.redirect(previousRedirect);
+      }
+      if (previousSession?.status !== 'expired') {
+        logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 502);
+        return res.status(502).send('Billing status could not be verified safely. Please try again later.');
+      }
+      checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
+        userId: user.id,
+        planTier,
+        priceId,
+        allowExpiredReplacement: true
+      });
+    }
     const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCheckoutSession(
       user.email, 
       priceId, 
       `${publicOrigin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       `${publicOrigin}/pricing`,
-      `checkout:${user.id}:${checkoutKey}`,
-      user.id
+      `checkout:${user.id}:${checkoutIntent.idempotencyKey}`,
+      user.id,
+      Math.floor(checkoutIntent.expiresAt.getTime() / 1000)
     );
     const redirectUrl = getTrustedStripeRedirect(session.url, 'checkout');
-    if (!redirectUrl) {
+    if (!redirectUrl || typeof session.id !== 'string') {
       logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
       return res.status(502).send('Billing provider returned an invalid response. Please try again.');
     }
+    recordSubscriptionCheckoutSession(db, {
+      userId: user.id,
+      planTier,
+      idempotencyKey: checkoutIntent.idempotencyKey,
+      stripeCheckoutSessionId: session.id
+    });
     res.redirect(redirectUrl);
   } catch (err) {
     if (err?.code === 'BILLING_DISABLED') {

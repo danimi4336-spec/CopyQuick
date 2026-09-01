@@ -10,7 +10,7 @@ const { buildOperationalStatus, exitCodeForOperationalStatus } = require('../lib
 function healthy(overrides = {}) {
   return {
     production: true,
-    migration: { safe: true, code: 'MIGRATION_COMPATIBLE', currentVersion: 3, pendingCount: 0 },
+    migration: { safe: true, code: 'MIGRATION_COMPATIBLE', currentVersion: 4, pendingCount: 0 },
     storage: {
       status: 'healthy', quickCheck: 'ok', capacityStatus: 'healthy', freePercent: 70,
       localBackupStatus: 'healthy', latestVerifiedBackupAt: '2026-08-31T10:00:00.000Z',
@@ -100,7 +100,7 @@ function run() {
   assert.strictEqual(cli.status, 0, cli.stderr);
   const output = JSON.parse(cli.stdout);
   assert.strictEqual(output.status, 'healthy');
-  assert.strictEqual(output.migration.currentVersion, 3);
+  assert.strictEqual(output.migration.currentVersion, 4);
   assert.strictEqual(output.storage.quickCheck, 'ok');
   assert.strictEqual(output.generation.mode, 'running');
   assert(!cli.stdout.includes(databasePath));

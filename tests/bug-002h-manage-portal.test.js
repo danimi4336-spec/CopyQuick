@@ -26,6 +26,7 @@ require.cache[stripeModuleId] = {
     createCheckoutSession: async () => {
       throw new Error('Checkout should not be called by /manage');
     },
+    retrieveCheckoutSession: async () => ({ status: 'expired' }),
     createCustomerPortalSession: async (customerId, returnUrl) => {
       portalCalls.push({ customerId, returnUrl });
       return { url: 'https://billing.stripe.com/p/session/test-session' };

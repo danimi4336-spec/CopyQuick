@@ -52,8 +52,9 @@ function installMocks() {
     exports: {
       createCheckoutSession: async (customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId) => {
         checkoutCalls.push({ customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId });
-        return { url: 'https://checkout.stripe.com/c/pay/mock-session' };
+        return { id: 'cs_test_csrf_safe', url: 'https://checkout.stripe.com/c/pay/mock-session' };
       },
+      retrieveCheckoutSession: async () => ({ status: 'expired' }),
       createCustomerPortalSession: async (customerId, returnUrl) => {
         portalCalls.push({ customerId, returnUrl });
         return { url: 'https://billing.stripe.com/p/session/mock-session' };

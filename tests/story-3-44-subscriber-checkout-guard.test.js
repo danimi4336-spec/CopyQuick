@@ -3,6 +3,8 @@ const ejs = require('ejs');
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const Database = require('better-sqlite3');
+const { runMigrationEngine } = require('../db/migrations');
 const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPolicy');
 
 process.env.STRIPE_UNLIMITED_PRICE = 'price_unlimited_story_344';
@@ -22,8 +24,9 @@ require.cache[stripeModuleId] = {
     isBillingEnabled: true,
     createCheckoutSession: async (...args) => {
       checkoutCalls.push(args);
-      return { url: 'https://checkout.stripe.com/c/pay/test-session' };
+      return { id: 'cs_test_subscriber_safe', url: 'https://checkout.stripe.com/c/pay/test-session' };
     },
+    retrieveCheckoutSession: async () => ({ status: 'expired' }),
     createCustomerPortalSession: async () => ({ url: 'https://billing.stripe.com/p/session/test-session' })
   }
 };
@@ -55,6 +58,11 @@ function post(server, user) {
 
 async function run() {
   const app = express();
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+  runMigrationEngine(db, { logger: () => {} });
+  db.prepare('INSERT INTO users(id, email, name) VALUES (?, ?, ?)').run(44, 'safe@example.com', 'Safe');
+  app.locals.copyquickDb = db;
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
     const planTier = req.headers['x-test-plan'];
@@ -84,6 +92,7 @@ async function run() {
     assert.strictEqual(checkoutCalls.length, 1);
   } finally {
     await new Promise(resolve => server.close(resolve));
+    db.close();
   }
 
   const pricingView = path.join(__dirname, '..', 'views', 'pricing.ejs');
