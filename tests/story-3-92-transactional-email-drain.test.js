@@ -1,8 +1,13 @@
 const assert = require('assert');
 
-const { createEmailDeliveryTracker } = require('../lib/emailDeliveryTracker');
+const { DEFAULT_EMAIL_DRAIN_TIMEOUT_MS, createEmailDeliveryTracker, emailDrainTimeoutMs } = require('../lib/emailDeliveryTracker');
 
 async function run() {
+  assert.strictEqual(emailDrainTimeoutMs('1'), 1);
+  assert.strictEqual(emailDrainTimeoutMs('60000'), 60000);
+  assert.strictEqual(emailDrainTimeoutMs('0'), DEFAULT_EMAIL_DRAIN_TIMEOUT_MS);
+  assert.strictEqual(emailDrainTimeoutMs('60001'), DEFAULT_EMAIL_DRAIN_TIMEOUT_MS);
+  assert.strictEqual(emailDrainTimeoutMs('invalid'), DEFAULT_EMAIL_DRAIN_TIMEOUT_MS);
   const events = [];
   let complete;
   const pending = new Promise(resolve => { complete = resolve; });

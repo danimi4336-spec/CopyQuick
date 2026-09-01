@@ -17,6 +17,18 @@ Configure the bounds with:
 - `EMAIL_DELIVERY_MAX_ATTEMPTS` (default `3`)
 - `EMAIL_DELIVERY_RETRY_BASE_MS` (default `250`)
 - `EMAIL_DELIVERY_TIMEOUT_MS` (default `10000`)
+- `EMAIL_DELIVERY_DRAIN_TIMEOUT_MS` (default `15000`, valid range `1`–`60000`)
+
+During graceful shutdown, CopyQuick stops accepting new HTTP requests first.
+It lets active requests finish, then drains password-reset delivery so a reset
+request that was already in flight cannot be lost between request completion
+and process exit. The email drain is bounded by
+`EMAIL_DELIVERY_DRAIN_TIMEOUT_MS`. Active HTTP requests have a separate
+`HTTP_SHUTDOWN_TIMEOUT_MS` bound (default `25000`, valid range
+`1000`–`120000`); connections still open at that boundary are closed so the
+SQLite runtime lock can be released. These in-process drains protect planned
+deploys and SIGTERM shutdowns; they are not a durable queue and cannot recover
+mail interrupted by an abrupt process or host failure.
 
 The support notification is authoritative. If it succeeds but the customer
 acknowledgement exhausts retries, the contact submission remains successful and
