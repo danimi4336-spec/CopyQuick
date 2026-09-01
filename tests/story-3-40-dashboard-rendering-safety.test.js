@@ -1,0 +1,17 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const view = fs.readFileSync(path.join(__dirname, '..', 'views', 'dashboard.ejs'), 'utf8');
+const routes = fs.readFileSync(path.join(__dirname, '..', 'routes', 'generations.js'), 'utf8');
+assert(!view.includes('<%- error %>'));
+assert(view.includes('<%= error %>'));
+assert(view.includes('<%= errorAction.href %>'));
+assert(!routes.includes('Monthly generation limit reached. <a'));
+assert.match(routes, /errorAction: \{ href: '\/pricing'/);
+assert(!view.includes('listEl.innerHTML=sec.deliverables'));
+assert(!view.includes('platformsEl.innerHTML = chips'));
+assert(!view.includes('groupsEl.innerHTML = h'));
+assert.match(view, /item\.textContent='• '\+d/);
+assert.match(view, /category\.textContent=cat\.category/);
+assert.match(view, /JSON\.stringify\(campaignSections\)\.replace/);
+console.log('Story 3.40 dashboard rendering safety tests passed');

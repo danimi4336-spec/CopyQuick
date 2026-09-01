@@ -223,7 +223,7 @@
                     <h2>⚡ Quick Generate</h2>
                     <p class="mode-panel-desc">Generate a single piece of content in seconds.</p>
                 </div>
-                <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%- error %></div><% } %>
+                <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%= error %><% if (typeof errorAction !== 'undefined' && errorAction) { %> <a href="<%= errorAction.href %>"><%= errorAction.label %></a><% } %></div><% } %>
                 <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="quick">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="idempotencyKey" value="<%= requestKeys.quick %>">
@@ -689,7 +689,7 @@
   });
 
   // ===== Campaign Section Buttons =====
-  var sections = <%- JSON.stringify(campaignSections) %>;
+  var sections = <%- JSON.stringify(campaignSections).replace(/</g, '\\u003c') %>;
   var __journeys = <%- journeysData %>;
   var brainPct = <%= brainPct %>;
   var secBtns=document.querySelectorAll('.campaign-sec-btn');
@@ -704,7 +704,7 @@
       var sec=sections.find(function(s){return s.id===id;});
       if(sec){
         if(titleEl)titleEl.textContent=sec.icon+' '+sec.label+' Includes';
-        if(listEl)listEl.innerHTML=sec.deliverables.map(function(d){return '<div class="deliverable-item">• '+d+'</div>';}).join('');
+        if(listEl){listEl.replaceChildren();sec.deliverables.forEach(function(d){var item=document.createElement('div');item.className='deliverable-item';item.textContent='• '+d;listEl.appendChild(item);});}
         if(countEl)countEl.textContent=sec.deliverables.length+' assets';
       }
     });
@@ -890,30 +890,26 @@
     // Platforms
     var platformsEl = document.getElementById('bpPlatforms');
     if (journey.platforms && journey.platforms.length > 0) {
-      var chips = '';
+      platformsEl.replaceChildren();
       journey.platforms.forEach(function(p){
-        chips += '<span class="bp-platform-chip">' + p + '</span>';
+        var chip=document.createElement('span');chip.className='bp-platform-chip';chip.textContent=p;platformsEl.appendChild(chip);
       });
-      platformsEl.innerHTML = chips;
       platformsEl.style.display = '';
     } else {
-      platformsEl.innerHTML = '';
+      platformsEl.replaceChildren();
       platformsEl.style.display = 'none';
     }
 
     // Blueprint groups
     var groupsEl = document.getElementById('bpGroups');
-    var h = '';
+    groupsEl.replaceChildren();
     journey.blueprint.forEach(function(cat){
-      h += '<div class="bp-group">';
-      h += '<div class="bp-group-category">' + cat.category + '</div>';
-      h += '<div class="bp-group-items">';
+      var group=document.createElement('div');group.className='bp-group';var category=document.createElement('div');category.className='bp-group-category';category.textContent=cat.category;group.appendChild(category);var items=document.createElement('div');items.className='bp-group-items';
       cat.items.forEach(function(item){
-        h += '<span class="bp-item-chip">' + item + '</span>';
+        var chip=document.createElement('span');chip.className='bp-item-chip';chip.textContent=item;items.appendChild(chip);
       });
-      h += '</div></div>';
+      group.appendChild(items);groupsEl.appendChild(group);
     });
-    groupsEl.innerHTML = h;
 
     // Stats
     document.getElementById('bpAssetCount').textContent = 'Estimated Assets: ' + journey.estimatedAssets;
