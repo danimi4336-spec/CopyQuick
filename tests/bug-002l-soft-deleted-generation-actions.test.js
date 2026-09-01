@@ -113,6 +113,7 @@ async function run() {
   const owner = db.prepare('SELECT * FROM users WHERE id = ?').get(ownerId);
   const deletedId = insertGeneration(db, ownerId, { is_deleted: 1, title: 'Deleted title', tags: 'old', favorite: 0 });
   const otherGenId = insertGeneration(db, otherUserId);
+  const corruptedGenId = insertGeneration(db, ownerId, { title: 'Corrupted result', results: '{malformed' });
   const server = await listen(createApp(owner));
 
   try {
@@ -143,6 +144,14 @@ async function run() {
     const exportDeleted = await request(server, 'GET', `/generation/${deletedId}/export?format=txt`);
     assert.strictEqual(exportDeleted.res.statusCode, 404);
     assert.strictEqual(exportDeleted.body, 'Not found');
+
+    const corruptedDetail = await request(server, 'GET', `/generation/${corruptedGenId}`);
+    assert.strictEqual(corruptedDetail.res.statusCode, 409);
+    assert.match(corruptedDetail.body, /This saved generation is unavailable/);
+    assert.match(corruptedDetail.body, />409</);
+    const corruptedExport = await request(server, 'GET', `/generation/${corruptedGenId}/export?format=txt`);
+    assert.strictEqual(corruptedExport.res.statusCode, 409);
+    assert.strictEqual(corruptedExport.body, 'This saved generation is unavailable.');
 
     const blockedRow = db.prepare('SELECT title, tags, favorite, is_deleted FROM generations WHERE id = ?').get(deletedId);
     assert.deepStrictEqual(blockedRow, {

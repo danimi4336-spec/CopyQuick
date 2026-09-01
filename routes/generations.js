@@ -13,6 +13,7 @@ const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
+const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const {
   getCurrentUsageSnapshot,
@@ -435,9 +436,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     if (generationRequest.replay) {
       const existing = loadReplayGeneration(db, { userId: user.id, generationId: generationRequest.generationId });
       if (!isAjax) return res.redirect(`/generation/${existing.id}`);
+      const replayResults = parseStoredGenerationResults(existing.results);
+      if (!replayResults) return res.status(409).json({ error: 'Stored generation unavailable' });
       const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
       return res.set('Idempotency-Replayed', 'true').json({
-        results: JSON.parse(existing.results),
+        results: replayResults,
         genId: existing.id,
         generationsUsed: updatedUser.generations_used,
         monthlyLimit: updatedUser.monthly_limit,
@@ -737,7 +740,14 @@ router.get('/generation/:id', requireAuth, (req, res) => {
   const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(genId, userId);
   if (!gen) return res.status(404).render('error', { title: 'Not Found - CopyQuick', message: 'Generation not found.' });
 
-  const results = JSON.parse(gen.results);
+  const results = gen.generation_type === 'production' ? [] : parseStoredGenerationResults(gen.results);
+  if (!results) {
+    return res.status(409).render('error', {
+      errorStatus: 409,
+      title: 'Generation Unavailable - CopyQuick',
+      message: 'This saved generation is unavailable. You can return to History and create a new version.'
+    });
+  }
   let productionDeliverable = null;
   if (gen.generation_type === 'production' && gen.production_job_id) {
     const production = db.prepare(`
@@ -852,8 +862,10 @@ router.post('/generation/:id/regenerate', requireAuth, requireGenerationAvailabl
     });
     if (generationRequest.replay) {
       const existing = loadReplayGeneration(db, { userId, generationId: generationRequest.generationId });
+      const replayResults = parseStoredGenerationResults(existing.results);
+      if (!replayResults) return res.status(409).json({ error: 'Stored generation unavailable' });
       return res.set('Idempotency-Replayed', 'true').json({
-        results: JSON.parse(existing.results),
+        results: replayResults,
         idempotentReplay: true
       });
     }
@@ -924,7 +936,6 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
   const gen = db.prepare('SELECT * FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(req.params.id, userId);
   if (!gen) return res.status(404).send('Not found');
 
-  const results = JSON.parse(gen.results);
   let content = '';
   if (gen.generation_type === 'production') {
     const contract = getProductionContract(gen.deliverable_id);
@@ -939,6 +950,9 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="copyquick-deliverable-${gen.id}.${format}"`);
     return res.send(content);
   }
+
+  const results = parseStoredGenerationResults(gen.results);
+  if (!results) return res.status(409).send('This saved generation is unavailable.');
 
   if (format === 'txt') {
     content = results.map((r, i) => `--- Variation ${i + 1} (${r.tone}) ---\n${r.text}`).join('\n\n');
