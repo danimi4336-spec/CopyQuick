@@ -24,6 +24,9 @@ OFFSITE_BACKUP_KEY_ID=v1
 OFFSITE_BACKUP_RETENTION=30
 OFFSITE_BACKUP_MAX_AGE_HOURS=36
 OFFSITE_BACKUP_MAX_ARTIFACT_BYTES=67108864
+OFFSITE_STORAGE_CONNECTION_TIMEOUT_MS=5000
+OFFSITE_STORAGE_REQUEST_TIMEOUT_MS=120000
+OFFSITE_STORAGE_MAX_ATTEMPTS=3
 BACKUP_HEALTH_ALERTS_ENABLED=true
 BACKUP_ALERT_EMAIL=<private operator recipient>
 BACKUP_ALERT_REMINDER_HOURS=24
@@ -33,6 +36,13 @@ BACKUP_RECOVERY_NOTIFICATIONS_ENABLED=true
 The V1 artifact limit defaults to, and is capped at, 64 MiB. Encryption and
 verification can temporarily hold several copies of an artifact in memory;
 this bound prevents unsafe memory growth on the 512 MiB Starter service.
+
+R2/S3 transport is also bounded. Connection setup defaults to 5 seconds, each
+request attempt to 120 seconds, and the SDK to three total attempts. Operator
+overrides are restricted to 1–30 seconds for connection setup, 5–300 seconds
+per request attempt, and 1–5 attempts. Request timeouts raise failures rather
+than only warnings, allowing the scheduler and CLI to record a normalized
+failure instead of hanging indefinitely.
 
 Generate a key outside Render and the object-storage provider:
 
