@@ -97,7 +97,8 @@ async function run() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   runMigrationEngine(db, { logger: () => {} });
-  db.prepare('INSERT INTO users(id, email, name) VALUES (?, ?, ?)').run(36, 'owner@example.com', 'Owner');
+  db.prepare('INSERT INTO users(id, email, name, stripe_customer_id) VALUES (?, ?, ?, ?)')
+    .run(36, 'owner@example.com', 'Owner', 'cus_safe');
   db.prepare(`
     INSERT INTO subscriptions(
       user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
@@ -137,6 +138,7 @@ async function run() {
     assert.match(calls.checkout[0][4], /^checkout:36:[0-9a-f-]{36}$/i);
     assert.strictEqual(calls.checkout[0][5], 36);
     assert(Number.isSafeInteger(calls.checkout[0][6]));
+    assert.strictEqual(calls.checkout[0][7], 'cus_safe');
 
     db.prepare("UPDATE subscription_checkout_intents SET expires_at = '2020-01-01T00:00:00.000Z'").run();
     retrievedCheckoutSession = { status: 'complete' };

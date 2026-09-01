@@ -98,10 +98,13 @@ async function run() {
     assert.strictEqual(checkoutCalls.length, 0, 'a nonterminal local subscription must block checkout despite stale free entitlement');
 
     db.prepare("UPDATE subscriptions SET status='canceled' WHERE user_id=44").run();
+    db.prepare("UPDATE users SET stripe_customer_id='cus_story_344' WHERE id=44").run();
     const free = await post(server, { plan_tier: 'free' });
     assert.strictEqual(free.statusCode, 302);
     assert.strictEqual(free.headers.location, 'https://checkout.stripe.com/c/pay/test-session');
     assert.strictEqual(checkoutCalls.length, 1);
+    assert.strictEqual(checkoutCalls[0][7], 'cus_story_344',
+      'safe resubscription must reuse the historical Stripe customer');
     db.prepare("UPDATE subscriptions SET status='unpaid' WHERE user_id=44").run();
     assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: 'free' }, db), false);
     db.prepare("UPDATE subscriptions SET status='incomplete_expired' WHERE user_id=44").run();

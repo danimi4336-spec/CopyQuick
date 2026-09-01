@@ -43,7 +43,7 @@ async function run() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   runMigrationEngine(db, { logger: () => {} });
-  db.prepare("INSERT INTO users(id,email,name,plan_tier,monthly_limit) VALUES (174,'resub@example.com','Resub','free',10)").run();
+  db.prepare("INSERT INTO users(id,email,name,plan_tier,monthly_limit,stripe_customer_id) VALUES (174,'resub@example.com','Resub','free',10,'cus_story_3174')").run();
   db.prepare(`
     INSERT INTO subscriptions(
       user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,

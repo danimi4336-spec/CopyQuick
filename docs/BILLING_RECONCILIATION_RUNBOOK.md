@@ -30,7 +30,12 @@ Once a webhook or reconciliation transaction persists authoritative subscription
 state, it retires that user's now-obsolete Checkout intents. Subscriber guards still block
 duplicate active subscriptions, while a customer who later cancels can start a
 fresh same-plan Checkout instead of being trapped behind the historical
-completed session.
+completed session. A resubscription reuses the durable Stripe Customer only when
+all local subscription history is terminal, agrees with the user's cached
+customer, and that customer is exclusively owned by the same local user. New
+subscribers continue to create their initial Customer through Checkout. Mixed,
+mismatched, or shared customer history fails closed before a Checkout Session is
+created.
 For intents created before this cleanup existed, a completed session may rotate
 only when its exact local user/subscription relationship is authoritatively
 `canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,

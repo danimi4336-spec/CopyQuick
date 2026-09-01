@@ -9,7 +9,7 @@ const {
 } = require('../lib/stripe');
 const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
 const { issueCheckoutKeys, validateCheckoutKey } = require('../lib/checkoutIdempotency');
-const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPolicy');
+const { resolveSubscriptionCheckoutPolicy } = require('../lib/subscriptionCheckoutPolicy');
 const { getTrustedStripeRedirect } = require('../lib/stripeRedirect');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
 const { getDb } = require('../db/database');
@@ -80,7 +80,8 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
   const user = res.locals.user;
   const db = req.app.locals.copyquickDb || getDb();
 
-  if (!canStartSubscriptionCheckout(user, db)) {
+  const checkoutPolicy = resolveSubscriptionCheckoutPolicy(user, db);
+  if (!checkoutPolicy.allowed) {
     return res.redirect(303, '/profile');
   }
   
@@ -149,6 +150,10 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
         });
       }
     }
+    const currentCheckoutPolicy = resolveSubscriptionCheckoutPolicy(user, db);
+    if (!currentCheckoutPolicy.allowed) {
+      return res.redirect(303, '/profile');
+    }
     const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCheckoutSession(
       user.email, 
@@ -157,7 +162,8 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
       `${publicOrigin}/pricing`,
       `checkout:${user.id}:${checkoutIntent.idempotencyKey}`,
       user.id,
-      Math.floor(checkoutIntent.expiresAt.getTime() / 1000)
+      Math.floor(checkoutIntent.expiresAt.getTime() / 1000),
+      currentCheckoutPolicy.customerId
     );
     const redirectUrl = getTrustedStripeRedirect(session.url, 'checkout');
     if (!redirectUrl || typeof session.id !== 'string') {

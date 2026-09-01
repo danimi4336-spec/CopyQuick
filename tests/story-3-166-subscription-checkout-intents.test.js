@@ -84,6 +84,25 @@ async function run() {
   assert.strictEqual(stripeRequest.payload.expires_at, Math.floor(first.expiresAt.getTime() / 1000));
   assert.strictEqual(stripeRequest.requestOptions.idempotencyKey, `checkout:166:${first.idempotencyKey}`);
   assert.strictEqual(stripeRequest.payload.client_reference_id, '166');
+  assert.strictEqual(stripeRequest.payload.customer_email, 'checkout@example.com');
+  assert.strictEqual(stripeRequest.payload.customer, undefined);
+
+  await createCheckoutSessionWithClient({
+    checkout: { sessions: { create: async (payload, requestOptions) => {
+      stripeRequest = { payload, requestOptions };
+      return { id: 'cs_test_returning' };
+    } } }
+  }, 'checkout@example.com', 'price_pro', 'https://copyquick.example/success',
+  'https://copyquick.example/cancel', `checkout:166:${first.idempotencyKey}`, 166,
+  Math.floor(first.expiresAt.getTime() / 1000), 'cus_returning_166');
+  assert.strictEqual(stripeRequest.payload.customer, 'cus_returning_166');
+  assert.strictEqual(stripeRequest.payload.customer_email, undefined,
+    'returning subscriptions must reuse the authoritative Stripe customer');
+  await assert.rejects(() => createCheckoutSessionWithClient({
+    checkout: { sessions: { create: async () => ({}) } }
+  }, 'checkout@example.com', 'price_pro', 'https://copyquick.example/success',
+  'https://copyquick.example/cancel', 'checkout:invalid', 166,
+  Math.floor(first.expiresAt.getTime() / 1000), 'invalid_customer'));
 
     console.log('Story 3.166 Subscription Checkout Intent tests passed');
   } finally {
