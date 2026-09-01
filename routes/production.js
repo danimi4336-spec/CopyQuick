@@ -5,6 +5,7 @@ const { getProductionReview, getProductionRun, initializeProduction } = require(
 const { executeNextProductionJob } = require('../lib/productionExecution');
 const { generationActionRateLimit } = require('../lib/generationProtection');
 const { requireGenerationAvailable } = require('../lib/generationControls');
+const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 
 const router = express.Router();
 
@@ -81,8 +82,8 @@ router.post('/production/:id/run-next', requireAuth, requireGenerationAvailable,
   const db = getDb();
   const user = getUser(req, db);
   if (!user) return res.redirect('/login');
-  const runId = Number.parseInt(req.params.id, 10);
-  if (!Number.isInteger(runId)) return res.status(404).send('Production run not found.');
+  const runId = parsePositiveIntegerId(req.params.id);
+  if (!runId) return res.status(404).send('Production run not found.');
 
   const result = await executeNextProductionJob({ db, userId: user.id, productionRunId: runId });
   if (result.outcome === 'not_found') return res.status(404).send('Production run not found.');
@@ -101,8 +102,8 @@ router.get('/production/:id', requireAuth, (req, res) => {
   const db = getDb();
   const user = getUser(req, db);
   if (!user) return res.redirect('/login');
-  const runId = Number.parseInt(req.params.id, 10);
-  const production = Number.isInteger(runId) ? getProductionRun(db, user.id, runId) : null;
+  const runId = parsePositiveIntegerId(req.params.id);
+  const production = runId ? getProductionRun(db, user.id, runId) : null;
   if (!production) {
     return res.status(404).render('error', {
       title: 'Production Not Found - CopyQuick',
@@ -142,8 +143,8 @@ router.get('/production/:id/status', requireAuth, (req, res) => {
   const db = getDb();
   const user = getUser(req, db);
   if (!user) return res.redirect('/login');
-  const runId = Number.parseInt(req.params.id, 10);
-  const production = Number.isInteger(runId) ? getProductionRun(db, user.id, runId) : null;
+  const runId = parsePositiveIntegerId(req.params.id);
+  const production = runId ? getProductionRun(db, user.id, runId) : null;
   if (!production) return res.status(404).json({ error: 'Production run not found.' });
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
   return res.json({
