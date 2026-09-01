@@ -26,6 +26,11 @@ already belong to that user, and exactly one valid Stripe subscription may
 claim the user in the completed inventory. Missing, malformed, conflicting, or
 ambiguous bindings remain unresolved; reconciliation never falls back to email
 matching. Dry-run reports the proposed adoption without changing local state.
+Once a webhook or reconciliation transaction persists authoritative subscription
+state, it retires that user's now-obsolete Checkout intents. Subscriber guards still block
+duplicate active subscriptions, while a customer who later cancels can start a
+fresh same-plan Checkout instead of being trapped behind the historical
+completed session.
 
 ## Commands
 

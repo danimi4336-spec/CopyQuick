@@ -5,6 +5,7 @@ const { getDb } = require('../db/database');
 const { syncSubscriptionRecord } = require('../lib/subscriptions');
 const { BillingPolicyError, evaluateStripeEntitlement } = require('../lib/billingEntitlement');
 const { resolveCheckoutUser } = require('../lib/checkoutIdentity');
+const { clearSubscriptionCheckoutIntents } = require('../lib/subscriptionCheckoutIntent');
 const { STRIPE_WEBHOOK_BODY_LIMIT } = require('../lib/requestBodyLimits');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
 
@@ -178,6 +179,7 @@ function applyValidatedSubscription(db, event, user, subscription) {
   db.prepare(`
     UPDATE users SET plan_tier = ?, monthly_limit = ?, stripe_customer_id = ? WHERE id = ?
   `).run(decision.planTier, decision.monthlyLimit, decision.customerId, user.id);
+  clearSubscriptionCheckoutIntents(db, { userId: user.id });
   return decision;
 }
 
@@ -187,6 +189,7 @@ function downgradeUserForSubscription(db, user, stripeCustomerId) {
     SET plan_tier = 'free', monthly_limit = 10, stripe_customer_id = ?
     WHERE id = ?
   `).run(stripeCustomerId, user.id);
+  clearSubscriptionCheckoutIntents(db, { userId: user.id });
 }
 
 function applyAuthoritativeSubscriptionState(db, event, {

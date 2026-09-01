@@ -217,6 +217,15 @@ async function run() {
   const db = getDb();
 
   const checkoutUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('checkout@example.com', 'Checkout User').lastInsertRowid;
+  db.prepare(`
+    INSERT INTO subscription_checkout_intents(
+      user_id, plan_tier, price_id, idempotency_key, stripe_checkout_session_id,
+      expires_at, created_at, updated_at
+    ) VALUES (?, 'pro', ?, 'checkout-intent-webhook', 'cs_checkout_webhook', ?, ?, ?)
+  `).run(
+    checkoutUserId, process.env.STRIPE_PRO_PRICE,
+    '2026-01-02T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+  );
   const mismatchUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('mismatch@example.com', 'Mismatch User').lastInsertRowid;
   db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('legacy@example.com', 'Legacy Checkout User');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('fail@example.com', 'Fail User', 'cus_fail');
@@ -246,6 +255,7 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(JSON.parse(response.body).received, true);
     assert.strictEqual(getUser(db, 'checkout@example.com').plan_tier, 'pro');
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM subscription_checkout_intents WHERE user_id = ?').get(checkoutUserId).count, 0);
     assert.strictEqual(eventCount(db, 'evt_checkout_once'), 1);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM usage_periods').get().count, 1);
     assert.strictEqual(calls.listLineItems, 1);

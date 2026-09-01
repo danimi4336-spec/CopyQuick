@@ -214,6 +214,15 @@ async function run() {
         INSERT INTO users(email, name, plan_tier, monthly_limit)
         VALUES ('missed-checkout@example.com', 'Missed Checkout', 'free', 10)
       `).run().lastInsertRowid);
+      value.db.prepare(`
+        INSERT INTO subscription_checkout_intents(
+          user_id, plan_tier, price_id, idempotency_key, stripe_checkout_session_id,
+          expires_at, created_at, updated_at
+        ) VALUES (?, 'pro', ?, 'missed-checkout-intent', 'cs_missed_checkout', ?, ?, ?)
+      `).run(
+        userId, env.STRIPE_PRO_PRICE,
+        '2026-08-30T00:00:00.000Z', '2026-08-29T00:00:00.000Z', '2026-08-29T00:00:00.000Z'
+      );
       const subscription = remote({ metadata: { copyquick_user_id: String(userId) } });
       const protectedTables = ['usage_periods', 'usage_events', 'generations', 'production_jobs'];
       const before = Object.fromEntries(protectedTables.map(table => [table, tableDigest(value.db, table)]));
@@ -222,6 +231,7 @@ async function run() {
       assert.deepStrictEqual({ drift: result.driftCount, repaired: result.repairedCount }, { drift: 1, repaired: 0 });
       assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscriptions').get().count, 0);
       assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(userId).plan_tier, 'free');
+      assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscription_checkout_intents WHERE user_id=?').get(userId).count, 1);
 
       result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: [subscription], has_more: false }]), mode: 'apply', env, now: () => now, logger: () => {} });
       assert.strictEqual(result.repairedCount, 1);
@@ -231,6 +241,7 @@ async function run() {
       assert.deepStrictEqual(value.db.prepare('SELECT user_id, stripe_subscription_id, status, plan_tier FROM subscriptions').get(), {
         user_id: userId, stripe_subscription_id: 'sub_1', status: 'active', plan_tier: 'pro'
       });
+      assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscription_checkout_intents WHERE user_id=?').get(userId).count, 0);
       result = await reconcileBilling({ db: value.db, stripeClient: fakeStripe([{ data: [subscription], has_more: false }]), mode: 'apply', env, now: () => now, logger: () => {} });
       assert.strictEqual(result.repairedCount, 0);
       for (const [table, digest] of Object.entries(before)) assert.strictEqual(tableDigest(value.db, table), digest, table);
