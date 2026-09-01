@@ -281,6 +281,74 @@ async function run() {
     } finally { closeFixture(value); }
   }
 
+  // A missed resubscription webhook may be adopted when the durable user
+  // binding is exact and every prior local relationship is safely terminal.
+  {
+    const value = fixture();
+    try {
+      const ids = insertRelationship(value.db, {
+        customer: 'cus_resubscribe', subscription: 'sub_previous', status: 'canceled',
+        subscriptionPlan: 'pro', userPlan: 'free', userLimit: 10
+      });
+      const previous = remote({
+        id: 'sub_previous', customer: 'cus_resubscribe', status: 'canceled'
+      });
+      const replacement = remote({
+        id: 'sub_replacement', customer: 'cus_resubscribe', status: 'active',
+        metadata: { copyquick_user_id: String(ids.userId) }
+      });
+      let result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{ data: [previous, replacement], has_more: false }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(result.repairedCount, 1);
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(ids.userId).plan_tier, 'pro');
+      assert.deepStrictEqual(value.db.prepare(`
+        SELECT stripe_subscription_id, status FROM subscriptions
+        WHERE user_id=? ORDER BY stripe_subscription_id
+      `).all(ids.userId), [
+        { stripe_subscription_id: 'sub_previous', status: 'canceled' },
+        { stripe_subscription_id: 'sub_replacement', status: 'active' }
+      ]);
+      result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{ data: [previous, replacement], has_more: false }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(result.repairedCount, 0, 'adoption must be idempotent');
+    } finally { closeFixture(value); }
+  }
+
+  // Existing nonterminal subscription history makes a second unbound
+  // subscription ambiguous and therefore ineligible for automatic adoption.
+  {
+    const value = fixture();
+    try {
+      const ids = insertRelationship(value.db, {
+        customer: 'cus_nonterminal', subscription: 'sub_existing_active', status: 'active',
+        subscriptionPlan: 'pro', userPlan: 'pro', userLimit: 200
+      });
+      const existing = remote({ id: 'sub_existing_active', customer: 'cus_nonterminal' });
+      const ambiguous = remote({
+        id: 'sub_second_active', customer: 'cus_nonterminal',
+        metadata: { copyquick_user_id: String(ids.userId) }
+      });
+      const result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{ data: [existing, ambiguous], has_more: false }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(result.repairedCount, 0);
+      assert.strictEqual(value.db.prepare("SELECT COUNT(*) count FROM subscriptions WHERE stripe_subscription_id='sub_second_active'").get().count, 0);
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(ids.userId).plan_tier, 'pro');
+      assert(value.db.prepare(`
+        SELECT COUNT(*) count FROM billing_reconciliation_issues
+        WHERE issue_type='CUSTOMER_SUBSCRIPTION_MISMATCH' AND resolution_status='unresolved'
+      `).get().count >= 1);
+    } finally { closeFixture(value); }
+  }
+
   // Terminal status revokes stale access; active status restores incorrectly revoked access.
   for (const scenario of [
     { localPlan: 'pro', localLimit: 200, remoteStatus: 'canceled', expected: 'free' },
