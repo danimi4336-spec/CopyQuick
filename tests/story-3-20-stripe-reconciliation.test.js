@@ -294,6 +294,95 @@ async function run() {
     } finally { closeFixture(value); }
   }
 
+  // User entitlement is selected from the complete authoritative inventory,
+  // not from whichever subscription happens to be repaired last.
+  {
+    const value = fixture();
+    try {
+      const ids = insertRelationship(value.db, {
+        customer: 'cus_multi', subscription: 'sub_old', status: 'active',
+        subscriptionPlan: 'pro', userPlan: 'unlimited', userLimit: 999999
+      });
+      const activeSubscriptionId = Number(value.db.prepare(`
+        INSERT INTO subscriptions(
+          user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier, price_id,
+          current_period_start, current_period_end
+        ) VALUES (?, 'cus_multi', 'sub_current', 'active', 'unlimited', ?, ?, ?)
+      `).run(
+        ids.userId, env.STRIPE_UNLIMITED_PRICE,
+        '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'
+      ).lastInsertRowid);
+      const usagePeriodId = Number(value.db.prepare(`
+        INSERT INTO usage_periods(
+          user_id, subscription_id, period_start, period_end, plan_tier,
+          monthly_limit, usage_count
+        ) VALUES (?, ?, ?, ?, 'unlimited', 999999, 7)
+      `).run(
+        ids.userId, activeSubscriptionId,
+        '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'
+      ).lastInsertRowid);
+      value.db.prepare('UPDATE users SET current_usage_period_id=?, current_period_used=7 WHERE id=?')
+        .run(usagePeriodId, ids.userId);
+      const usageBefore = tableDigest(value.db, 'usage_periods');
+      const result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{
+          data: [
+            remote({ id: 'sub_current', customer: 'cus_multi', price: env.STRIPE_UNLIMITED_PRICE }),
+            remote({ id: 'sub_old', customer: 'cus_multi', status: 'canceled' })
+          ],
+          has_more: false
+        }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(result.repairedCount, 1);
+      assert.deepStrictEqual(value.db.prepare('SELECT plan_tier, monthly_limit, current_usage_period_id, current_period_used FROM users WHERE id=?').get(ids.userId), {
+        plan_tier: 'unlimited', monthly_limit: 999999,
+        current_usage_period_id: usagePeriodId, current_period_used: 7
+      });
+      assert.strictEqual(value.db.prepare("SELECT status FROM subscriptions WHERE stripe_subscription_id='sub_old'").get().status, 'canceled');
+      assert.strictEqual(tableDigest(value.db, 'usage_periods'), usageBefore);
+    } finally { closeFixture(value); }
+  }
+
+  // A missing historical subscription is operator-visible but cannot revoke a
+  // different subscription that is present and authoritatively entitled.
+  {
+    const value = fixture();
+    try {
+      const ids = insertRelationship(value.db, {
+        customer: 'cus_multi_missing', subscription: 'sub_missing_old',
+        userPlan: 'unlimited', userLimit: 999999
+      });
+      value.db.prepare(`
+        INSERT INTO subscriptions(
+          user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier, price_id,
+          current_period_start, current_period_end
+        ) VALUES (?, 'cus_multi_missing', 'sub_present', 'active', 'unlimited', ?, ?, ?)
+      `).run(
+        ids.userId, env.STRIPE_UNLIMITED_PRICE,
+        '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'
+      );
+      const result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{
+          data: [remote({
+            id: 'sub_present', customer: 'cus_multi_missing', price: env.STRIPE_UNLIMITED_PRICE
+          })],
+          has_more: false
+        }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(ids.userId).plan_tier, 'unlimited');
+      assert.strictEqual(result.repairedCount, 0);
+      assert(result.unresolvedCount >= 1);
+      assert.strictEqual(value.db.prepare(`
+        SELECT resolution_status FROM billing_reconciliation_issues
+        WHERE issue_type='STRIPE_SUBSCRIPTION_MISSING' ORDER BY id DESC LIMIT 1
+      `).get().resolution_status, 'unresolved');
+    } finally { closeFixture(value); }
+  }
+
   // Unknown/malformed authority and relationship mismatch never mutate entitlement.
   for (const subscription of [
     remote({ price: 'price_unknown' }), remote({ status: 'future_status' }), remote({ items: { data: [] } }),
