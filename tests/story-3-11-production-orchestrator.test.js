@@ -18,7 +18,7 @@ const { buildPlan } = require('../lib/buildPlanEngine');
 const { createApprovedProductionSet, createDefaultSelection, planFingerprint } = require('../lib/buildPlanApproval');
 const { initializeProduction } = require('../lib/productionInitialization');
 const { claimNextRunnableJob, renewJobLease } = require('../lib/productionExecution');
-const { maxConcurrency, runOrchestratorCycle } = require('../lib/productionOrchestrator');
+const { MAX_CYCLE_WORK, eligibleRuns, maxConcurrency, recoverActiveRuns, runOrchestratorCycle } = require('../lib/productionOrchestrator');
 const { createProductionWorker } = require('../lib/productionWorker');
 const productionRoutes = require('../routes/production');
 
@@ -127,6 +127,7 @@ async function run() {
   initDb();
   const db = getDb();
   assert.strictEqual(maxConcurrency(), 1);
+  assert.strictEqual(maxConcurrency('999999'), MAX_CYCLE_WORK);
 
   const owner = createUser(db);
   const runId = startProduction(db, owner);
@@ -296,6 +297,11 @@ async function run() {
   assert.strictEqual(missingOutputResult.results[0].outcome, 'permanent_failure');
   assert.strictEqual(missingOutputCalls.length, 0, 'missing persisted prerequisite output never reaches the provider');
   assert.strictEqual(db.prepare('SELECT last_error_code FROM production_jobs WHERE id = ?').get(missingOutputJobs[1].id).last_error_code, 'DEPENDENCY_OUTPUT_MISSING');
+
+  const scanRuns = Array.from({ length: 3 }, () => startProduction(db, createUser(db)));
+  assert.strictEqual(eligibleRuns(db, new Date().toISOString()).length, 1, 'eligible run selection is bounded in SQL');
+  assert.strictEqual(recoverActiveRuns(db, new Date().toISOString(), 2).length, 2, 'recovery scans honor their per-cycle bound');
+  db.prepare(`UPDATE production_runs SET status = 'completed' WHERE id IN (?, ?, ?)`).run(...scanRuns);
 
   const eventTypes = db.prepare(`
     SELECT DISTINCT event_type FROM production_job_events WHERE production_run_id = ?
