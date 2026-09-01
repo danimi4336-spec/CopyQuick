@@ -277,7 +277,13 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 302);
     const created = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(postBrainUser);
     assert.strictEqual(created.business_name, 'Created Co');
-    assert.strictEqual(created.brand_voice, 'Clear and warm');
+    assert.strictEqual(created.brand_voice, 'custom');
+    assert.strictEqual(created.brand_voice_custom, 'Clear and warm');
+
+    const rendered = await request(agent, 'GET', '/brand-brain');
+    assert.strictEqual(rendered.res.statusCode, 200);
+    assert.match(rendered.body, /<option value="custom" selected>Custom<\/option>/);
+    assert.match(rendered.body, />Clear and warm<\/textarea>/);
 
     const invalidToken = await getToken(agent);
     const invalid = await request(agent, 'POST', '/brand-brain', {

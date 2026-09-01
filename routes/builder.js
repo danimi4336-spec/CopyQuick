@@ -3,7 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { objectiveUniverse, getObjective } = require('../lib/businessJourneys');
-const { validateBrandBrain } = require('../lib/brandBrainValidation');
+const { normalizeStoredBrandBrain, validateBrandBrain } = require('../lib/brandBrainValidation');
 
 function emptyBrandBrain(userId) {
   return {
@@ -62,7 +62,9 @@ router.post('/welcome', requireAuth, (req, res) => {
 // ====== Brand Brain ======
 router.get('/brand-brain', requireAuth, (req, res) => {
   const db = getDb();
-  const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(req.session.userId) || emptyBrandBrain(req.session.userId);
+  const brain = normalizeStoredBrandBrain(
+    db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(req.session.userId) || emptyBrandBrain(req.session.userId)
+  );
   const fields = ['business_name', 'industry', 'target_audience', 'brand_voice', 'unique_value', 'competitors', 'goals', 'key_messages'];
   const filled = fields.filter(f => brain[f] && brain[f].trim()).length;
   const pct = Math.round((filled / fields.length) * 100);
@@ -82,12 +84,10 @@ router.post('/brand-brain', requireAuth, (req, res) => {
     });
   }
   const { business_name, industry, target_audience, brand_voice, brand_voice_custom, unique_value, competitors, goals, key_messages } = validation.values;
-  // Handle custom: if custom selected, store both flag and custom text; if not, store preset value as voice
-  const finalVoice = brand_voice === 'custom' ? brand_voice_custom || 'custom' : brand_voice;
   const existing = db.prepare('SELECT id FROM brand_brain WHERE user_id = ?').get(req.session.userId);
   if (existing) {
-    db.prepare(`UPDATE brand_brain SET business_name=?, industry=?, target_audience=?, brand_voice=?, unique_value=?, competitors=?, goals=?, key_messages=?, brand_voice_custom=COALESCE(?, brand_voice_custom), updated_at=datetime('now') WHERE user_id=?`)
-      .run(business_name || '', industry || '', target_audience || '', finalVoice, unique_value || '', competitors || '', goals || '', key_messages || '', brand_voice === 'custom' ? brand_voice_custom || '' : null, req.session.userId);
+    db.prepare(`UPDATE brand_brain SET business_name=?, industry=?, target_audience=?, brand_voice=?, unique_value=?, competitors=?, goals=?, key_messages=?, brand_voice_custom=?, updated_at=datetime('now') WHERE user_id=?`)
+      .run(business_name || '', industry || '', target_audience || '', brand_voice, unique_value || '', competitors || '', goals || '', key_messages || '', brand_voice_custom || '', req.session.userId);
   } else {
     db.prepare(`
       INSERT INTO brand_brain (
@@ -99,12 +99,12 @@ router.post('/brand-brain', requireAuth, (req, res) => {
       business_name || '',
       industry || '',
       target_audience || '',
-      finalVoice,
+      brand_voice,
       unique_value || '',
       competitors || '',
       goals || '',
       key_messages || '',
-      brand_voice === 'custom' ? brand_voice_custom || '' : ''
+      brand_voice_custom || ''
     );
   }
   res.redirect('/brand-brain');
