@@ -2,8 +2,9 @@
 
 CopyQuick off-site backups are optional and disabled by default. The service first creates or verifies a Story 3.13 SQLite snapshot, encrypts it locally with AES-256-GCM, and uploads only the encrypted `.cqbackup` artifact to private S3-compatible object storage.
 
-CopyQuick pins Node.js 24.x. Confirm the Render service runtime satisfies the
-`package.json` engine before deployment.
+CopyQuick pins Node.js 24.20.0 (native-module ABI 137) in `.node-version`, the
+`package.json` engine, and the Render Blueprint. Build, migration, recovery, and
+runtime commands must use that exact release.
 
 ## Configuration
 

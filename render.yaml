@@ -7,6 +7,8 @@ services:
     # in the Render dashboard after migration review; see the durable-storage runbook.
     plan: starter
     envVars:
+      - key: NODE_VERSION
+        value: 24.20.0
       - key: PORT
         value: 3000
       - key: SESSION_SECRET
