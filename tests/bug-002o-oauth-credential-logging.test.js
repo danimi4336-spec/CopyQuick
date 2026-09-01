@@ -153,6 +153,7 @@ function runServerStartupSmoke() {
       GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,
       GOOGLE_CALLBACK_URL: DUMMY_CALLBACK_URL,
+      PUBLIC_APP_ORIGIN: 'https://copyquick.example',
       STRIPE_KEY: 'sk_test_bug_002o',
       STRIPE_WEBHOOK_SECRET: 'whsec_bug_002o',
       STRIPE_PRO_PRICE: 'price_bug_002o_pro',

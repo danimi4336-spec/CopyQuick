@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('./auth');
 const { isBillingEnabled, createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
+const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
 
 function rejectWhenBillingDisabled(res) {
   if (isBillingEnabled !== false) return false;
@@ -40,11 +41,12 @@ router.post('/subscribe', requireAuth, async (req, res) => {
   }
 
   try {
+    const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCheckoutSession(
       user.email, 
       priceId, 
-      `${req.protocol}://${req.get('host')}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      `${req.protocol}://${req.get('host')}/pricing`
+      `${publicOrigin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      `${publicOrigin}/pricing`
     );
     res.redirect(session.url);
   } catch (err) {
@@ -67,9 +69,10 @@ router.post('/manage', requireAuth, async (req, res) => {
   }
 
   try {
+    const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCustomerPortalSession(
       user.stripe_customer_id,
-      `${req.protocol}://${req.get('host')}/profile`
+      `${publicOrigin}/profile`
     );
     res.redirect(session.url);
   } catch (err) {

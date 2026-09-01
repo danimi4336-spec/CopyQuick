@@ -37,10 +37,12 @@ const { createOperationalHealthWatcher } = require('./lib/operationalHealthWatch
 const { createRequestContextMiddleware } = require('./lib/requestContext');
 const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
+const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
 configureBrowserSecurity(app);
+validateBillingReturnOrigin(process.env);
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
