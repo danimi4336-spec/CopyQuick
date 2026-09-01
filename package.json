@@ -17,7 +17,8 @@
     "migrations:check": "node scripts/migration-check.js",
     "migrate:database": "node scripts/migrate-database.js",
     "billing:status": "node scripts/billing-status.js",
-    "billing:reconcile": "node scripts/reconcile-billing.js"
+    "billing:reconcile": "node scripts/reconcile-billing.js",
+    "generation:control": "node scripts/generation-control.js"
   },
   "keywords": [],
   "author": "",

@@ -4,6 +4,7 @@ const { getDb } = require('../db/database');
 const { getProductionReview, getProductionRun, initializeProduction } = require('../lib/productionInitialization');
 const { executeNextProductionJob } = require('../lib/productionExecution');
 const { generationActionRateLimit } = require('../lib/generationProtection');
+const { requireGenerationAvailable } = require('../lib/generationControls');
 
 const router = express.Router();
 
@@ -50,7 +51,7 @@ router.get('/production/review', requireAuth, (req, res) => {
   return renderReview(res, review);
 });
 
-router.post('/production/start', requireAuth, generationActionRateLimit, (req, res) => {
+router.post('/production/start', requireAuth, requireGenerationAvailable, generationActionRateLimit, (req, res) => {
   const db = getDb();
   const user = getUser(req, db);
   if (!user) return res.redirect('/login');
@@ -76,7 +77,7 @@ router.post('/production/start', requireAuth, generationActionRateLimit, (req, r
   return res.redirect(303, `/production/${result.productionRunId}`);
 });
 
-router.post('/production/:id/run-next', requireAuth, generationActionRateLimit, async (req, res) => {
+router.post('/production/:id/run-next', requireAuth, requireGenerationAvailable, generationActionRateLimit, async (req, res) => {
   const db = getDb();
   const user = getUser(req, db);
   if (!user) return res.redirect('/login');

@@ -60,10 +60,10 @@ async function run() {
 
   const generationsRoute = fs.readFileSync(path.join(__dirname, '..', 'routes', 'generations.js'), 'utf8');
   const productionRoute = fs.readFileSync(path.join(__dirname, '..', 'routes', 'production.js'), 'utf8');
-  assert.match(generationsRoute, /router\.post\('\/dashboard\/generate', requireAuth, generationActionRateLimit/);
-  assert.match(generationsRoute, /router\.post\('\/generation\/:id\/regenerate', requireAuth, generationActionRateLimit/);
-  assert.match(productionRoute, /router\.post\('\/production\/start', requireAuth, generationActionRateLimit/);
-  assert.match(productionRoute, /router\.post\('\/production\/:id\/run-next', requireAuth, generationActionRateLimit/);
+  assert.match(generationsRoute, /router\.post\('\/dashboard\/generate', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
+  assert.match(generationsRoute, /router\.post\('\/generation\/:id\/regenerate', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
+  assert.match(productionRoute, /router\.post\('\/production\/start', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
+  assert.match(productionRoute, /router\.post\('\/production\/:id\/run-next', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
 
   console.log('Story 3.28 Generation Abuse Protection tests passed');
 }
