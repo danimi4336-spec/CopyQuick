@@ -36,6 +36,11 @@
             </ul>
             <% if (user && user.plan_tier === 'pro') { %>
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>
+            <% } else if (user && user.plan_tier !== 'free') { %>
+                <form action="/manage" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-outline btn-block">Manage Subscription</button>
+                </form>
             <% } else { %>
                 <form action="/subscribe" method="POST">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -58,6 +63,11 @@
             </ul>
             <% if (user && user.plan_tier === 'unlimited') { %>
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>
+            <% } else if (user && user.plan_tier !== 'free') { %>
+                <form action="/manage" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <button type="submit" class="btn btn-outline btn-block">Manage Subscription</button>
+                </form>
             <% } else { %>
                 <form action="/subscribe" method="POST">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">

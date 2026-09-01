@@ -99,6 +99,7 @@ async function run() {
     res.locals.user = {
       id: 36,
       email: 'owner@example.com',
+      plan_tier: 'free',
       stripe_customer_id: 'cus_safe'
     };
     next();

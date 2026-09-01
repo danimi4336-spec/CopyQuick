@@ -4,6 +4,7 @@ const { requireAuth } = require('./auth');
 const { isBillingEnabled, createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
 const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
 const { issueCheckoutKeys, validateCheckoutKey } = require('../lib/checkoutIdempotency');
+const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPolicy');
 
 function rejectWhenBillingDisabled(res) {
   if (isBillingEnabled !== false) return false;
@@ -31,6 +32,10 @@ router.post('/subscribe', requireAuth, async (req, res) => {
 
   const { price, checkoutKey } = req.body;
   const user = res.locals.user;
+
+  if (!canStartSubscriptionCheckout(user)) {
+    return res.redirect(303, '/profile');
+  }
   
   let priceId;
   if (price === 'pro' || price === 'pro_price') {

@@ -339,18 +339,20 @@ async function run() {
     assert.strictEqual(subscribeGet.res.headers.location, '/pricing');
     assert.strictEqual(mocks.checkoutCalls.length, checkoutBeforeGet);
 
+    currentUser = { ...currentUser, plan_tier: 'free' };
     const checkoutPricingPage = await request(agent, 'GET', '/pricing');
     const checkoutKey = checkoutPricingPage.body.match(/name="checkoutKey" value="([^"]+)"/)?.[1];
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/subscribe', {
-      body: { price: 'unlimited', checkoutKey, _csrf: token }
+      body: { price: 'pro', checkoutKey, _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 302);
     assert.strictEqual(valid.res.headers.location, '/mock-checkout-session');
     assert.strictEqual(mocks.checkoutCalls.length, checkoutBeforeGet + 1);
-    assert.strictEqual(mocks.checkoutCalls.at(-1).priceId, process.env.STRIPE_UNLIMITED_PRICE);
+    assert.strictEqual(mocks.checkoutCalls.at(-1).priceId, process.env.STRIPE_PRO_PRICE);
     assert.match(mocks.checkoutCalls.at(-1).idempotencyKey, /^checkout:\d+:/);
 
+    currentUser = { ...currentUser, plan_tier: 'pro' };
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/manage', {
       body: { _csrf: token }
