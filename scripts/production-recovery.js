@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-require('dotenv').config();
+require('dotenv').config({ quiet: true });
 const fs = require('fs');
 const Database = require('better-sqlite3');
 const { prepareDatabaseStorage } = require('../lib/databasePath');

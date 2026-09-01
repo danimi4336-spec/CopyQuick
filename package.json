@@ -19,7 +19,8 @@
     "billing:status": "node scripts/billing-status.js",
     "billing:reconcile": "node scripts/reconcile-billing.js",
     "generation:control": "node scripts/generation-control.js",
-    "production:recovery": "node scripts/production-recovery.js"
+    "production:recovery": "node scripts/production-recovery.js",
+    "operations:status": "node scripts/operations-status.js"
   },
   "keywords": [],
   "author": "",
