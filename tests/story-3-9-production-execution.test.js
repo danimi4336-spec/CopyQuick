@@ -218,7 +218,9 @@ async function run() {
   const failedUser = createUser(db);
   const failedRunId = startRun(db, failedUser);
   const prepaid = db.prepare('SELECT production_cost_units FROM production_runs WHERE id = ?').get(failedRunId).production_cost_units;
-  const failingGenerator = { generateCopy: () => { throw new Error('provider secret raw failure payload'); } };
+  const failingGenerator = { generateCopy: () => {
+    throw Object.assign(new Error('provider secret raw failure payload'), { status: 429 });
+  } };
   let failureResult = await executeNextProductionJob({ db, userId: failedUser, productionRunId: failedRunId, generatorApi: failingGenerator });
   assert.strictEqual(failureResult.outcome, 'retry_scheduled');
   let failedRoot = db.prepare('SELECT * FROM production_jobs WHERE id = ?').get(failureResult.jobId);

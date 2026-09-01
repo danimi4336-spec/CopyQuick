@@ -170,7 +170,9 @@ async function run() {
   let providerCalls = 0;
   const retryGenerator = generator([], function() {
     providerCalls += 1;
-    if (providerCalls === 1) throw new Error('temporary secret provider detail');
+    if (providerCalls === 1) {
+      throw Object.assign(new Error('temporary secret provider detail'), { status: 429 });
+    }
     return [{ text: 'Recovered retry output', tone: 'professional' }];
   });
   const retryStart = new Date();

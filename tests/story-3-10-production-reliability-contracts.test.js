@@ -262,6 +262,36 @@ async function run() {
   assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id = ? AND event_type = 'production_reversal'").get(validationUser).count, 1);
   assert.strictEqual(db.prepare('SELECT generations_used FROM users WHERE id = ?').get(validationUser).generations_used, 0);
 
+  const limitedUser = createUser(db);
+  const limitedRun = createRun(db, limitedUser, [{ id: 'customer_profile' }]);
+  const limitedResult = await executeNextProductionJob({
+    db,
+    userId: limitedUser,
+    productionRunId: limitedRun,
+    retryDelayBaseSeconds: 10,
+    generatorApi: { generateCopy: () => { throw Object.assign(new Error('sensitive rate-limit detail'), { status: 429 }); } }
+  });
+  assert.strictEqual(limitedResult.outcome, 'retry_scheduled');
+  const limitedJob = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ?').get(limitedRun);
+  assert.strictEqual(limitedJob.status, 'queued');
+  assert.strictEqual(limitedJob.last_error_code, 'PROVIDER_RATE_LIMITED');
+  assert.doesNotMatch(limitedJob.error_message, /sensitive|rate-limit detail/);
+
+  const ambiguousUser = createUser(db);
+  const ambiguousRun = createRun(db, ambiguousUser, [{ id: 'customer_profile' }]);
+  const ambiguousResult = await executeNextProductionJob({
+    db,
+    userId: ambiguousUser,
+    productionRunId: ambiguousRun,
+    generatorApi: { generateCopy: () => { throw Object.assign(new Error('sensitive upstream detail'), { status: 503 }); } }
+  });
+  assert.strictEqual(ambiguousResult.outcome, 'recovery_required');
+  const ambiguousJob = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ?').get(ambiguousRun);
+  assert.strictEqual(ambiguousJob.status, 'recovery_required');
+  assert.strictEqual(ambiguousJob.last_error_code, 'PROVIDER_UNAVAILABLE');
+  assert.doesNotMatch(`${ambiguousJob.error_message} ${ambiguousJob.recovery_reason}`, /sensitive|upstream detail/);
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE production_run_id = ? AND event_type = 'production_reversal'").get(ambiguousRun).count, 0);
+
   const routeUser = createUser(db);
   const routeRun = createRun(db, routeUser, [{ id: 'customer_profile' }]);
   db.prepare(`
