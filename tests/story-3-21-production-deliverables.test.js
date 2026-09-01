@@ -230,6 +230,16 @@ async function run() {
   assert.deepStrictEqual(invalidJobs.map(row => row.status), ['failed', 'skipped']);
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(invalid.userId).count, 0);
 
+  const unsupportedClaim = createRun(db, [{ id: 'customer_profile', title: 'Customer Profile' }, { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }]);
+  const claimingGenerator = { generateCopy: () => [{ text: 'bad', tone: 'professional', structuredOutput: customerProfile({ summary: 'This FDA approved product is trusted by 10,000 customers.' }) }] };
+  let claimFailure;
+  for (let attempt = 0; attempt < 3; attempt += 1) claimFailure = await executeNextProductionJob({ db, userId: unsupportedClaim.userId, productionRunId: unsupportedClaim.runId, generatorApi: claimingGenerator });
+  assert.strictEqual(claimFailure.outcome, 'permanent_failure');
+  const unsupportedJobs = db.prepare('SELECT status, last_error_code FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order').all(unsupportedClaim.runId);
+  assert.deepStrictEqual(unsupportedJobs.map(row => row.status), ['failed', 'skipped']);
+  assert.strictEqual(unsupportedJobs[0].last_error_code, 'PRODUCTION_QUALITY_UNSUPPORTED_CLAIM');
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(unsupportedClaim.userId).count, 0);
+
   const tampered = createRun(db, [{ id: 'customer_profile', title: 'Customer Profile' }, { id: 'product_positioning', title: 'Product Positioning', dependencies: ['customer_profile'] }]);
   const upstream = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ? AND deliverable_id = ?').get(tampered.runId, 'customer_profile');
   const generationId = Number(db.prepare(`INSERT INTO generations (user_id, title, input_text, content_type, tone, results, generation_type, production_job_id, deliverable_id, contract_version, structured_result) VALUES (?, 'Customer Profile', 'internal', 'sales_message', 'professional', '[]', 'production', ?, 'customer_profile', ?, ?)`).run(tampered.userId, upstream.id, profileContract.version, JSON.stringify(customerProfile({ summary: 'Use known facts as facts.' }))).lastInsertRowid);
