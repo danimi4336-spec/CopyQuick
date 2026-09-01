@@ -33,6 +33,10 @@ function discoveryState() {
     category: confirmed('dietary_supplement', 'Dietary Supplement'),
     intendedOutcome: confirmed('everyday_wellness', 'Everyday wellness'),
     conceptMaturity: confirmed('formula_in_mind', 'Ingredients or formula in mind'),
+    existingProductDefinition: {
+      ...confirmed('An organic turmeric capsule concept with a preliminary formula.', 'An organic turmeric capsule concept with a preliminary formula.'),
+      semanticRole: 'builder_provided_product_context'
+    },
     targetAudience: confirmed('health-conscious adults', 'Health-conscious adults'),
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),

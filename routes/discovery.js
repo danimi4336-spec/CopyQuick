@@ -294,6 +294,56 @@ router.post('/discovery', requireAuth, async (req, res) => {
     return res.redirect(303, '/discovery');
   }
 
+  if (currentQuestion.type === 'free_text') {
+    const freeTextAnswer = typeof req.body.freeTextAnswer === 'string' ? req.body.freeTextAnswer.trim() : '';
+    const unsure = currentQuestion.allowsUnsure && req.body.unsure === 'unsure';
+    const rerender = message => validationError(req, res, message, { otherAnswer: freeTextAnswer });
+    if (unsure && freeTextAnswer) return rerender('Choose “I’m not sure yet” or describe the product, but not both.');
+    if (!unsure && !freeTextAnswer) return rerender('Describe what you know so far, or choose “I’m not sure yet.”');
+    if (freeTextAnswer.length > MAX_ANSWER_LENGTH) {
+      return rerender(`Keep your answer under ${MAX_ANSWER_LENGTH} characters.`);
+    }
+
+    const confirmedUnderstanding = {
+      ...discoverySession.understanding,
+      [currentQuestion.understandingField]: {
+        value: unsure ? 'unsure' : freeTextAnswer,
+        label: unsure ? "I'm not sure yet" : freeTextAnswer,
+        confidence: 1,
+        source: 'user_confirmed',
+        semanticRole: 'builder_provided_product_context'
+      }
+    };
+    const updatedAnswers = {
+      ...discoverySession.answers,
+      [currentQuestion.id]: unsure ? 'unsure' : { value: freeTextAnswer }
+    };
+    const understandingResult = await understandBusiness({
+      objective: discoverySession.objective,
+      answer: discoverySession.answers.initial_description,
+      existingUnderstanding: confirmedUnderstanding
+    });
+    const intelligenceResult = analyzeDiscovery({
+      objective: discoverySession.objective,
+      understanding: understandingResult.understanding,
+      unknowns: understandingResult.unknowns,
+      answers: updatedAnswers
+    });
+    discoverySession.answers = updatedAnswers;
+    discoverySession.understanding = understandingResult.understanding;
+    discoverySession.unknowns = understandingResult.unknowns;
+    discoverySession.completedQuestions = Array.from(new Set(
+      discoverySession.completedQuestions.concat(currentQuestion.id)
+    ));
+    applyIntelligenceResult(discoverySession, intelligenceResult);
+    discoverySession.updatedAt = new Date().toISOString();
+    if (intelligenceResult.discoveryCompleteForNow) {
+      discoverySession.reflectionStartedAt = new Date().toISOString();
+      return res.redirect(303, '/discovery/reflection');
+    }
+    return res.redirect(303, '/discovery');
+  }
+
   const selectedChoice = typeof req.body.choice === 'string' ? req.body.choice : '';
   const selectedOption = currentQuestion.options.find(function(option) {
     return option.value === selectedChoice;

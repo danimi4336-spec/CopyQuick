@@ -20,6 +20,10 @@ function completeUnderstanding(overrides = {}) {
     category: confirmed('dietary_supplement', 'Dietary Supplement'),
     intendedOutcome: confirmed('everyday_wellness', 'Everyday wellness'),
     conceptMaturity: confirmed('formula_in_mind', 'Ingredients or formula in mind'),
+    existingProductDefinition: {
+      ...confirmed('A capsule formula using ingredients selected by the builder.'),
+      semanticRole: 'builder_provided_product_context'
+    },
     targetAudience: confirmed('health-conscious adults', 'Health-conscious adults'),
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),

@@ -59,6 +59,15 @@
                         <fieldset class="discovery-question-fieldset">
                             <legend><%= nextQuestion.prompt %></legend>
                             <p><%= nextQuestion.explanation %></p>
+                            <% if (nextQuestion.type === 'free_text') { %>
+                                <textarea name="freeTextAnswer" rows="5" maxlength="2000" placeholder="<%= nextQuestion.placeholder || '' %>"><%= otherAnswer %></textarea>
+                                <% if (nextQuestion.allowsUnsure) { %>
+                                    <label class="discovery-choice discovery-unsure-choice">
+                                        <input type="checkbox" name="unsure" value="unsure">
+                                        <span>I’m not sure yet</span>
+                                    </label>
+                                <% } %>
+                            <% } else { %>
                             <div class="discovery-choice-grid">
                                 <% nextQuestion.options.forEach(function(option) { %>
                                     <label class="discovery-choice">
@@ -71,6 +80,7 @@
                                     </label>
                                 <% }); %>
                             </div>
+                            <% } %>
                         </fieldset>
 
                         <% if (nextQuestion.allowsAdditionalDetail) { %>
@@ -81,10 +91,10 @@
                             </div>
                         <% } %>
 
-                        <div class="form-group discovery-other-field <%= selectedChoice === 'other' ? 'visible' : '' %>" id="discoveryOtherField">
+                        <% if (nextQuestion.type !== 'free_text') { %><div class="form-group discovery-other-field <%= selectedChoice === 'other' ? 'visible' : '' %>" id="discoveryOtherField">
                             <label for="otherAnswer">Tell us more</label>
                             <input type="text" id="otherAnswer" name="otherAnswer" maxlength="2000" value="<%= otherAnswer %>">
-                        </div>
+                        </div><% } %>
 
                         <div class="discovery-actions">
                             <button type="submit" class="btn btn-primary btn-lg">Continue <span aria-hidden="true">→</span></button>

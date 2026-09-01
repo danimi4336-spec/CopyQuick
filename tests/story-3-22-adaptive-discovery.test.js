@@ -61,6 +61,19 @@ async function answerCurrent(agent, choice, otherAnswer) {
   });
 }
 
+async function answerFreeText(agent, freeTextAnswer, unsure = false) {
+  const page = await request(agent, 'GET', '/discovery');
+  const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+  const state = await sessionState(agent);
+  assert.strictEqual(state.nextQuestion?.type, 'free_text');
+  return request(agent, 'POST', '/discovery', {
+    _csrf: token,
+    questionId: state.nextQuestion.id,
+    ...(freeTextAnswer ? { freeTextAnswer } : {}),
+    ...(unsure ? { unsure: 'unsure' } : {})
+  });
+}
+
 async function begin(agent, description = 'an herbal supplement') {
   await request(agent, 'GET', '/test/authenticate');
   const page = await request(agent, 'GET', '/discovery');
@@ -123,12 +136,10 @@ async function run() {
       understanding: { ...establishedSupplement, conceptMaturity: known(conceptMaturity) },
       answers: {}
     });
-    assert.strictEqual(ambiguous.nextQuestion.id, 'supplement_launch_stage');
-    assert.strictEqual(ambiguous.nextQuestion.prompt, 'Where are you in the launch process?');
-    assert.strictEqual(
-      ambiguous.nextQuestion.explanation,
-      'This is about preparing to sell the product, separate from how far the product or formula has been developed.'
-    );
+    assert.strictEqual(ambiguous.nextQuestion.id, conceptMaturity === 'formula_in_mind'
+      ? 'supplement_formula_context'
+      : 'supplement_finalized_context');
+    assert.strictEqual(ambiguous.nextQuestion.type, 'free_text');
   }
 
   const nonSupplement = analyzeDiscovery({
@@ -412,15 +423,15 @@ async function run() {
     assert.strictEqual(state.nextQuestion.id, 'supplement_concept_maturity');
     await answerCurrent(ready, 'direction_no_formula');
     await answerCurrent(ready, 'consumers');
-    await answerCurrent(ready, 'amazon');
+    const directionComplete = await answerCurrent(ready, 'amazon');
     state = await sessionState(ready);
-    assert.strictEqual(state.nextQuestion.id, 'competitive_differentiation');
-    const readyRedirect = await answerCurrent(ready, 'unsure');
-    assert.strictEqual(readyRedirect.res.headers.location, '/discovery/reflection');
+    assert.strictEqual(directionComplete.res.headers.location, '/discovery/reflection');
+    assert.strictEqual(state.nextQuestion, null);
+    assert.strictEqual(state.answers.competitive_differentiation, undefined);
     state = await sessionState(ready);
     assert.strictEqual(state.planningReadiness.ready, true, 'nonessential differentiation uncertainty must not block planning');
     assert(state.planningReadiness.knownRequirements.includes('launch_stage'));
-    assert(state.planningReadiness.unresolvedNonBlockingRequirements.some((item) => item.id === 'competitive_context'));
+    assert(state.planningReadiness.optionalKnowledgeGaps.includes('Competitive Context'));
     assert.strictEqual(state.understanding.ingredients, undefined);
     assert.strictEqual(state.understanding.claimsEvidence, undefined);
 
@@ -441,6 +452,72 @@ async function run() {
     const blockedApproval = await request(ready, 'POST', '/discovery/build-plan/approve', { _csrf: approvalToken });
     assert.strictEqual(blockedApproval.res.headers.location, '/discovery/build-plan');
     assert.strictEqual(Boolean((await sessionState(ready)).approvedProductionSet), false);
+
+    const existingProduct = { server, cookie: '' };
+    await begin(existingProduct, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');
+    await answerCurrent(existingProduct, 'digestive_wellness');
+    await answerCurrent(existingProduct, 'finalized');
+    state = await sessionState(existingProduct);
+    assert.strictEqual(state.nextQuestion.id, 'supplement_finalized_context');
+    assert.strictEqual(state.nextQuestion.type, 'free_text');
+    assert.strictEqual(state.planningReadiness.ready, false);
+    const definitionPage = await request(existingProduct, 'GET', '/discovery');
+    assert.match(definitionPage.body, /What is the finished supplement product\?/);
+    assert.match(definitionPage.body, /name="freeTextAnswer"/);
+    assert.match(definitionPage.body, /name="unsure"/);
+    assert.strictEqual((await answerFreeText(existingProduct, '')).res.statusCode, 400);
+    const productDescription = 'A shelf-ready herbal capsule with a finalized label and packaging.';
+    await answerFreeText(existingProduct, productDescription);
+    state = await sessionState(existingProduct);
+    assert.strictEqual(state.understanding.existingProductDefinition.value, productDescription);
+    assert.strictEqual(state.understanding.existingProductDefinition.semanticRole, 'builder_provided_product_context');
+    assert.strictEqual(state.understanding.ingredients, undefined);
+    assert.strictEqual(state.understanding.claimsEvidence, undefined);
+    assert.strictEqual(state.nextQuestion.id, 'supplement_launch_stage');
+    await answerCurrent(existingProduct, 'ready');
+    state = await sessionState(existingProduct);
+    assert.strictEqual(state.nextQuestion.id, 'competitive_differentiation');
+    await answerCurrent(existingProduct, 'unsure');
+    const existingReflection = await request(existingProduct, 'GET', '/discovery/reflection');
+    assert.match(existingReflection.body, /Builder-Provided Product Context/);
+    assert.match(existingReflection.body, /not independent verification/);
+    assert.doesNotMatch(existingReflection.body, /name="field" value="existingProductDefinition"/);
+    const existingToken = existingReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    await request(existingProduct, 'POST', '/discovery/reflection/plan', { _csrf: existingToken });
+    await request(existingProduct, 'GET', '/discovery/build-plan');
+    state = await sessionState(existingProduct);
+    assert(state.strategyResult.assumptions.some(item => /builder-provided context/.test(item)));
+    assert(JSON.stringify(state.buildPlan).includes('Builder-provided product context'));
+    assert(JSON.stringify(state.buildPlan).includes('not proof of ingredients, efficacy, claims, or substantiation'));
+
+    for (const [maturity, questionId] of [
+      ['formula_in_mind', 'supplement_formula_context'],
+      ['in_development', 'supplement_development_context'],
+      ['finalized', 'supplement_finalized_context']
+    ]) {
+      const evaluation = analyzeDiscovery({
+        objective: 'launch_product',
+        understanding: { ...establishedSupplement, conceptMaturity: known(maturity) },
+        answers: {}
+      });
+      assert.strictEqual(evaluation.nextQuestion.id, questionId);
+      assert.strictEqual(evaluation.planningReadiness.ready, false);
+    }
+    const unresolvedExistingProduct = analyzeDiscovery({
+      objective: 'launch_product',
+      understanding: {
+        ...establishedSupplement,
+        conceptMaturity: known('finalized'),
+        launchStage: known('ready', 'Ready to launch'),
+        existingProductDefinition: known('unsure', "I'm not sure yet")
+      },
+      answers: { supplement_finalized_context: 'unsure' }
+    });
+    assert.strictEqual(unresolvedExistingProduct.nextQuestion, null);
+    assert.strictEqual(unresolvedExistingProduct.discoveryCompleteForNow, true);
+    assert.strictEqual(unresolvedExistingProduct.planningReadiness.ready, false);
+    assert(unresolvedExistingProduct.planningReadiness.unresolvedBlockingRequirements
+      .some(item => item.id === 'existing_product_definition'));
 
     console.log('Story 3.22 Adaptive Product Discovery & Meaningful Readiness tests passed');
   } finally {
