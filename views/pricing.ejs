@@ -40,6 +40,7 @@
                 <form action="/subscribe" method="POST">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="price" value="pro">
+                    <input type="hidden" name="checkoutKey" value="<%= checkoutKeys.pro %>">
                     <button type="submit" class="btn btn-primary btn-block">Upgrade to Pro</button>
                 </form>
             <% } %>
@@ -61,6 +62,7 @@
                 <form action="/subscribe" method="POST">
                     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                     <input type="hidden" name="price" value="unlimited">
+                    <input type="hidden" name="checkoutKey" value="<%= checkoutKeys.unlimited %>">
                     <button type="submit" class="btn btn-primary btn-block">Go Unlimited</button>
                 </form>
             <% } %>

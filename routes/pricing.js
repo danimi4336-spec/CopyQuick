@@ -3,6 +3,7 @@ const router = express.Router();
 const { requireAuth } = require('./auth');
 const { isBillingEnabled, createCheckoutSession, createCustomerPortalSession } = require('../lib/stripe');
 const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
+const { issueCheckoutKeys, validateCheckoutKey } = require('../lib/checkoutIdempotency');
 
 function rejectWhenBillingDisabled(res) {
   if (isBillingEnabled !== false) return false;
@@ -11,9 +12,11 @@ function rejectWhenBillingDisabled(res) {
 }
 
 router.get('/pricing', (req, res) => {
+  const checkoutKeys = req.session ? issueCheckoutKeys(req.session) : {};
   res.render('pricing', { 
     title: 'Pricing - CopyQuick',
-    user: res.locals.user 
+    user: res.locals.user,
+    checkoutKeys
   });
 });
 
@@ -26,7 +29,7 @@ router.get('/subscribe', requireAuth, (req, res) => {
 router.post('/subscribe', requireAuth, async (req, res) => {
   if (rejectWhenBillingDisabled(res)) return;
 
-  const { price } = req.body;
+  const { price, checkoutKey } = req.body;
   const user = res.locals.user;
   
   let priceId;
@@ -39,6 +42,9 @@ router.post('/subscribe', requireAuth, async (req, res) => {
   if (!priceId) {
     return res.status(400).send('Invalid price selected.');
   }
+  if (!validateCheckoutKey(req.session, checkoutKey, price === 'pro_price' ? 'pro' : price === 'unlimited_price' ? 'unlimited' : price)) {
+    return res.status(400).send('Invalid checkout request. Please return to pricing and try again.');
+  }
 
   try {
     const publicOrigin = getPublicAppOrigin({ req });
@@ -46,7 +52,8 @@ router.post('/subscribe', requireAuth, async (req, res) => {
       user.email, 
       priceId, 
       `${publicOrigin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-      `${publicOrigin}/pricing`
+      `${publicOrigin}/pricing`,
+      `checkout:${user.id}:${checkoutKey}`
     );
     res.redirect(session.url);
   } catch (err) {

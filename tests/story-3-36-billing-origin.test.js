@@ -9,6 +9,7 @@ const {
 
 const stripeModuleId = require.resolve('../lib/stripe');
 const calls = { checkout: [], portal: [] };
+const checkoutKey = '11111111-1111-4111-8111-111111111111';
 require.cache[stripeModuleId] = {
   id: stripeModuleId,
   filename: stripeModuleId,
@@ -42,7 +43,7 @@ function request(server, route) {
       res.on('end', () => resolve(res));
     });
     req.on('error', reject);
-    if (route === '/subscribe') req.write('price=pro');
+    if (route === '/subscribe') req.write(`price=pro&checkoutKey=${checkoutKey}`);
     req.end();
   });
 }
@@ -91,7 +92,10 @@ async function run() {
   const app = express();
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
-    req.session = { userId: 36 };
+    req.session = {
+      userId: 36,
+      checkoutKeys: [{ key: checkoutKey, price: 'pro', createdAt: Date.now() }]
+    };
     res.locals.user = {
       id: 36,
       email: 'owner@example.com',
@@ -112,7 +116,8 @@ async function run() {
     assert.deepStrictEqual(calls.checkout[0].slice(1), [
       'price_pro',
       'https://app.copyquick.example/dashboard?session_id={CHECKOUT_SESSION_ID}',
-      'https://app.copyquick.example/pricing'
+      'https://app.copyquick.example/pricing',
+      `checkout:36:${checkoutKey}`
     ]);
 
     const portal = await request(server, '/manage');
