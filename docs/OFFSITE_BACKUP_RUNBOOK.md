@@ -46,10 +46,11 @@ than only warnings, allowing the scheduler and CLI to record a normalized
 failure instead of hanging indefinitely.
 
 Remote retention listing is capped at 10,000 objects by default and 100,000 at
-most. Pagination tokens may not repeat, and a listing may not exceed 1,000
-pages. Crossing a bound fails before retention deletes anything, preventing a
-polluted prefix or malformed S3 response from causing unbounded memory use or a
-partial-inventory retention decision.
+most. Pagination tokens must be present for truncated responses, may not repeat,
+and a listing may not exceed 1,000 pages. Crossing a bound or receiving malformed
+pagination fails before retention deletes anything, preventing a polluted prefix
+or incomplete S3 inventory from causing unbounded memory use or a partial-list
+retention decision.
 
 Generate a key outside Render and the object-storage provider:
 

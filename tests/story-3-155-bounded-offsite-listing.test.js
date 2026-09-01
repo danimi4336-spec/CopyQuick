@@ -45,6 +45,21 @@ async function run() {
   );
   assert.strictEqual(cycleCalls, 2, 'a repeated continuation token must terminate pagination');
 
+  for (const invalidPage of [
+    { Contents: [{ Key: 'partial', Size: 1 }], IsTruncated: true },
+    { Contents: [], IsTruncated: true, NextContinuationToken: '' },
+    { Contents: [], IsTruncated: 'true', NextContinuationToken: 'next' }
+  ]) {
+    const incomplete = new S3CompatibleStorage({
+      bucket: 'local', maxListedObjects: 10,
+      client: { send: async () => invalidPage }
+    });
+    await assert.rejects(
+      incomplete.listObjects('prefix/'),
+      error => error.code === 'REMOTE_LIST_PAGINATION_INVALID'
+    );
+  }
+
   let page = 0;
   const valid = new S3CompatibleStorage({
     bucket: 'local', maxListedObjects: 3,
