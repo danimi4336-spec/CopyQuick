@@ -221,6 +221,7 @@ async function run() {
 
     const recent = inspectOffsiteFreshness({ env: baseEnv, now: () => new Date('2026-08-27T03:00:00Z') });
     assert.strictEqual(recent.status, 'healthy');
+    assert.strictEqual(recent.retentionRemainingCount, 0);
     const stateConfig = resolveOffsiteConfig(baseEnv, { requireSecrets: false });
     writeOffsiteState(stateConfig, successState({ lastFailureCode: 'REMOTE_TIMEOUT' }));
     assert.strictEqual(inspectOffsiteFreshness({ env: baseEnv, now: () => new Date('2026-08-27T00:00:00Z') }).status, 'warning');
@@ -228,6 +229,11 @@ async function run() {
     const freshnessJson = JSON.stringify(inspectOffsiteFreshness({ env: baseEnv, now: () => new Date('2026-08-29T00:00:00Z') }));
     assert(!freshnessJson.includes(baseEnv.OFFSITE_BACKUP_SECRET_ACCESS_KEY));
     assert(!freshnessJson.includes(keyV1));
+    writeOffsiteState(stateConfig, successState({ retentionRemainingCount: 7 }));
+    assert.strictEqual(
+      inspectOffsiteFreshness({ env: baseEnv, now: () => new Date('2026-08-27T00:00:00Z') }).retentionRemainingCount,
+      7
+    );
     writeOffsiteState(stateConfig, successState({ lastSuccessAt: 'malformed' }));
     assert.strictEqual(inspectOffsiteFreshness({ env: baseEnv, now: () => new Date('2026-08-27T00:00:00Z') }).status, 'critical');
     writeOffsiteState(stateConfig, successState({ lastSuccessAt: '2099-01-01T00:00:00.000Z' }));
@@ -297,6 +303,21 @@ async function run() {
       'verified success resets consecutive failure tracking');
     assert.strictEqual(readOffsiteState(stateConfig).lastFailureAt, null);
     assert.strictEqual(fs.readdirSync(config.stagingDirectory).length, 0);
+
+    writeOffsiteState(stateConfig, successState({ retentionRemainingCount: 7 }));
+    const retentionListingFailureStorage = new FakeStorage();
+    retentionListingFailureStorage.listObjects = async () => {
+      throw Object.assign(new Error('temporarily unavailable'), { code: 'REMOTE_TIMEOUT' });
+    };
+    await createOffsiteBackup({
+      source: localPath,
+      env: baseEnv,
+      storage: retentionListingFailureStorage,
+      logger: () => {},
+      now: () => new Date('2026-08-27T04:03:00Z')
+    });
+    assert.strictEqual(readOffsiteState(stateConfig).retentionRemainingCount, 7,
+      'a retention inspection failure must preserve the previously known cleanup backlog');
 
     const retentionFailureStorage = new FakeStorage();
     retentionFailureStorage.objects.set('copyquick/production/2026/08/20/copyquick-2026-08-20T010000Z-v1.cqbackup', { body: bytesOne, metadata: {}, sizeBytes: bytesOne.length });

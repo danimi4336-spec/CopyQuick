@@ -58,6 +58,8 @@ from 1 to 1,000) and stops after the first delete failure. The completion event
 reports `retentionRemainingCount`; later scheduled runs safely continue the
 backlog. This keeps a provider outage or polluted prefix from turning one
 verified backup into an unbounded sequence of delete requests.
+The remaining count is persisted in private off-site state and surfaced as the
+sanitized `OFFSITE_RETENTION_BACKLOG` warning until a later run clears it.
 
 Generate a key outside Render and the object-storage provider:
 
