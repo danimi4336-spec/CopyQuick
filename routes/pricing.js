@@ -78,8 +78,9 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
 
   const { price, checkoutKey } = req.body;
   const user = res.locals.user;
+  const db = req.app.locals.copyquickDb || getDb();
 
-  if (!canStartSubscriptionCheckout(user)) {
+  if (!canStartSubscriptionCheckout(user, db)) {
     return res.redirect(303, '/profile');
   }
   
@@ -99,7 +100,6 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
 
   try {
     const planTier = price === 'pro_price' ? 'pro' : price === 'unlimited_price' ? 'unlimited' : price;
-    const db = req.app.locals.copyquickDb || getDb();
     let checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
       userId: user.id,
       planTier,

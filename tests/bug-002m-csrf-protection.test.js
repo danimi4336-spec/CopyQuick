@@ -347,6 +347,7 @@ async function run() {
     assert.strictEqual(mocks.checkoutCalls.length, checkoutBeforeGet);
 
     currentUser = { ...currentUser, plan_tier: 'free' };
+    db.prepare("UPDATE subscriptions SET status='canceled' WHERE user_id=?").run(userId);
     const checkoutPricingPage = await request(agent, 'GET', '/pricing');
     const checkoutKey = checkoutPricingPage.body.match(/name="checkoutKey" value="([^"]+)"/)?.[1];
     token = await getToken(agent);
@@ -361,6 +362,7 @@ async function run() {
     assert.strictEqual(Number(mocks.checkoutCalls.at(-1).userId), Number(userId));
 
     currentUser = { ...currentUser, plan_tier: 'pro' };
+    db.prepare("UPDATE subscriptions SET status='active' WHERE user_id=?").run(userId);
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/manage', {
       body: { _csrf: token }

@@ -9,11 +9,6 @@ const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPol
 
 process.env.STRIPE_UNLIMITED_PRICE = 'price_unlimited_story_344';
 
-assert.strictEqual(canStartSubscriptionCheckout({ plan_tier: 'free' }), true);
-for (const planTier of ['pro', 'unlimited', 'unexpected', null, undefined]) {
-  assert.strictEqual(canStartSubscriptionCheckout({ plan_tier: planTier }), false);
-}
-
 const stripeModuleId = require.resolve('../lib/stripe');
 const checkoutCalls = [];
 require.cache[stripeModuleId] = {
@@ -62,6 +57,11 @@ async function run() {
   db.pragma('foreign_keys = ON');
   runMigrationEngine(db, { logger: () => {} });
   db.prepare('INSERT INTO users(id, email, name) VALUES (?, ?, ?)').run(44, 'safe@example.com', 'Safe');
+  assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: 'free' }, db), true);
+  assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: 'free' }), false);
+  for (const planTier of ['pro', 'unlimited', 'unexpected', null, undefined]) {
+    assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: planTier }, db), false);
+  }
   app.locals.copyquickDb = db;
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
@@ -86,10 +86,26 @@ async function run() {
     assert.strictEqual(paid.headers.location, '/profile');
     assert.strictEqual(checkoutCalls.length, 0, 'an entitled subscriber must not create another subscription Checkout Session');
 
+    db.prepare(`
+      INSERT INTO subscriptions(
+        user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+        price_id, current_period_start, current_period_end
+      ) VALUES (44, 'cus_story_344', 'sub_story_344', 'active', 'pro', 'price_pro', ?, ?)
+    `).run('2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
+    const driftedFree = await post(server, { plan_tier: 'free' });
+    assert.strictEqual(driftedFree.statusCode, 303);
+    assert.strictEqual(driftedFree.headers.location, '/profile');
+    assert.strictEqual(checkoutCalls.length, 0, 'a nonterminal local subscription must block checkout despite stale free entitlement');
+
+    db.prepare("UPDATE subscriptions SET status='canceled' WHERE user_id=44").run();
     const free = await post(server, { plan_tier: 'free' });
     assert.strictEqual(free.statusCode, 302);
     assert.strictEqual(free.headers.location, 'https://checkout.stripe.com/c/pay/test-session');
     assert.strictEqual(checkoutCalls.length, 1);
+    db.prepare("UPDATE subscriptions SET status='unpaid' WHERE user_id=44").run();
+    assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: 'free' }, db), false);
+    db.prepare("UPDATE subscriptions SET status='incomplete_expired' WHERE user_id=44").run();
+    assert.strictEqual(canStartSubscriptionCheckout({ id: 44, plan_tier: 'free' }, db), true);
   } finally {
     await new Promise(resolve => server.close(resolve));
     db.close();

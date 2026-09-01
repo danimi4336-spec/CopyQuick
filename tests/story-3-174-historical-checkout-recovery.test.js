@@ -86,7 +86,7 @@ async function run() {
     insertExpiredIntent();
     const active = await post(server);
     assert.strictEqual(active.statusCode, 303);
-    assert.strictEqual(active.headers.location, '/profile?billing=pending');
+    assert.strictEqual(active.headers.location, '/profile');
     assert.strictEqual(createCount, 1, 'potentially active billing must not create a duplicate subscription');
   } finally {
     await new Promise(resolve => server.close(resolve));
