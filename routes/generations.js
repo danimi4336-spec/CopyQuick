@@ -66,15 +66,25 @@ class GenerationValidationError extends Error {
 }
 
 const bundleAssetContentTypeByLabel = {
+  'Email Drafts': 'email_campaign',
   'Email Campaign': 'email_campaign',
+  'Facebook Post Variations': 'social_post',
   'Facebook Post': 'social_post',
+  'Facebook Ad Headlines': 'ad_headline',
   'Facebook Ad': 'ad_headline',
+  'Google Search Ad Headlines': 'ad_headline',
   'Google Search Ad': 'ad_headline',
+  'Product Description Variations': 'product_description',
   'Product Description': 'product_description',
+  'Amazon Product Description': 'product_description',
   'Amazon Listing': 'product_description',
+  'SEO Article Introductions': 'blog_intro',
   'SEO Package': 'blog_intro',
+  'Blog Introductions': 'blog_intro',
   'Blog Article': 'blog_intro',
+  'Landing Page CTAs': 'cta',
   'Landing Page': 'cta',
+  'Video Sales Messages': 'sales_message',
   'Video Package': 'sales_message'
 };
 

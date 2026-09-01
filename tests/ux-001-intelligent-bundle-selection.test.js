@@ -172,16 +172,16 @@ class FakeDocument extends FakeElement {
 }
 
 const assetDefs = [
-  ['email_campaign:Email Campaign', 'Email Campaign', true],
-  ['social_post:Facebook Post', 'Facebook Post', true],
-  ['ad_headline:Facebook Ad', 'Facebook Ad', true],
-  ['social_post:Google Search Ad', 'Google Search Ad', true],
-  ['product_description:Product Description', 'Product Description', true],
-  ['subject_line:Amazon Listing', 'Amazon Listing', false],
-  ['blog_intro:SEO Package', 'SEO Package', false],
-  ['blog_intro:Blog Article', 'Blog Article', false],
-  ['cta:Landing Page', 'Landing Page', false],
-  ['sales_message:Video Package', 'Video Package', false]
+  ['email_campaign:Email Drafts', 'Email Drafts', true],
+  ['social_post:Facebook Post Variations', 'Facebook Post Variations', true],
+  ['ad_headline:Facebook Ad Headlines', 'Facebook Ad Headlines', true],
+  ['social_post:Google Search Ad Headlines', 'Google Search Ad Headlines', true],
+  ['product_description:Product Description Variations', 'Product Description Variations', true],
+  ['subject_line:Amazon Product Description', 'Amazon Product Description', false],
+  ['blog_intro:SEO Article Introductions', 'SEO Article Introductions', false],
+  ['blog_intro:Blog Introductions', 'Blog Introductions', false],
+  ['cta:Landing Page CTAs', 'Landing Page CTAs', false],
+  ['sales_message:Video Sales Messages', 'Video Sales Messages', false]
 ];
 
 function createBundleDocument(selectedIndexes = [0, 1, 2, 3, 4]) {
@@ -367,9 +367,9 @@ async function run() {
   assert(!checkedValues(doc).includes(assetDefs[0][0]));
   assert(checkedValues(doc).includes(assetDefs[5][0]));
   assert.deepStrictEqual(badgeTexts(doc).slice(1, 6), ['1', '2', '3', '4', '5']);
-  assert.strictEqual(doc.getElementById('bundleSelectionToast').textContent, 'Maximum of 5 assets. Replaced "Email Campaign" with "Amazon Listing".');
+  assert.strictEqual(doc.getElementById('bundleSelectionToast').textContent, 'Maximum of 5 assets. Replaced "Email Drafts" with "Amazon Product Description".');
   assert.strictEqual(doc.getElementById('bundleSelectionToast').classList.contains('visible'), true);
-  assert.strictEqual(doc.getElementById('bundleSelectionLive').textContent, 'Amazon Listing selected. Email Campaign replaced.');
+  assert.strictEqual(doc.getElementById('bundleSelectionLive').textContent, 'Amazon Product Description selected. Email Drafts replaced.');
 
   chips(doc)[6].click();
   assert.deepStrictEqual(controller.getSelectionOrder(), assetDefs.slice(2, 7).map(([value]) => value));
