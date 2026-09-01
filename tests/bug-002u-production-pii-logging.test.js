@@ -283,7 +283,7 @@ async function runDashboardAndGenerationLoggingTest(db, userId) {
     });
     assert.strictEqual(generated.res.statusCode, 200);
     const output = capture.output();
-    assert.match(output, /Dashboard route called/);
+    assert.doesNotMatch(output, /Dashboard route called|Rendering dashboard/);
     assertNoMarkers(output, 'Dashboard/generation logging');
   } finally {
     capture.restore();

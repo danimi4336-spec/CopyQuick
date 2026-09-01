@@ -169,63 +169,17 @@ function loadDashboardSnapshot(db, user, options = {}) {
 
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
-  console.log('📊 Dashboard route called.');
   try {
     const db = getDb();
     const user = res.locals.user;
-    if (!user) { console.log('⛔ No user in locals, redirecting to login'); return res.redirect('/login'); }
-    const userId = user.id;
-
-    const safeVal = function(val, fallback) { return val !== null && val !== undefined ? val : fallback; };
-
-    const totalGenerations = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId)?.count, 0);
-    const favorites = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId)?.count, 0);
-    const thisMonth = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId)?.count, 0);
-    const quickCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId)?.count, 0);
-    const bundleCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId)?.count, 0);
-    const recent = safeVal(db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId), []);
-    const typeBreakdown = safeVal(db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId), []);
-    const history = safeVal(db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId), []);
-    const aiCredits = getAiCredits(db, user);
-
-    // Brand Brain data for progress
-    let brain = {};
-    let brainFilled = 0;
-    let brainPct = 0;
-    try {
-      const brainRow = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId);
-      if (brainRow) {
-        brain = brainRow;
-        const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
-        brainFilled = brainFields.filter(function(f){ return brainRow[f] && brainRow[f].trim(); }).length;
-        brainPct = Math.round((brainFilled / brainFields.length) * 100);
-      } else {
-        console.log('ℹ️ No brand_brain row for dashboard user.');
-      }
-    } catch(e) {
-      writeOperationalEvent({
-        event: 'dashboard_brand_context_failed',
-        requestId: req.requestId,
-        code: 'DASHBOARD_BRAND_CONTEXT_FAILED'
-      });
-    }
-
-    console.log('✅ Rendering dashboard — stats:',
-      'gens:', totalGenerations, 'fav:', favorites, 'month:', thisMonth,
-      'quick:', quickCount, 'bundle:', bundleCount);
+    if (!user) return res.redirect('/login');
 
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(),
       tones: getTones(),
-      history: history, results: null,
-      totalGenerations: totalGenerations, favorites: favorites, thisMonth: thisMonth,
-      quickCount: quickCount, bundleCount: bundleCount,
-      recent: recent, typeBreakdown: typeBreakdown,
-      bundleAssets: bundleAssets,
-      brandVoices: brandVoices, audiencePresets: audiencePresets,
-      brain: brain, brainPct: brainPct, brainFilled: brainFilled,
-      aiCredits: aiCredits,
+      ...loadDashboardSnapshot(db, user),
+      results: null,
       currentPage: 'dashboard'
     });
   } catch(err) {
