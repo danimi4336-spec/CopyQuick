@@ -125,7 +125,7 @@ async function run() {
     assert.strictEqual(checkout.statusCode, 302);
     assert.deepStrictEqual(calls.checkout[0].slice(1, 4), [
       'price_pro',
-      'https://app.copyquick.example/dashboard?session_id={CHECKOUT_SESSION_ID}',
+      'https://app.copyquick.example/billing/return?session_id={CHECKOUT_SESSION_ID}',
       'https://app.copyquick.example/pricing'
     ]);
     assert.match(calls.checkout[0][4], /^checkout:36:[0-9a-f-]{36}$/i);

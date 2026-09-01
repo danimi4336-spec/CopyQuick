@@ -18,6 +18,10 @@ const {
   canReplaceCompletedCheckoutIntent,
   recordSubscriptionCheckoutSession
 } = require('../lib/subscriptionCheckoutIntent');
+const {
+  createBillingReturnNotice,
+  inspectBillingCheckoutReturn
+} = require('../lib/billingCheckoutReturn');
 
 function logBillingFailure(req, event, code, statusCode) {
   writeOperationalEvent({
@@ -48,6 +52,22 @@ router.get('/pricing', (req, res) => {
 // Legacy GET links are non-mutating; checkout creation happens only via POST.
 router.get('/subscribe', requireAuth, (req, res) => {
   res.redirect('/pricing');
+});
+
+router.get('/billing/return', requireAuth, async (req, res) => {
+  const user = res.locals.user;
+  const db = req.app.locals.copyquickDb || getDb();
+  const result = await inspectBillingCheckoutReturn({
+    db,
+    user,
+    sessionId: req.query.session_id,
+    retrieveSession: retrieveCheckoutSession
+  });
+  req.session.billingReturnNotice = createBillingReturnNotice(result.status);
+  if (result.status === 'unavailable') {
+    logBillingFailure(req, 'billing_checkout_return_unverified', 'STRIPE_CHECKOUT_RETURN_UNVERIFIED', 303);
+  }
+  return res.redirect(303, '/dashboard');
 });
 
 // POST /subscribe (alternate version if using form)
@@ -131,7 +151,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
     const session = await createCheckoutSession(
       user.email, 
       priceId, 
-      `${publicOrigin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      `${publicOrigin}/billing/return?session_id={CHECKOUT_SESSION_ID}`,
       `${publicOrigin}/pricing`,
       `checkout:${user.id}:${checkoutIntent.idempotencyKey}`,
       user.id,

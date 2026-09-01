@@ -15,6 +15,7 @@ const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, pars
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
+const { consumeBillingReturnNotice } = require('../lib/billingCheckoutReturn');
 const {
   getCurrentUsageSnapshot,
   getCurrentUsageSnapshotReadOnly,
@@ -190,6 +191,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
       contentTypes: getContentTypes(),
       tones: getTones(),
       ...loadDashboardSnapshot(db, user),
+      billingReturnNotice: consumeBillingReturnNotice(req.session),
       results: null,
       currentPage: 'dashboard'
     });

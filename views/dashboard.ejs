@@ -15,6 +15,11 @@
     var creditsRenewal = credits.periodEnd ? new Date(credits.periodEnd).toLocaleDateString() : 'Current monthly period';
 %>
 <div class="container builder-center">
+    <% if (typeof billingReturnNotice !== 'undefined' && billingReturnNotice) { %>
+        <div class="alert <%= billingReturnNotice.status === 'active' ? 'alert-success' : 'alert-info' %>" role="status">
+            <%= billingReturnNotice.message %>
+        </div>
+    <% } %>
     <!-- ===== SECTION 1: Welcome + Brand Brain Progress ===== -->
     <section class="bc-welcome fade-in">
         <div class="bc-welcome-left">
