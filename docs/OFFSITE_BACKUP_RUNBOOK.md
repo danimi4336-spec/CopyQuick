@@ -22,6 +22,7 @@ OFFSITE_BACKUP_PREFIX=copyquick/production
 OFFSITE_BACKUP_ENCRYPTION_KEY=<base64 32-byte key>
 OFFSITE_BACKUP_KEY_ID=v1
 OFFSITE_BACKUP_RETENTION=30
+OFFSITE_BACKUP_RETENTION_DELETE_LIMIT=100
 OFFSITE_BACKUP_MAX_AGE_HOURS=36
 OFFSITE_BACKUP_MAX_ARTIFACT_BYTES=67108864
 OFFSITE_STORAGE_CONNECTION_TIMEOUT_MS=5000
@@ -51,6 +52,12 @@ and a listing may not exceed 1,000 pages. Crossing a bound or receiving malforme
 pagination fails before retention deletes anything, preventing a polluted prefix
 or incomplete S3 inventory from causing unbounded memory use or a partial-list
 retention decision.
+
+Retention deletes at most 100 expired objects per run by default (configurable
+from 1 to 1,000) and stops after the first delete failure. The completion event
+reports `retentionRemainingCount`; later scheduled runs safely continue the
+backlog. This keeps a provider outage or polluted prefix from turning one
+verified backup into an unbounded sequence of delete requests.
 
 Generate a key outside Render and the object-storage provider:
 
