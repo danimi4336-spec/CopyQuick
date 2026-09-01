@@ -77,10 +77,11 @@
         <!-- Pagination -->
         <% if (totalPages > 1) { %>
             <div class="pagination fade-in">
-                <% for (var p = 1; p <= totalPages; p++) { %>
+                <% paginationPages.forEach(function(p, index) { %>
+                    <% if (index > 0 && p - paginationPages[index - 1] > 1) { %><span class="page-btn" aria-hidden="true">…</span><% } %>
                     <a href="?page=<%= p %><%= search ? '&search=' + search : '' %><%= type ? '&type=' + type : '' %><%= sort !== 'newest' ? '&sort=' + sort : '' %><%= favorite ? '&favorite=' + favorite : '' %>" 
                        class="page-btn <%= p === page ? 'active' : '' %>"><%= p %></a>
-                <% } %>
+                <% }); %>
             </div>
         <% } %>
     <% } %>

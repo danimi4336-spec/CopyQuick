@@ -39,6 +39,14 @@
                 </div>
             <% }); %>
         </div>
+        <% if (totalPages > 1) { %>
+            <nav class="pagination fade-in" aria-label="Favorite pages">
+                <% paginationPages.forEach(function(p, index) { %>
+                    <% if (index > 0 && p - paginationPages[index - 1] > 1) { %><span class="page-btn" aria-hidden="true">…</span><% } %>
+                    <a href="?page=<%= p %>" class="page-btn <%= p === page ? 'active' : '' %>"><%= p %></a>
+                <% }); %>
+            </nav>
+        <% } %>
     <% } %>
 </div>
 

@@ -12,7 +12,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
-const { GENERATION_METADATA_LIMITS, boundedQueryText, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
+const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const {
@@ -658,9 +658,8 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
 router.get('/history', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
-  const page = parseHistoryPage(req.query.page);
+  const requestedPage = parseHistoryPage(req.query.page);
   const perPage = 20;
-  const offset = (page - 1) * perPage;
   const search = boundedQueryText(req.query.search);
   const type = boundedQueryText(req.query.type, 80);
   const sort = boundedQueryText(req.query.sort, 20) || 'newest';
@@ -695,6 +694,8 @@ router.get('/history', requireAuth, (req, res) => {
 
   const total = db.prepare(`SELECT COUNT(*) as count FROM generations ${where}`).get(...params).count;
   const totalPages = Math.ceil(total / perPage);
+  const page = Math.min(requestedPage, Math.max(1, totalPages));
+  const offset = (page - 1) * perPage;
 
   const generations = db.prepare(`SELECT * FROM generations ${where} ${orderBy} LIMIT ? OFFSET ?`).all(...params, perPage, offset);
 
@@ -703,6 +704,7 @@ router.get('/history', requireAuth, (req, res) => {
     generations,
     page,
     totalPages,
+    paginationPages: buildPaginationPages(totalPages, page),
     total,
     search,
     type,
@@ -719,14 +721,27 @@ router.get('/history', requireAuth, (req, res) => {
 router.get('/favorites', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
+  const requestedPage = parseHistoryPage(req.query.page);
+  const perPage = 20;
+  const total = db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId).count;
+  const totalPages = Math.ceil(total / perPage);
+  const page = Math.min(requestedPage, Math.max(1, totalPages));
+  const offset = (page - 1) * perPage;
 
-  const generations = db.prepare('SELECT * FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0 ORDER BY created_at DESC').all(userId);
+  const generations = db.prepare(`
+    SELECT * FROM generations
+    WHERE user_id = ? AND favorite = 1 AND is_deleted = 0
+    ORDER BY created_at DESC LIMIT ? OFFSET ?
+  `).all(userId, perPage, offset);
 
   res.render('favorites', {
     title: 'Favorites - CopyQuick',
     generations,
     contentTypes: getContentTypes(),
-    total: generations.length,
+    total,
+    page,
+    totalPages,
+    paginationPages: buildPaginationPages(totalPages, page),
     currentPage: 'favorites'
   });
 });
