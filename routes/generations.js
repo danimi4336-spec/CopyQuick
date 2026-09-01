@@ -11,7 +11,6 @@ const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
-const { getGroupsWithJourneys, getAllJourneys } = require('../lib/businessJourneys');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
@@ -46,16 +45,6 @@ router.param('id', (req, res, next, value) => {
   req.generationResourceId = id;
   return next();
 });
-
-const goalLabels = {
-  launch_product: 'Launch a New Product',
-  grow_business: 'Grow My Existing Business',
-  start_store: 'Start an Online Store',
-  promote_service: 'Promote My Service',
-  build_brand: 'Build My Brand',
-  campaigns: 'Generate Marketing Campaigns',
-  other: 'Something Else'
-};
 
 class GenerationValidationError extends Error {
   constructor(message) {
@@ -167,14 +156,12 @@ router.get('/dashboard', requireAuth, (req, res) => {
     // Validate critical data before rendering
     const sections = campaignSections;
     if (!sections || !sections.length) { console.log('⚠️ campaignSections is empty!'); }
-    if (!goalLabels) { console.log('⚠️ goalLabels is missing!'); }
 
     const totalGenerations = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId)?.count, 0);
     const favorites = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId)?.count, 0);
     const thisMonth = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId)?.count, 0);
     const quickCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId)?.count, 0);
     const bundleCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId)?.count, 0);
-    const campaignCount = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(userId)?.count, 0);
     const recent = safeVal(db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId), []);
     const typeBreakdown = safeVal(db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId), []);
     const history = safeVal(db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId), []);
@@ -202,19 +189,9 @@ router.get('/dashboard', requireAuth, (req, res) => {
       });
     }
 
-    const journey = {
-      accountCreated: true, loggedIn: true,
-      brandBrainStarted: brainFilled > 0,
-      firstQuickGenerate: quickCount > 0,
-      firstMarketingBundle: bundleCount > 0,
-      firstCompleteCampaign: campaignCount > 0,
-      firstFavorite: favorites > 0,
-      firstDownload: false
-    };
-
     console.log('✅ Rendering dashboard — stats:',
       'gens:', totalGenerations, 'fav:', favorites, 'month:', thisMonth,
-      'quick:', quickCount, 'bundle:', bundleCount, 'campaign:', campaignCount);
+      'quick:', quickCount, 'bundle:', bundleCount);
 
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
@@ -222,17 +199,12 @@ router.get('/dashboard', requireAuth, (req, res) => {
       tones: getTones(),
       history: history, results: null,
       totalGenerations: totalGenerations, favorites: favorites, thisMonth: thisMonth,
-      quickCount: quickCount, bundleCount: bundleCount, campaignCount: campaignCount,
+      quickCount: quickCount, bundleCount: bundleCount,
       recent: recent, typeBreakdown: typeBreakdown,
       bundleAssets: bundleAssets, campaignSections: campaignSections,
       brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
       brain: brain, brainPct: brainPct, brainFilled: brainFilled,
-      journey: journey,
-      goalLabels: goalLabels,
-      journeyGroupsData: getGroupsWithJourneys(),
-      journeysData: JSON.stringify(getAllJourneys()),
       aiCredits: aiCredits,
-      builderGoal: safeVal(user.builder_goal, '') || '',
       currentPage: 'dashboard'
     });
   } catch(err) {
@@ -247,19 +219,12 @@ router.get('/dashboard', requireAuth, (req, res) => {
         contentTypes: getContentTypes(), tones: getTones(),
         history: [], results: null,
         totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
         bundleAssets: bundleAssets, campaignSections: campaignSections,
         brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
         brain: {}, brainPct: 0, brainFilled: 0,
-        journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false,
-                   firstQuickGenerate:false, firstMarketingBundle:false,
-                   firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
-        goalLabels: goalLabels,
-        journeyGroupsData: getGroupsWithJourneys(),
-        journeysData: JSON.stringify(getAllJourneys()),
         aiCredits: null,
-        builderGoal: '',
         currentPage: 'dashboard'
       });
     } catch(e2) {
@@ -302,10 +267,8 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
 
   const getDashboardCounts = function(currentUserId) {
     return {
-      favorites: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(currentUserId)?.count || 0,
       quickCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(currentUserId)?.count || 0,
-      bundleCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(currentUserId)?.count || 0,
-      campaignCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'campaign'").get(currentUserId)?.count || 0
+      bundleCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(currentUserId)?.count || 0
     };
   };
 
@@ -353,17 +316,12 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         results: null,
         error: 'Please check your generation request and try again.',
         totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
         bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
         brain: db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {},
         brainPct: 0, brainFilled: 0,
-        journey: { accountCreated:true, loggedIn:true, brandBrainStarted:false, firstQuickGenerate:false, firstMarketingBundle:false, firstCompleteCampaign:false, firstFavorite:false, firstDownload:false },
-        goalLabels,
-        journeyGroupsData: getGroupsWithJourneys(),
-        journeysData: JSON.stringify(getAllJourneys()),
         aiCredits: getAiCredits(db, user),
-        builderGoal: user.builder_goal || '',
         input: { productDescription: cleanProductDescription || '', targetAudience: cleanTargetAudience || '', contentType: cleanContentType || 'sales_message', tone: cleanTone || 'professional' }
       });
     }
@@ -373,13 +331,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
   const usageSnapshot = getCurrentUsageSnapshot(db, user);
   if (usageSnapshot.isOverLimit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
-    // Fetch brain + journey for safe render
-    const { favorites, quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
+    const { quickCount, bundleCount } = getDashboardCounts(user.id);
     const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
     const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
     const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
-    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
     return res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(),
@@ -389,16 +345,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       error: 'Monthly generation limit reached.',
       errorAction: { href: '/pricing', label: 'Upgrade your plan to continue.' },
       totalGenerations: 0, favorites: 0, thisMonth: 0,
-      quickCount: 0, bundleCount: 0, campaignCount: 0,
+      quickCount: 0, bundleCount: 0,
       recent: [], typeBreakdown: [],
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      journey: journeySafe,
-      goalLabels,
-      journeyGroupsData: getGroupsWithJourneys(),
-      journeysData: JSON.stringify(getAllJourneys()),
       aiCredits: formatAiCredits(usageSnapshot, user),
-      builderGoal: user.builder_goal || '',
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
   }
@@ -507,34 +458,28 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     res.locals.user = updatedUser;
     const updatedUsageSnapshot = getCurrentUsageSnapshot(db, updatedUser);
-    const { quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
+    const { quickCount, bundleCount } = getDashboardCounts(user.id);
     const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
     const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
     const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count;
     const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(user.id);
     const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(user.id);
     const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id);
-    // Safe brain + journey for render
+    // Safe Brand Brain context for render.
     const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
     const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
     const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
-    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
       history, results,
       totalGenerations, favorites, thisMonth,
-      quickCount, bundleCount, campaignCount,
+      quickCount, bundleCount,
       recent, typeBreakdown,
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      journey: journeySafe,
-      goalLabels,
-      journeyGroupsData: getGroupsWithJourneys(),
-      journeysData: JSON.stringify(getAllJourneys()),
       aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser),
-      builderGoal: updatedUser.builder_goal || '',
       input: { productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone },
       genId,
       genMode: genType
@@ -566,12 +511,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
 
       const latestUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) || user;
       const latestUsageSnapshot = getCurrentUsageSnapshot(db, latestUser);
-      const { favorites, quickCount, bundleCount, campaignCount } = getDashboardCounts(user.id);
+      const { quickCount, bundleCount } = getDashboardCounts(user.id);
       const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
       const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
       const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
       const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
-      const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:quickCount > 0, firstMarketingBundle:bundleCount > 0, firstCompleteCampaign:campaignCount > 0, firstFavorite:favorites > 0, firstDownload:false };
       return res.status(403).render('dashboard', {
         title: 'Dashboard - CopyQuick',
         contentTypes: getContentTypes(),
@@ -581,16 +525,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         error: 'Monthly generation limit reached.',
         errorAction: { href: '/pricing', label: 'Upgrade your plan to continue.' },
         totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0, campaignCount: 0,
+        quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
         bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
         brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-        journey: journeySafe,
-        goalLabels,
-        journeyGroupsData: getGroupsWithJourneys(),
-        journeysData: JSON.stringify(getAllJourneys()),
         aiCredits: formatAiCredits(latestUsageSnapshot, latestUser),
-        builderGoal: latestUser.builder_goal || '',
         input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
       });
     }
@@ -602,23 +541,17 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
     const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
     const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
-    const journeySafe = { accountCreated:true, loggedIn:true, brandBrainStarted:brainFilledSafe > 0, firstQuickGenerate:0, firstMarketingBundle:0, firstCompleteCampaign:0, firstFavorite:0, firstDownload:false };
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
       history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
       results: null, error: 'An error occurred',
       totalGenerations: 0, favorites: 0, thisMonth: 0,
-      quickCount: 0, bundleCount: 0, campaignCount: 0,
+      quickCount: 0, bundleCount: 0,
       recent: [], typeBreakdown: [],
       bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      journey: journeySafe,
-      goalLabels,
-      journeyGroupsData: getGroupsWithJourneys(),
-      journeysData: JSON.stringify(getAllJourneys()),
-      aiCredits: null,
-      builderGoal: user.builder_goal || ''
+      aiCredits: null
     });
   }
 });
