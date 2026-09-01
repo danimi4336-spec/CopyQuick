@@ -5,6 +5,7 @@ const { getDb } = require('../db/database');
 const { syncSubscriptionRecord } = require('../lib/subscriptions');
 const { BillingPolicyError, evaluateStripeEntitlement } = require('../lib/billingEntitlement');
 const { resolveCheckoutUser } = require('../lib/checkoutIdentity');
+const { STRIPE_WEBHOOK_BODY_LIMIT } = require('../lib/requestBodyLimits');
 
 function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
   let user = null;
@@ -222,7 +223,10 @@ function safelyApplySubscription(db, event, user, subscription) {
 }
 
 // Use express.raw() for webhook route to verify signature
-router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/stripe/webhook', express.raw({
+  type: 'application/json',
+  limit: STRIPE_WEBHOOK_BODY_LIMIT
+}), async (req, res) => {
   // Undefined preserves compatibility with injected Stripe test implementations.
   if (isBillingEnabled === false) {
     return res.status(503).send('Stripe billing is disabled until STRIPE_KEY is configured.');
