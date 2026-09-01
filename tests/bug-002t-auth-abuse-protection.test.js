@@ -331,6 +331,18 @@ async function run() {
     assert.strictEqual(countUsers(db), usersBeforeBlockedSignup);
     signup.close();
 
+    const weakSignup = await createTestAgent();
+    const weakSignupToken = await getToken(weakSignup.agent);
+    const usersBeforeWeakSignup = countUsers(db);
+    const weakSignupResponse = await postSignup(weakSignup.agent, weakSignupToken, {
+      email: 'weak-signup@example.com',
+      password: 'short'
+    });
+    assert.strictEqual(weakSignupResponse.res.statusCode, 400);
+    assert.strictEqual(countUsers(db), usersBeforeWeakSignup);
+    assert.strictEqual(weakSignup.calls.hash, 0);
+    weakSignup.close();
+
     const signupIps = await createTestAgent({ maxSignupAttempts: 1 });
     const signupIpToken = await getToken(signupIps.agent);
     await postSignup(signupIps.agent, signupIpToken, { email: 'ip-one@example.com' }, { 'X-Forwarded-For': '198.51.100.1' });
