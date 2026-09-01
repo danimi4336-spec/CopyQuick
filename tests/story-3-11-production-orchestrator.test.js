@@ -258,6 +258,24 @@ async function run() {
   assert.strictEqual(raceResults.reduce((sum, item) => sum + item.workPerformed, 0), 1);
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(raceOwner).count, 1);
 
+  db.prepare("UPDATE production_runs SET status = 'completed' WHERE status IN ('queued', 'running')").run();
+  const poisonOwner = createUser(db);
+  const poisonRun = startProduction(db, poisonOwner);
+  const poisonJob = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order LIMIT 1').get(poisonRun);
+  db.prepare("UPDATE production_jobs SET dependencies = '{malformed' WHERE id = ?").run(poisonJob.id);
+  const healthyOwner = createUser(db);
+  const healthyRun = startProduction(db, healthyOwner);
+  const poisonCalls = [];
+  const contained = await runOrchestratorCycle({ db, generatorApi: generator(poisonCalls), concurrency: 1 });
+  assert.strictEqual(contained.results[0].productionRunId, poisonRun);
+  assert.strictEqual(contained.results[0].outcome, 'permanent_failure');
+  assert.strictEqual(poisonCalls.length, 0, 'corrupt persisted state never reaches the provider');
+  assert.strictEqual(db.prepare('SELECT status FROM production_jobs WHERE id = ?').get(poisonJob.id).status, 'failed');
+  assert.strictEqual(db.prepare('SELECT last_error_code FROM production_jobs WHERE id = ?').get(poisonJob.id).last_error_code, 'PRODUCTION_STATE_INVALID');
+  const afterPoison = await runOrchestratorCycle({ db, generatorApi: generator(poisonCalls), concurrency: 1 });
+  assert.strictEqual(afterPoison.results[0].productionRunId, healthyRun);
+  assert.strictEqual(afterPoison.results[0].outcome, 'completed', 'a poison job cannot block later healthy work');
+
   const eventTypes = db.prepare(`
     SELECT DISTINCT event_type FROM production_job_events WHERE production_run_id = ?
   `).all(runId).map((row) => row.event_type);
