@@ -11,6 +11,10 @@ can create generation or Production work:
 The default budget is 12 actions per 60 seconds. Configure it with
 `AI_ACTION_RATE_LIMIT_PER_WINDOW` and `AI_ACTION_RATE_LIMIT_WINDOW_MS`.
 Invalid, zero, or negative values fall back to the safe defaults.
+The window must remain between 10 seconds and 1 hour, and the action allowance
+cannot exceed 100 per window. Values outside those safety bounds also fall back
+to the defaults so configuration cannot silently disable abuse and cost
+containment.
 
 Rejected requests return HTTP `429`, a bounded `Retry-After` header, and the
 normalized code `GENERATION_RATE_LIMITED`. Rejection happens before generation,

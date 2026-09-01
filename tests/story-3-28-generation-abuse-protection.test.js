@@ -3,7 +3,14 @@ const express = require('express');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { createGenerationActionRateLimiter } = require('../lib/generationProtection');
+const {
+  DEFAULT_MAX_ACTIONS,
+  DEFAULT_WINDOW_MS,
+  MAX_ACTIONS,
+  MAX_WINDOW_MS,
+  MIN_WINDOW_MS,
+  createGenerationActionRateLimiter
+} = require('../lib/generationProtection');
 
 function request(server, userId, accept = 'application/json') {
   return new Promise((resolve, reject) => {
@@ -57,6 +64,18 @@ async function run() {
 
   assert.strictEqual(createGenerationActionRateLimiter({ windowMs: -1, maxActions: 0 }).config.windowMs, 60000);
   assert.strictEqual(createGenerationActionRateLimiter({ windowMs: -1, maxActions: 0 }).config.maxActions, 12);
+  assert.deepStrictEqual(
+    createGenerationActionRateLimiter({ windowMs: MIN_WINDOW_MS, maxActions: MAX_ACTIONS }).config,
+    { windowMs: MIN_WINDOW_MS, maxActions: MAX_ACTIONS }
+  );
+  assert.deepStrictEqual(
+    createGenerationActionRateLimiter({ windowMs: MIN_WINDOW_MS - 1, maxActions: MAX_ACTIONS + 1 }).config,
+    { windowMs: DEFAULT_WINDOW_MS, maxActions: DEFAULT_MAX_ACTIONS }
+  );
+  assert.strictEqual(
+    createGenerationActionRateLimiter({ windowMs: MAX_WINDOW_MS + 1 }).config.windowMs,
+    DEFAULT_WINDOW_MS
+  );
 
   const generationsRoute = fs.readFileSync(path.join(__dirname, '..', 'routes', 'generations.js'), 'utf8');
   const productionRoute = fs.readFileSync(path.join(__dirname, '..', 'routes', 'production.js'), 'utf8');
