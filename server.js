@@ -148,7 +148,7 @@ app.get('/contact', (req, res) => {
 app.post('/contact', createContactRateLimiter(), createContactHandler({ sendContactFormEmails }));
 
 app.get('/blog', (req, res) => {
-  res.render('blog', { title: 'Blog - CopyQuick', currentPage: 'blog' });
+  res.redirect(302, '/about');
 });
 
 app.get('/privacy', (req, res) => {
