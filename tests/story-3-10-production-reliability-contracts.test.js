@@ -335,6 +335,35 @@ async function run() {
   assert.strictEqual(persistenceProviderCalls, 1,
     'completed provider work must not be repeated automatically after persistence fails');
 
+  const leaseLossUser = createUser(db);
+  const leaseLossRun = createRun(db, leaseLossUser, [{ id: 'customer_profile' }]);
+  let leaseLossSignal;
+  let leaseLossProviderCalls = 0;
+  const leaseLossExecution = executeNextProductionJob({
+    db,
+    userId: leaseLossUser,
+    productionRunId: leaseLossRun,
+    leaseDurationSeconds: 1,
+    generatorApi: {
+      generateCopy: ({ signal }) => {
+        leaseLossProviderCalls += 1;
+        leaseLossSignal = signal;
+        return new Promise((resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        });
+      }
+    }
+  });
+  while (!leaseLossSignal) await new Promise(resolve => setImmediate(resolve));
+  db.prepare("UPDATE production_jobs SET claim_token='replacement-owner' WHERE production_run_id=?")
+    .run(leaseLossRun);
+  const leaseLossResult = await leaseLossExecution;
+  assert.strictEqual(leaseLossResult.outcome, 'not_owned');
+  assert.strictEqual(leaseLossSignal.aborted, true,
+    'losing the durable lease must cancel abort-aware provider work');
+  assert.strictEqual(leaseLossProviderCalls, 1);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id=?').get(leaseLossUser).count, 0);
+
   const routeUser = createUser(db);
   const routeRun = createRun(db, routeUser, [{ id: 'customer_profile' }]);
   db.prepare(`
