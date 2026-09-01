@@ -6,6 +6,12 @@ const { syncSubscriptionRecord } = require('../lib/subscriptions');
 const { BillingPolicyError, evaluateStripeEntitlement } = require('../lib/billingEntitlement');
 const { resolveCheckoutUser } = require('../lib/checkoutIdentity');
 const { STRIPE_WEBHOOK_BODY_LIMIT } = require('../lib/requestBodyLimits');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
+
+function logWebhookEvent(event, code, statusCode, operation) {
+  const normalizedOperation = typeof operation === 'string' ? operation.replaceAll('.', '_') : 'unknown';
+  writeOperationalEvent({ event, code, statusCode, operation: normalizedOperation });
+}
 
 function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
   let user = null;
@@ -152,7 +158,7 @@ function applyValidatedSubscription(db, event, user, subscription) {
     pastDueSince
   });
   if (decision.issueCode) {
-    console.warn(JSON.stringify({ event: 'stripe_subscription_sync_issue', code: decision.issueCode }));
+    logWebhookEvent('stripe_subscription_sync_issue', decision.issueCode, 422, 'subscription_sync');
   }
   syncSubscriptionRecordForEvent(db, event, {
     userId: user.id,
@@ -194,7 +200,7 @@ function applyAuthoritativeSubscriptionState(db, event, {
   const user = findUserForSubscription(db, effectiveCustomerId, stripeSubscriptionId);
 
   if (!user) {
-    console.warn(`${context} received for unknown user.`);
+    logWebhookEvent('stripe_webhook_user_unresolved', 'LOCAL_SUBSCRIPTION_MISSING', 200, context);
     return;
   }
 
@@ -217,7 +223,7 @@ function safelyApplySubscription(db, event, user, subscription) {
     return { status: 'processed' };
   } catch (error) {
     if (!(error instanceof BillingPolicyError)) throw error;
-    console.warn(JSON.stringify({ event: 'stripe_subscription_sync_rejected', code: error.code }));
+    logWebhookEvent('stripe_subscription_sync_rejected', error.code, 422, 'subscription_sync');
     return { status: 'invalid' };
   }
 }
@@ -238,7 +244,7 @@ router.post('/stripe/webhook', express.raw({
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err) {
-    console.error('Webhook signature verification failed.');
+    logWebhookEvent('stripe_webhook_signature_rejected', 'STRIPE_SIGNATURE_INVALID', 400, 'signature_verification');
     return res.status(400).send('Webhook signature verification failed');
   }
 
@@ -270,12 +276,12 @@ router.post('/stripe/webhook', express.raw({
 
           const checkoutIdentity = resolveCheckoutUser(db, session);
           if (checkoutIdentity.legacy && checkoutIdentity.valid) {
-            console.warn(JSON.stringify({ event: 'stripe_checkout_legacy_identity' }));
+            writeOperationalEvent({ event: 'stripe_checkout_legacy_identity', outcome: 'accepted' });
           }
           const user = checkoutIdentity.user;
           if (!checkoutIdentity.valid || !user || !stripeSubscriptionId || !subscription || subscription.customer !== stripeCustomerId ||
               subscription.items?.data?.[0]?.price?.id !== priceId) {
-            console.warn(JSON.stringify({ event: 'stripe_subscription_sync_rejected', code: 'STRIPE_RECORD_INCOMPLETE' }));
+            logWebhookEvent('stripe_subscription_sync_rejected', 'STRIPE_RECORD_INCOMPLETE', 422, 'checkout_sync');
             return { status: 'invalid' };
           }
           return safelyApplySubscription(db, event, user, subscription);
@@ -315,7 +321,7 @@ router.post('/stripe/webhook', express.raw({
           const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
 
           if (!user) {
-            console.warn('Subscription update received for unknown user.');
+            logWebhookEvent('stripe_webhook_user_unresolved', 'LOCAL_SUBSCRIPTION_MISSING', 200, event.type);
             return { status: 'processed' };
           }
 
@@ -356,7 +362,7 @@ router.post('/stripe/webhook', express.raw({
           const user = findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId);
 
           if (!user) {
-            console.warn('Subscription deletion received for unknown user.');
+            logWebhookEvent('stripe_webhook_user_unresolved', 'LOCAL_SUBSCRIPTION_MISSING', 200, event.type);
             return { status: 'processed' };
           }
 
@@ -373,7 +379,7 @@ router.post('/stripe/webhook', express.raw({
       }
     }
   } catch (err) {
-    console.error('Stripe webhook processing failed.');
+    logWebhookEvent('stripe_webhook_processing_failed', 'STRIPE_WEBHOOK_PROCESSING_FAILED', 500, event?.type || 'unknown');
     return res.status(500).send('Webhook processing failed');
   }
 

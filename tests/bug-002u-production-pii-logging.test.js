@@ -315,8 +315,12 @@ async function runWebhookLoggingTest() {
   };
   clearModule('../routes/webhook');
   const webhookRoutes = require('../routes/webhook');
+  const { createRequestContextMiddleware } = require('../lib/requestContext');
 
   const app = express();
+  app.use(createRequestContextMiddleware({
+    idFactory: () => '00000000-0000-4000-8000-000000000133'
+  }));
   app.use(webhookRoutes);
   const server = await listen(app);
   const capture = captureConsole();
@@ -355,8 +359,11 @@ async function runWebhookLoggingTest() {
     assert.strictEqual(unknown.res.statusCode, 200);
 
     const output = capture.output();
-    assert.match(output, /Webhook signature verification failed/);
-    assert.match(output, /Subscription update received for unknown user/);
+    assert.match(output, /"event":"stripe_webhook_signature_rejected"/);
+    assert.match(output, /"code":"STRIPE_SIGNATURE_INVALID"/);
+    assert.match(output, /"event":"stripe_webhook_user_unresolved"/);
+    assert.match(output, /"code":"LOCAL_SUBSCRIPTION_MISSING"/);
+    assert.match(output, /"requestId":"00000000-0000-4000-8000-000000000133"/);
     assertNoMarkers(output, 'Webhook logging');
   } finally {
     capture.restore();
