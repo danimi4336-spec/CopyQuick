@@ -300,6 +300,7 @@ body {
 .production-job-status.status-failed { background: #fee2e2; color: #991b1b; }
 .production-job-status.status-skipped { background: #f1f5f9; color: #475569; }
 .production-job-status.status-recovery_required { background: #fff7ed; color: #9a3412; }
+.production-live-status { min-height: 1.25rem; margin: .35rem 0; color: #92400e; font-size: .9rem; }
 .production-execution-notice { margin-bottom: 1rem; border: 1px solid #bfdbfe; background: #eff6ff; color: #1e40af; }
 .production-job-error { color: #991b1b !important; }
 .production-job-recovery { display: block; margin-top: .35rem; color: #9a3412; }
