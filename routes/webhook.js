@@ -4,6 +4,7 @@ const { stripe, isBillingEnabled } = require('../lib/stripe');
 const { getDb } = require('../db/database');
 const { syncSubscriptionRecord } = require('../lib/subscriptions');
 const { BillingPolicyError, evaluateStripeEntitlement } = require('../lib/billingEntitlement');
+const { resolveCheckoutUser } = require('../lib/checkoutIdentity');
 
 function findUserForSubscription(db, stripeCustomerId, stripeSubscriptionId) {
   let user = null;
@@ -247,7 +248,6 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
       case 'checkout.session.completed': {
         requireEventCreated(event);
         const session = event.data.object;
-        const customerEmail = session.customer_email;
         const stripeCustomerId = session.customer;
         const stripeSubscriptionId = session.subscription;
 
@@ -264,8 +264,12 @@ router.post('/stripe/webhook', express.raw({ type: 'application/json' }), async 
             return { status: 'stale' };
           }
 
-          const user = db.prepare('SELECT * FROM users WHERE email = ?').get(customerEmail);
-          if (!user || !stripeSubscriptionId || !subscription || subscription.customer !== stripeCustomerId ||
+          const checkoutIdentity = resolveCheckoutUser(db, session);
+          if (checkoutIdentity.legacy && checkoutIdentity.valid) {
+            console.warn(JSON.stringify({ event: 'stripe_checkout_legacy_identity' }));
+          }
+          const user = checkoutIdentity.user;
+          if (!checkoutIdentity.valid || !user || !stripeSubscriptionId || !subscription || subscription.customer !== stripeCustomerId ||
               subscription.items?.data?.[0]?.price?.id !== priceId) {
             console.warn(JSON.stringify({ event: 'stripe_subscription_sync_rejected', code: 'STRIPE_RECORD_INCOMPLETE' }));
             return { status: 'invalid' };

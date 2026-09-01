@@ -118,7 +118,8 @@ async function run() {
       'price_pro',
       'https://app.copyquick.example/dashboard?session_id={CHECKOUT_SESSION_ID}',
       'https://app.copyquick.example/pricing',
-      `checkout:36:${checkoutKey}`
+      `checkout:36:${checkoutKey}`,
+      36
     ]);
 
     const portal = await request(server, '/manage');

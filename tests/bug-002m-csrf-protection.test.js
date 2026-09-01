@@ -50,8 +50,8 @@ function installMocks() {
     filename: stripeModuleId,
     loaded: true,
     exports: {
-      createCheckoutSession: async (customerEmail, priceId, successUrl, cancelUrl, idempotencyKey) => {
-        checkoutCalls.push({ customerEmail, priceId, successUrl, cancelUrl, idempotencyKey });
+      createCheckoutSession: async (customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId) => {
+        checkoutCalls.push({ customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId });
         return { url: '/mock-checkout-session' };
       },
       createCustomerPortalSession: async (customerId, returnUrl) => {
@@ -351,6 +351,7 @@ async function run() {
     assert.strictEqual(mocks.checkoutCalls.length, checkoutBeforeGet + 1);
     assert.strictEqual(mocks.checkoutCalls.at(-1).priceId, process.env.STRIPE_PRO_PRICE);
     assert.match(mocks.checkoutCalls.at(-1).idempotencyKey, /^checkout:\d+:/);
+    assert.strictEqual(Number(mocks.checkoutCalls.at(-1).userId), Number(userId));
 
     currentUser = { ...currentUser, plan_tier: 'pro' };
     token = await getToken(agent);

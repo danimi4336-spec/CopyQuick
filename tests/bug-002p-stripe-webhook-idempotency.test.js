@@ -123,7 +123,11 @@ function subscriptionEvent({ id, type = 'customer.subscription.updated', created
   };
 }
 
-function checkoutEvent({ id, created, email, customer, subscription }) {
+function checkoutEvent({ id, created, email, customer, subscription, userId, metadataUserId = userId }) {
+  const identity = userId === undefined && metadataUserId === undefined ? {} : {
+    client_reference_id: String(userId),
+    metadata: { copyquick_user_id: String(metadataUserId) }
+  };
   return {
     id,
     type: 'checkout.session.completed',
@@ -133,7 +137,8 @@ function checkoutEvent({ id, created, email, customer, subscription }) {
         id: `cs_${id}`,
         customer_email: email,
         customer,
-        subscription
+        subscription,
+        ...identity
       }
     }
   };
@@ -211,7 +216,9 @@ async function run() {
   initDb();
   const db = getDb();
 
-  db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('checkout@example.com', 'Checkout User');
+  const checkoutUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('checkout@example.com', 'Checkout User').lastInsertRowid;
+  const mismatchUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('mismatch@example.com', 'Mismatch User').lastInsertRowid;
+  db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('legacy@example.com', 'Legacy Checkout User');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('fail@example.com', 'Fail User', 'cus_fail');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('stale@example.com', 'Stale User', 'cus_stale');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('other@example.com', 'Other User', 'cus_other');
@@ -232,7 +239,8 @@ async function run() {
       created: 100,
       email: 'checkout@example.com',
       customer: 'cus_checkout',
-      subscription: 'sub_checkout'
+      subscription: 'sub_checkout',
+      userId: checkoutUserId
     });
     let response = await request(server, checkout);
     assert.strictEqual(response.res.statusCode, 200);
@@ -248,13 +256,32 @@ async function run() {
       created: 100,
       email: 'checkout@example.com',
       customer: 'cus_checkout',
-      subscription: 'sub_checkout'
+      subscription: 'sub_checkout',
+      userId: checkoutUserId
     }));
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(eventCount(db, 'evt_checkout_once'), 1);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM usage_periods').get().count, 1);
     assert.strictEqual(calls.listLineItems, 1, 'duplicate checkout should not repeat line item lookup');
     assert.strictEqual(calls.retrieve, 1, 'duplicate checkout should not repeat subscription retrieval');
+
+    subscriptionStates.set('sub_mismatch', makeStripeSubscription({ id: 'sub_mismatch', customer: 'cus_mismatch' }));
+    response = await request(server, checkoutEvent({
+      id: 'evt_checkout_mismatch', created: 110, email: 'mismatch@example.com',
+      customer: 'cus_mismatch', subscription: 'sub_mismatch', userId: mismatchUserId,
+      metadataUserId: checkoutUserId
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'mismatch@example.com').plan_tier, 'free');
+    assert.strictEqual(db.prepare('SELECT status FROM stripe_webhook_events WHERE event_id = ?').get('evt_checkout_mismatch').status, 'invalid');
+
+    subscriptionStates.set('sub_legacy', makeStripeSubscription({ id: 'sub_legacy', customer: 'cus_legacy' }));
+    response = await request(server, checkoutEvent({
+      id: 'evt_checkout_legacy', created: 120, email: 'legacy@example.com',
+      customer: 'cus_legacy', subscription: 'sub_legacy'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'legacy@example.com').plan_tier, 'pro');
 
     db.exec(`
       CREATE TRIGGER fail_subscription_insert

@@ -58,7 +58,8 @@ router.post('/subscribe', requireAuth, async (req, res) => {
       priceId, 
       `${publicOrigin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       `${publicOrigin}/pricing`,
-      `checkout:${user.id}:${checkoutKey}`
+      `checkout:${user.id}:${checkoutKey}`,
+      user.id
     );
     res.redirect(session.url);
   } catch (err) {
