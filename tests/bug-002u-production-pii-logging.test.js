@@ -187,6 +187,9 @@ async function runContactLoggingTest() {
       },
       headers: { accept: 'application/json', 'user-agent': 'BUG002U_USER_AGENT_MARKER' },
       ip: '203.0.113.42',
+      requestId: '00000000-0000-4000-8000-000000000138',
+      method: 'POST',
+      route: { path: '/contact' },
       xhr: false,
       get(name) {
         return this.headers[String(name).toLowerCase()];
@@ -217,7 +220,7 @@ async function runContactLoggingTest() {
     const res = await invoke(async () => ({ ticketNumber: 'CQ-BUG002U_TICKET_MARKER' }));
     assert.strictEqual(res.statusCode, 200);
     const output = successCapture.output();
-    assert.match(output, /Contact form processed/);
+    assert.strictEqual(output, '');
     assertNoMarkers(output, 'Contact success logging');
   } finally {
     successCapture.restore();
@@ -230,7 +233,9 @@ async function runContactLoggingTest() {
     });
     assert.strictEqual(res.statusCode, 500);
     const output = failureCapture.output();
-    assert.match(output, /Contact form error/);
+    assert.match(output, /"event":"contact_delivery_failed"/);
+    assert.match(output, /"code":"CONTACT_DELIVERY_FAILED"/);
+    assert.match(output, /"requestId":"00000000-0000-4000-8000-000000000138"/);
     assertNoMarkers(output, 'Contact failure logging');
   } finally {
     failureCapture.restore();
