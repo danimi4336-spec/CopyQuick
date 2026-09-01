@@ -23,11 +23,12 @@ function emptyBrandBrain(userId) {
 
 // ====== Welcome / Builder Journey ======
 router.get('/welcome', requireAuth, (req, res) => {
+  const requestedGoal = typeof req.query.goal === 'string' ? req.query.goal.trim() : '';
   res.render('welcome', {
     title: 'Choose Your Business Objective - CopyQuick',
     currentPage: 'welcome',
     objectives: objectiveUniverse,
-    selectedGoal: '',
+    selectedGoal: getObjective(requestedGoal) ? requestedGoal : '',
     error: null
   });
 });

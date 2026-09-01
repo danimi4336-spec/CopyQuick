@@ -86,6 +86,10 @@ async function run() {
     assert.strictEqual(welcome.res.statusCode, 200, 'a returning user with builder_goal must still see /welcome');
     assert.match(welcome.body, /type="radio" name="goal"[^>]+value="launch_product"/);
     assert.match(welcome.body, /Start This Objective/);
+
+    const preselected = await request(agent, 'GET', '/welcome?goal=launch_product');
+    assert.strictEqual(preselected.res.statusCode, 200);
+    assert.match(preselected.body, /value="launch_product" checked/);
     assert.doesNotMatch(welcome.body, /button type="submit" name="goal"/, 'objective cards must select rather than submit');
     const token = welcome.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     assert(token);

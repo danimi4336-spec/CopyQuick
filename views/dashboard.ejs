@@ -866,6 +866,7 @@
 	    return'campaign';
 	  }
 	  function getJourneyCtaLabel(mode){
+	    if(selectedJourneyId==='launch_product')return'Start Launch a New Product →';
 	    if(brainPct<100)return'Continue to Brand Brain';
 	    if(mode==='quick')return'⚡ Generate Individual Asset';
 	    if(mode==='bundle')return'📦 Generate Marketing Bundle';
@@ -923,7 +924,11 @@
 
 	    // CTA text
 	    bjCtaBtn.textContent=getJourneyCtaLabel(journeyMode);
-	    if(brainPct>=100){
+	    if(id==='launch_product'){
+	      bjCtaBtn.setAttribute('href','/welcome?goal=launch_product');
+	      bjCtaBtn.removeAttribute('data-mode-trigger');
+	      bjCtaBtn.classList.remove('mode-trigger');
+	    }else if(brainPct>=100){
 	      bjCtaBtn.setAttribute('href','#mode-'+journeyMode);
 	      bjCtaBtn.setAttribute('data-mode-trigger',journeyMode);
 	      bjCtaBtn.classList.add('mode-trigger');
@@ -947,6 +952,20 @@
 
 	  // CTA click saves selection then navigates
 	  bjCtaBtn.addEventListener('click', function(e){
+	    if(selectedJourneyId==='launch_product'){
+	      e.preventDefault();
+	      fetch('/welcome', {
+	        method: 'POST',
+	        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded'}),
+	        body: 'goal=launch_product'
+	      }).then(function(response){
+	        if(!response.ok)throw new Error('Objective start failed');
+	        window.location.assign(response.url || '/discovery');
+	      }).catch(function(){
+	        window.location.assign('/welcome?goal=launch_product');
+	      });
+	      return;
+	    }
 	    if(selectedJourneyId){
 	      fetch('/dashboard/update-goal', {
 	        method: 'POST',
