@@ -185,7 +185,15 @@ async function run() {
     ) VALUES (?, 'Customer Profile', 'input', 'sales_message', ?, ?, 'customer_profile', 'customer_profile:v1', ?, 'production')
   `).run(
     normalizedUser, JSON.stringify([{ text: 'Canonical readable output', tone: 'professional' }]), normalizedClaim.id,
-    JSON.stringify({ summary: 'Known', primaryCustomer: 'Known customer', needs: ['Need'], motivations: ['Motivation'], objections: ['Objection'], buyingTriggers: ['Trigger'], languageStyle: 'Clear' })
+    JSON.stringify({
+      summary: 'Known customers need a clear, evidence-aware way to evaluate the current product direction.',
+      primaryCustomer: 'Known customer segment',
+      needs: ['Clear product information and appropriately limited claims'],
+      motivations: ['Confidence that the offer is relevant and credible'],
+      objections: ['Missing evidence or unclear product details'],
+      buyingTriggers: ['Confirmed product facts presented transparently'],
+      languageStyle: 'Clear, practical, and appropriately cautious'
+    })
   ).lastInsertRowid);
   db.prepare('UPDATE production_jobs SET provider_started_at = ? WHERE id = ?').run(baseTime.toISOString(), normalizedClaim.id);
   const normalized = recoverExpiredJobs(db, normalizedUser, normalizedRun, { now: '2026-08-25T12:00:11.000Z' });
