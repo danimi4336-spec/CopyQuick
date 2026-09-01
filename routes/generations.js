@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
+const { generationActionRateLimit } = require('../lib/generationProtection');
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const generator = require('../lib/generator');
@@ -295,7 +296,7 @@ router.post('/dashboard/update-goal', requireAuth, (req, res) => {
 });
 
 // ====== Generate Copy ======
-router.post('/dashboard/generate', requireAuth, (req, res) => {
+router.post('/dashboard/generate', requireAuth, generationActionRateLimit, (req, res) => {
   const { productDescription, targetAudience, contentType, tone, generationType, assets, goal, campaignSections: requestedCampaignSections } = req.body;
   const db = getDb();
   const user = res.locals.user;
@@ -808,7 +809,7 @@ router.post('/generation/:id/title', requireAuth, (req, res) => {
 });
 
 // ====== Regenerate ======
-router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
+router.post('/generation/:id/regenerate', requireAuth, generationActionRateLimit, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
   const genId = req.params.id;
