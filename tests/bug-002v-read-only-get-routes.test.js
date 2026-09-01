@@ -278,6 +278,15 @@ async function run() {
     const created = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(postBrainUser);
     assert.strictEqual(created.business_name, 'Created Co');
     assert.strictEqual(created.brand_voice, 'Clear and warm');
+
+    const invalidToken = await getToken(agent);
+    const invalid = await request(agent, 'POST', '/brand-brain', {
+      headers: { 'X-CSRF-Token': invalidToken },
+      body: { business_name: 'x'.repeat(121), brand_voice: 'professional' }
+    });
+    assert.strictEqual(invalid.res.statusCode, 400);
+    assert.match(invalid.body, /Please shorten or correct/);
+    assert.strictEqual(db.prepare('SELECT business_name FROM brand_brain WHERE user_id = ?').get(postBrainUser).business_name, 'Created Co');
     assert.strictEqual(created.brand_voice_custom, 'Clear and warm');
   });
 

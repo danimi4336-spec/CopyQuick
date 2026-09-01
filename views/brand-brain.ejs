@@ -10,20 +10,21 @@
         </div>
     </div>
     <div class="brain-progress-bar fade-in"><div class="brain-progress-fill" style="width:<%= pct %>%"></div></div>
+    <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
     <form action="/brand-brain" method="POST" class="brain-form fade-in">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="brain-grid">
             <div class="form-group">
                 <label for="business_name">What should CopyQuick call your business? <span class="brain-helper">Your business name makes everything personal.</span></label>
-                <input type="text" id="business_name" name="business_name" value="<%= brain.business_name %>" placeholder="e.g. Acme Marketing Co.">
+                <input type="text" id="business_name" name="business_name" maxlength="120" value="<%= brain.business_name %>" placeholder="e.g. Acme Marketing Co.">
             </div>
             <div class="form-group">
                 <label for="industry">What industry are you in? <span class="brain-helper">Helps us match your industry tone and vocabulary.</span></label>
-                <input type="text" id="industry" name="industry" value="<%= brain.industry %>" placeholder="e.g. SaaS, Ecommerce, Health & Wellness">
+                <input type="text" id="industry" name="industry" maxlength="120" value="<%= brain.industry %>" placeholder="e.g. SaaS, Ecommerce, Health & Wellness">
             </div>
             <div class="form-group">
                 <label for="target_audience">Describe your ideal customer. <span class="brain-helper">Who are you trying to reach? Be specific.</span></label>
-                <input type="text" id="target_audience" name="target_audience" value="<%= brain.target_audience %>" placeholder="e.g. Small business owners, busy working mothers, fitness enthusiasts">
+                <input type="text" id="target_audience" name="target_audience" maxlength="500" value="<%= brain.target_audience %>" placeholder="e.g. Small business owners, busy working mothers, fitness enthusiasts">
             </div>
             <div class="form-group">
                 <label for="brand_voice">How should your brand sound? <span class="brain-helper">Choose a voice that matches your brand personality.</span></label>
@@ -38,25 +39,25 @@
                         <option value="custom" <%= brain.brand_voice === 'custom' ? 'selected' : '' %>>Custom</option>
                     </select>
                     <div id="custom-voice-wrap" class="custom-field-hidden <%= brain.brand_voice === 'custom' ? 'custom-field-visible' : '' %>">
-                        <textarea name="brand_voice_custom" id="brand_voice_custom" rows="2" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."><%= brain.brand_voice_custom || '' %></textarea>
+                        <textarea name="brand_voice_custom" id="brand_voice_custom" rows="2" maxlength="300" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."><%= brain.brand_voice_custom || '' %></textarea>
                     </div>
                 </div>
             </div>
             <div class="form-group">
                 <label for="unique_value">What makes your business different? <span class="brain-helper">Your unique value proposition sets you apart from competitors.</span></label>
-                <input type="text" id="unique_value" name="unique_value" value="<%= brain.unique_value %>" placeholder="e.g. Only organic supplement with 30-day satisfaction guarantee">
+                <input type="text" id="unique_value" name="unique_value" maxlength="1000" value="<%= brain.unique_value %>" placeholder="e.g. Only organic supplement with 30-day satisfaction guarantee">
             </div>
             <div class="form-group">
                 <label for="competitors">Who do customers compare you with? <span class="brain-helper">Knowing your competitors helps us position you better.</span></label>
-                <input type="text" id="competitors" name="competitors" value="<%= brain.competitors %>" placeholder="e.g. Competitor A, Competitor B">
+                <input type="text" id="competitors" name="competitors" maxlength="1000" value="<%= brain.competitors %>" placeholder="e.g. Competitor A, Competitor B">
             </div>
             <div class="form-group">
                 <label for="goals">What do you want CopyQuick to help you accomplish? <span class="brain-helper">Your goals shape the content we recommend.</span></label>
-                <input type="text" id="goals" name="goals" value="<%= brain.goals %>" placeholder="e.g. Increase sales, build brand awareness, generate leads">
+                <input type="text" id="goals" name="goals" maxlength="1000" value="<%= brain.goals %>" placeholder="e.g. Increase sales, build brand awareness, generate leads">
             </div>
             <div class="form-group">
                 <label for="key_messages">What key messages should your content always include? <span class="brain-helper">These themes will appear across all your marketing.</span></label>
-                <input type="text" id="key_messages" name="key_messages" value="<%= brain.key_messages %>" placeholder="e.g. Quality, affordability, trust, sustainability">
+                <input type="text" id="key_messages" name="key_messages" maxlength="2000" value="<%= brain.key_messages %>" placeholder="e.g. Quality, affordability, trust, sustainability">
             </div>
         </div>
         <button type="submit" class="btn btn-primary btn-block btn-lg">Save Brand Brain</button>

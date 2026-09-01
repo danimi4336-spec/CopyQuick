@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { objectiveUniverse, getObjective } = require('../lib/businessJourneys');
+const { validateBrandBrain } = require('../lib/brandBrainValidation');
 
 function emptyBrandBrain(userId) {
   return {
@@ -70,7 +71,17 @@ router.get('/brand-brain', requireAuth, (req, res) => {
 
 router.post('/brand-brain', requireAuth, (req, res) => {
   const db = getDb();
-  const { business_name, industry, target_audience, brand_voice, brand_voice_custom, unique_value, competitors, goals, key_messages } = req.body;
+  const validation = validateBrandBrain(req.body);
+  if (!validation.valid) {
+    return res.status(400).render('brand-brain', {
+      title: 'Brand Brain - CopyQuick',
+      brain: { ...emptyBrandBrain(req.session.userId), ...validation.values },
+      pct: 0,
+      error: 'Please shorten or correct the highlighted business details and try again.',
+      currentPage: 'brand-brain'
+    });
+  }
+  const { business_name, industry, target_audience, brand_voice, brand_voice_custom, unique_value, competitors, goals, key_messages } = validation.values;
   // Handle custom: if custom selected, store both flag and custom text; if not, store preset value as voice
   const finalVoice = brand_voice === 'custom' ? brand_voice_custom || 'custom' : brand_voice;
   const existing = db.prepare('SELECT id FROM brand_brain WHERE user_id = ?').get(req.session.userId);
