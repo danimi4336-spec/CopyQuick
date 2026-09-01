@@ -294,14 +294,16 @@ router.get('/dashboard', requireAuth, (req, res) => {
 
 // ====== Update Builder Goal ======
 router.post('/dashboard/update-goal', requireAuth, (req, res) => {
-  const { goal, goalCustom } = req.body;
-  if (goal) {
-    const db = getDb();
-    db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
-    // If it's AJAX (fetch), return success JSON
-    const isAjax = req.xhr || req.headers.accept?.includes('json');
-    if (isAjax) return res.json({ success: true, goal });
+  const goal = typeof req.body.goal === 'string' ? req.body.goal.trim() : '';
+  const isAjax = req.xhr || req.headers.accept?.includes('json');
+  if (!getJourney(goal)) {
+    if (isAjax) return res.status(400).json({ error: 'Invalid business journey.' });
+    return res.status(400).send('Invalid business journey.');
   }
+
+  const db = getDb();
+  db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
+  if (isAjax) return res.json({ success: true, goal });
   res.redirect('/dashboard');
 });
 
