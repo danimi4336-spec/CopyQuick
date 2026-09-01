@@ -12,7 +12,8 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
-const { GENERATION_METADATA_LIMITS, boundedQueryText, validateOptionalText } = require('../lib/generationMetadata');
+const { GENERATION_METADATA_LIMITS, boundedQueryText, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
+const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const {
   getCurrentUsageSnapshot,
   getCurrentUsageSnapshotReadOnly,
@@ -35,6 +36,13 @@ router.use((req, res, next) => {
     regenerate: crypto.randomUUID()
   };
   next();
+});
+
+router.param('id', (req, res, next, value) => {
+  const id = parsePositiveIntegerId(value);
+  if (!id) return res.status(404).send('Not found');
+  req.generationResourceId = id;
+  return next();
 });
 
 const goalLabels = {
@@ -645,7 +653,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
 router.get('/history', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
-  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const page = parseHistoryPage(req.query.page);
   const perPage = 20;
   const offset = (page - 1) * perPage;
   const search = boundedQueryText(req.query.search);
