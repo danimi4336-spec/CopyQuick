@@ -42,6 +42,7 @@ const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
 const { closeApplicationServices } = require('./lib/httpShutdown');
+const { startHttpServer } = require('./lib/httpServerStartup');
 const {
   BROWSER_REQUEST_BODY_LIMIT,
   BROWSER_FORM_PARAMETER_LIMIT
@@ -243,9 +244,11 @@ async function startApplication() {
     }),
     initializeRuntimeDatabase: db => initializeDatabaseRuntime({ db }),
     shouldStop: () => shuttingDown,
-    startHttp: () => app.listen(PORT, '0.0.0.0', () => {
+    startHttp: async () => {
+      const listeningServer = await startHttpServer(app, { port: PORT });
       console.log(`Server is running on http://0.0.0.0:${PORT}`);
-    }),
+      return listeningServer;
+    },
     startProductionWorker: db => {
       const worker = createProductionWorker({ db });
       worker.start();

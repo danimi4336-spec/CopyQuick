@@ -314,7 +314,7 @@ async function run() {
   {
     const source = fs.readFileSync(path.join(projectRoot, 'server.js'), 'utf8');
     assert.doesNotMatch(source, /runMigrationEngine|executeMigrationsWithProductionBackup|migrateDatabase/);
-    assert.ok(source.indexOf('requireCompatibleMigrationState') < source.indexOf('app.listen'));
+    assert.ok(source.indexOf('requireCompatibleMigrationState') < source.indexOf('startHttpServer(app'));
   }
 
   console.log('Story 3.19 Production-Safe Migration Deployment Gate tests passed');

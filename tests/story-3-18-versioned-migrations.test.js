@@ -359,7 +359,7 @@ async function run() {
   // Startup constructs no normal service before migration compatibility passes.
   {
     const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-    assert.ok(source.indexOf('requireCompatibleMigrationState') < source.indexOf('app.listen'));
+    assert.ok(source.indexOf('requireCompatibleMigrationState') < source.indexOf('startHttpServer(app'));
     assert.ok(source.indexOf('startHttp:') < source.indexOf('startProductionWorker:'));
     assert.match(source, /acquireRuntimeLock[\s\S]+requireCompatibleMigrationState/);
   }
