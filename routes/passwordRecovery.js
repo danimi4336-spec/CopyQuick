@@ -29,6 +29,7 @@ function createPasswordRecoveryRouter(options = {}) {
     now: options.now
   });
   const maxRequests = options.maxRequests || 5;
+  const maxEmailRequests = options.maxEmailRequests || maxRequests;
 
   router.get('/forgot-password', (req, res) => res.render('forgot-password', {
     title: 'Reset Password - CopyQuick', currentPage: 'login', message: null
@@ -36,13 +37,15 @@ function createPasswordRecoveryRouter(options = {}) {
 
   router.post('/forgot-password', async (req, res) => {
     const ipKey = `ip:${req.ip || req.socket?.remoteAddress || 'unknown'}`;
-    if (requestBuckets.isLimited(ipKey, maxRequests)) {
+    const email = normalizeEmail(req.body.email);
+    const emailKey = `email:${email || 'invalid'}`;
+    if (requestBuckets.isLimited(ipKey, maxRequests) || requestBuckets.isLimited(emailKey, maxEmailRequests)) {
       return res.status(429).render('forgot-password', {
         title: 'Reset Password - CopyQuick', currentPage: 'login', message: GENERIC_REQUEST_MESSAGE
       });
     }
     requestBuckets.increment(ipKey);
-    const email = normalizeEmail(req.body.email);
+    requestBuckets.increment(emailKey);
     try {
       const db = database();
       const user = email.length <= 254

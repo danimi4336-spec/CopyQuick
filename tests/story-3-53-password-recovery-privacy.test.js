@@ -8,12 +8,16 @@ const {
   createPasswordRecoveryRouter
 } = require('../routes/passwordRecovery');
 
-function request(server, email) {
+function request(server, email, sourceIp = '198.51.100.1') {
   const body = new URLSearchParams({ email }).toString();
   return new Promise((resolve, reject) => {
     const req = http.request({
       host: '127.0.0.1', port: server.address().port, path: '/forgot-password', method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body) }
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(body),
+        'X-Forwarded-For': sourceIp
+      }
     }, (res) => {
       let responseBody = '';
       res.on('data', chunk => { responseBody += chunk; });
@@ -39,6 +43,7 @@ async function run() {
   const waits = [];
   const deliveries = [];
   const app = express();
+  app.set('trust proxy', true);
   app.set('view engine', 'ejs');
   app.set('views', require('path').join(__dirname, '..', 'views'));
   app.use(express.urlencoded({ extended: false }));
@@ -51,6 +56,8 @@ async function run() {
     env: { NODE_ENV: 'test', SESSION_SECRET: 'story-3-53-secret' },
     publicOrigin: 'https://copyquick.example',
     responseDelayMs: 750,
+    maxRequests: 10,
+    maxEmailRequests: 2,
     sleep: async milliseconds => { waits.push(milliseconds); },
     sendPasswordResetEmail: async payload => { deliveries.push(payload); }
   }));
@@ -68,6 +75,22 @@ async function run() {
     assert.strictEqual(deliveries[0].email, 'owner@example.com');
     assert(deliveries[0].resetUrl.startsWith('https://copyquick.example/reset-password?token='));
     assert.strictEqual(DEFAULT_REQUEST_RESPONSE_DELAY_MS, 750);
+
+    const secondKnown = await request(server, 'OWNER@example.com', '198.51.100.2');
+    const throttledKnown = await request(server, 'owner@example.com', '198.51.100.3');
+    assert.strictEqual(secondKnown.res.statusCode, 200);
+    assert.strictEqual(throttledKnown.res.statusCode, 429);
+    assert(throttledKnown.body.includes(GENERIC_REQUEST_MESSAGE));
+    assert.strictEqual(deliveries.length, 2, 'email throttling prevents distributed duplicate deliveries');
+    assert.deepStrictEqual(waits, [750, 750, 750], 'only accepted requests use the response delay');
+
+    const unknownOne = await request(server, 'missing@example.com', '198.51.100.4');
+    const unknownTwo = await request(server, 'MISSING@example.com', '198.51.100.5');
+    const unknownLimited = await request(server, 'missing@example.com', '198.51.100.6');
+    assert.strictEqual(unknownOne.res.statusCode, 200);
+    assert.strictEqual(unknownTwo.res.statusCode, 200);
+    assert.strictEqual(unknownLimited.res.statusCode, 429, 'unknown accounts receive the same normalized-email limit');
+    assert(unknownLimited.body.includes(GENERIC_REQUEST_MESSAGE));
   } finally {
     await new Promise(resolve => server.close(resolve));
     db.close();
