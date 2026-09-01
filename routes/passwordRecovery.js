@@ -8,6 +8,7 @@ const { createExpiringBucketStore } = require('../lib/authProtection');
 const { destroyAuthenticatedSession } = require('../lib/authSession');
 const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
 const { defaultEmailDeliveryTracker } = require('../lib/emailDeliveryTracker');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
 
 const GENERIC_REQUEST_MESSAGE = 'If an account exists for that email, a password reset link has been sent.';
 const DEFAULT_REQUEST_RESPONSE_DELAY_MS = 750;
@@ -21,6 +22,7 @@ function createPasswordRecoveryRouter(options = {}) {
   const database = options.getDb || getDb;
   const sendResetEmail = options.sendPasswordResetEmail || sendPasswordResetEmail;
   const emailDeliveryTracker = options.emailDeliveryTracker || defaultEmailDeliveryTracker;
+  const operationalLogger = options.operationalLogger || writeOperationalEvent;
   const responseDelayMs = Number.isFinite(options.responseDelayMs)
     ? Math.max(0, options.responseDelayMs)
     : DEFAULT_REQUEST_RESPONSE_DELAY_MS;
@@ -32,6 +34,17 @@ function createPasswordRecoveryRouter(options = {}) {
   });
   const maxRequests = options.maxRequests || 5;
   const maxEmailRequests = options.maxEmailRequests || maxRequests;
+
+  function logDeliveryFailure(req) {
+    operationalLogger({
+      event: 'password_reset_delivery_failed',
+      requestId: req.requestId,
+      method: req.method,
+      route: req.route?.path || 'unmatched',
+      statusCode: 500,
+      code: 'PASSWORD_RESET_DELIVERY_FAILED'
+    });
+  }
 
   router.get('/forgot-password', (req, res) => res.render('forgot-password', {
     title: 'Reset Password - CopyQuick', currentPage: 'login', message: null
@@ -61,11 +74,11 @@ function createPasswordRecoveryRouter(options = {}) {
           resetUrl: `${origin}/reset-password?token=${encodeURIComponent(token)}`
         }, options.emailOptions));
         void emailDeliveryTracker.track('password_reset', delivery).catch(() => {
-          console.warn('Password reset request could not be delivered.');
+          logDeliveryFailure(req);
         });
       }
     } catch (err) {
-      console.warn('Password reset request could not be delivered.');
+      logDeliveryFailure(req);
     }
     await wait(responseDelayMs);
     res.render('forgot-password', {
