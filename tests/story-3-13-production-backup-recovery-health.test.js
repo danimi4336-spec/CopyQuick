@@ -109,17 +109,29 @@ async function run() {
     verifySqliteBackup(validRestoreSource);
     assert(fs.existsSync(`${validRestoreSource}-wal`));
     assert(fs.existsSync(`${validRestoreSource}-shm`));
-    const health = inspectStorageHealth({ env, db: sourceDb });
+    const health = inspectStorageHealth({
+      env,
+      db: sourceDb,
+      now: () => new Date('2026-08-28T01:00:00.000Z')
+    });
     assert(['healthy', 'warning', 'critical'].includes(health.status));
     assert.strictEqual(health.database.quickCheck, 'ok');
     assert.strictEqual(health.backups.recognizedCount, 2);
     assert.strictEqual(health.backups.retentionRemainingCount, 0);
     const backlogHealth = inspectStorageHealth({
       env: { ...env, DATABASE_BACKUP_RETENTION: '1' },
-      db: sourceDb
+      db: sourceDb,
+      now: () => new Date('2026-08-28T01:00:00.000Z')
     });
     assert.strictEqual(backlogHealth.backups.retentionRemainingCount, 1);
     assert.strictEqual(backlogHealth.status, 'warning');
+    const staleHealth = inspectStorageHealth({
+      env,
+      db: sourceDb,
+      now: () => new Date('2026-09-01T00:00:00.000Z')
+    });
+    assert.strictEqual(staleHealth.backups.status, 'stale');
+    assert.strictEqual(staleHealth.status, 'warning');
     assert(health.backups.latestVerifiedBackupAt);
     assert(!fs.existsSync(`${validRestoreSource}-wal`));
     assert(!fs.existsSync(`${validRestoreSource}-shm`));

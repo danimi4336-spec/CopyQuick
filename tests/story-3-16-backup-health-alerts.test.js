@@ -69,6 +69,9 @@ async function run() {
     assert(ids(healthy({ backups: { status: 'unavailable', directoryStatus: 'unavailable' } })).includes('LOCAL_BACKUP_DIRECTORY_UNWRITABLE'));
     assert(ids(healthy({ backups: { status: 'missing', directoryStatus: 'writable' } })).includes('LOCAL_BACKUP_MISSING_OR_INVALID'));
     assert(ids(healthy({ backups: {
+      ...healthy().backups, status: 'stale'
+    } })).includes('LOCAL_BACKUP_STALE'));
+    assert(ids(healthy({ backups: {
       ...healthy().backups, retentionRemainingCount: 3
     } })).includes('LOCAL_BACKUP_RETENTION_BACKLOG'));
     assert(ids(healthy({ offsiteBackup: {

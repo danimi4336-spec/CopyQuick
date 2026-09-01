@@ -106,6 +106,10 @@ remaining backlog without touching unrelated files.
 The current remaining count is derived during private storage health inspection
 and surfaced as the sanitized `LOCAL_BACKUP_RETENTION_BACKLOG` warning until
 bounded cleanup catches up.
+The canonical timestamp in the newest verified snapshot filename is also
+checked against `DATABASE_BACKUP_MAX_AGE_HOURS` (36 hours by default, bounded
+to 30 days). A stale or implausibly future-dated local backup cannot report as
+healthy and produces a sanitized local-backup health warning.
 
 While CopyQuick is running, never manually delete or replace:
 
