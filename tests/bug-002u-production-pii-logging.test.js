@@ -165,7 +165,7 @@ async function runOAuthLoggingTest(db) {
     });
 
     const output = capture.output();
-    assert.match(output, /Google auth complete/);
+    assert.strictEqual(output, '');
     assertNoMarkers(output, 'OAuth logging');
     assert(db.prepare('SELECT COUNT(*) AS count FROM users WHERE email = ?').get('bug002u_email_marker@example.com').count === 1);
   } finally {

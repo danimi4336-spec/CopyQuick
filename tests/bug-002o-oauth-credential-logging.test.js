@@ -207,9 +207,7 @@ async function run() {
     clientSecret: DUMMY_CLIENT_SECRET
   }));
   assertNoCredentialLeak(configured.output);
-  assert.match(configured.output, /clientID:\s+present/);
-  assert.match(configured.output, /clientSecret:\s+present/);
-  assert.match(configured.output, /enabled:\s+yes/);
+  assert.strictEqual(configured.output, '');
   assert.strictEqual(configured.result.isGoogleOAuthConfigured(), true);
   assert(configured.result._strategy('google'), 'configured Google OAuth should register the google strategy');
 
@@ -231,10 +229,7 @@ async function run() {
     clientSecret: undefined
   }));
   assertNoCredentialLeak(missing.output);
-  assert.match(missing.output, /clientID:\s+missing/);
-  assert.match(missing.output, /clientSecret:\s+missing/);
-  assert.match(missing.output, /enabled:\s+no/);
-  assert.match(missing.output, /Google OAuth is disabled/);
+  assert.strictEqual(missing.output, '');
   assert.strictEqual(missing.result.isGoogleOAuthConfigured(), false);
   assert.strictEqual(missing.result._strategy('google'), undefined);
 
