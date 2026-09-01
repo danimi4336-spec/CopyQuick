@@ -14,10 +14,16 @@ bound; a timeout is treated as an unavailable provider and retried with the
 same idempotency key. The same controls protect password-reset delivery.
 Configure the bounds with:
 
-- `EMAIL_DELIVERY_MAX_ATTEMPTS` (default `3`)
-- `EMAIL_DELIVERY_RETRY_BASE_MS` (default `250`)
-- `EMAIL_DELIVERY_TIMEOUT_MS` (default `10000`)
+- `EMAIL_DELIVERY_MAX_ATTEMPTS` (default `3`, maximum `5`)
+- `EMAIL_DELIVERY_RETRY_BASE_MS` (default `250`, maximum `10000`)
+- `EMAIL_DELIVERY_TIMEOUT_MS` (default `10000`, maximum `60000`)
+- `EMAIL_DELIVERY_TOTAL_TIMEOUT_MS` (default `35000`, maximum `60000`)
 - `EMAIL_DELIVERY_DRAIN_TIMEOUT_MS` (default `15000`, valid range `1`–`60000`)
+
+The total timeout is authoritative across provider attempts and exponential
+backoff. Each attempt is capped by the remaining budget, and CopyQuick does not
+start a retry when its backoff would cross the deadline. This prevents otherwise
+valid individual settings from combining into a multi-minute customer request.
 
 During graceful shutdown, CopyQuick stops accepting new HTTP requests first.
 It lets active requests finish, then drains password-reset delivery so a reset

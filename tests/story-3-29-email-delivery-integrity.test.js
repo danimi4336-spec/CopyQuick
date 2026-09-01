@@ -3,10 +3,12 @@ const {
   DEFAULT_EMAIL_ATTEMPT_TIMEOUT_MS,
   DEFAULT_EMAIL_MAX_ATTEMPTS,
   DEFAULT_EMAIL_RETRY_BASE_MS,
+  DEFAULT_EMAIL_TOTAL_TIMEOUT_MS,
   EmailDeliveryError,
   MAX_EMAIL_ATTEMPT_TIMEOUT_MS,
   MAX_EMAIL_ATTEMPTS,
   MAX_EMAIL_RETRY_BASE_MS,
+  MAX_EMAIL_TOTAL_TIMEOUT_MS,
   boundedPositiveInteger,
   normalizedEmailFailure,
   sendContactFormEmails,
@@ -26,6 +28,10 @@ async function run() {
   assert.strictEqual(boundedPositiveInteger('-1', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
   assert.strictEqual(boundedPositiveInteger('invalid', DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
   assert.strictEqual(boundedPositiveInteger(String(MAX_EMAIL_ATTEMPTS + 1), DEFAULT_EMAIL_MAX_ATTEMPTS, MAX_EMAIL_ATTEMPTS), DEFAULT_EMAIL_MAX_ATTEMPTS);
+  assert.strictEqual(
+    boundedPositiveInteger(MAX_EMAIL_TOTAL_TIMEOUT_MS + 1, DEFAULT_EMAIL_TOTAL_TIMEOUT_MS, MAX_EMAIL_TOTAL_TIMEOUT_MS),
+    DEFAULT_EMAIL_TOTAL_TIMEOUT_MS
+  );
 
   const unavailableLogs = [];
   await assert.rejects(
@@ -107,6 +113,26 @@ async function run() {
   assert.strictEqual(boundedCalls, DEFAULT_EMAIL_MAX_ATTEMPTS, 'excessive attempt overrides must fall back to the safe default');
   assert.deepStrictEqual(boundedDelays, [DEFAULT_EMAIL_RETRY_BASE_MS, DEFAULT_EMAIL_RETRY_BASE_MS * 2]);
   assert.deepStrictEqual(boundedTimeouts, Array(DEFAULT_EMAIL_MAX_ATTEMPTS).fill(DEFAULT_EMAIL_ATTEMPT_TIMEOUT_MS));
+
+  let budgetClock = 0;
+  let budgetCalls = 0;
+  const budgetDelays = [];
+  const budgetTimeouts = [];
+  await assert.rejects(() => sendEmailWithRetry({
+    client: { emails: { send: async () => {
+      budgetCalls += 1;
+      budgetClock += 20;
+      return { error: { statusCode: 500, name: 'internal_server_error' } };
+    } } },
+    payload: {}, idempotencyKey: 'total-budget-key', operation: 'password_reset',
+    maxAttempts: 5, retryBaseMs: 10, attemptTimeoutMs: 50, totalTimeoutMs: 25,
+    sleep: async milliseconds => { budgetDelays.push(milliseconds); budgetClock += milliseconds; },
+    setTimeoutFn: (_callback, milliseconds) => { budgetTimeouts.push(milliseconds); return 1; },
+    clearTimeoutFn: () => {}, now: () => budgetClock, logger: () => {}
+  }), error => error.code === 'EMAIL_PROVIDER_UNAVAILABLE');
+  assert.strictEqual(budgetCalls, 1, 'a retry must not begin when its backoff would exceed the total delivery budget');
+  assert.deepStrictEqual(budgetDelays, []);
+  assert.deepStrictEqual(budgetTimeouts, [25], 'each attempt timeout must be capped by the remaining total budget');
 
   const sent = [];
   const partialLogs = [];
