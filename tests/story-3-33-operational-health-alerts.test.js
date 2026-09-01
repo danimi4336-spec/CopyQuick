@@ -100,10 +100,13 @@ async function run() {
     assert.strictEqual(disabledCalls, 0);
 
     const payloads = [];
+    const deliveryOptions = [];
     const operator = createOperatorNotifier({
       env: { ...baseEnv, RESEND_API_KEY: 'private-key' },
       recipient: 'billing-ops@example.com', codePrefix: 'OPERATIONAL_ALERT',
-      resendClient: { emails: { send: async payload => { payloads.push(payload); return { data: { id: 'accepted' } }; } } }
+      resendClient: { emails: { send: async (payload, options) => {
+        payloads.push(payload); deliveryOptions.push(options); return { data: { id: 'accepted' } };
+      } } }
     });
     const delivered = await operator.send({
       condition: evaluateOperationalHealth(health({ productionRecovery: {
@@ -117,6 +120,27 @@ async function run() {
     assert(!serialized.includes(databasePath));
     const content = `${payloads[0].subject}\n${payloads[0].text}\n${payloads[0].html}`;
     assert(!content.includes('billing-ops@example.com'), 'operator address is not embedded in notification content');
+    assert.match(deliveryOptions[0].idempotencyKey, /^operational-alert:[a-f0-9]{64}$/);
+
+    const retryKeys = [];
+    let retryCalls = 0;
+    const transient = createOperatorNotifier({
+      env: baseEnv, recipient: 'ops@example.com', codePrefix: 'OPERATIONAL_ALERT',
+      deliveryOptions: { maxAttempts: 2, retryBaseMs: 1, sleep: async () => {}, logger: () => {} },
+      resendClient: { emails: { send: async (_payload, options) => {
+        retryCalls += 1;
+        retryKeys.push(options.idempotencyKey);
+        return retryCalls === 1
+          ? { error: { statusCode: 500, name: 'internal_server_error' } }
+          : { data: { id: 'accepted-after-retry' } };
+      } } }
+    });
+    assert.deepStrictEqual(await transient.send({
+      condition: { id: 'TEST_RETRY', severity: 'warning' },
+      kind: 'alert', observedAt: new Date(clock).toISOString()
+    }), { sent: true });
+    assert.strictEqual(retryCalls, 2);
+    assert.strictEqual(retryKeys[0], retryKeys[1], 'provider retries must reuse one alert idempotency key');
     const ambiguous = createOperatorNotifier({
       env: baseEnv, recipient: 'ops@example.com', codePrefix: 'OPERATIONAL_ALERT',
       resendClient: { emails: { send: async () => undefined } }

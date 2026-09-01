@@ -21,6 +21,12 @@ scheduler initialization. It evaluates hourly after a three-minute startup
 grace, never calls Stripe or an AI provider, never blocks `/healthz`, prevents
 overlapping evaluations, and drains on shutdown.
 
+Alert delivery uses the shared bounded transactional-email runtime. Transient
+provider failures retry within its aggregate deadline, and every retry reuses a
+deterministic idempotency key derived only from sanitized condition metadata.
+Permanent provider rejection and exhausted delivery return normalized failure
+codes to the watcher; raw provider details are neither logged nor persisted.
+
 Alert state is stored atomically as `.operational-health-alert-state.json` on
 the existing persistent disk with owner-only permissions. First alerts,
 reminders, escalation, failed-delivery retry delay, restart deduplication, and
