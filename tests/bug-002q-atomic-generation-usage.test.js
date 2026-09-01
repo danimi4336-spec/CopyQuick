@@ -269,16 +269,17 @@ async function run() {
 
   resetGeneratorState();
   const campaignUserId = createUser(db, { monthly_limit: 10 });
+  const campaignBefore = snapshot(db, campaignUserId);
   await withServer(campaignUserId, async (server) => {
     const response = await postGenerate(server, generationBody({
       generationType: 'campaign',
       campaignSections: 'email,social'
     }));
-    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(response.res.statusCode, 409);
+    assert.strictEqual(parseJson(response).code, 'CAMPAIGN_OBJECTIVE_REQUIRED');
     assert.strictEqual(generatorState.calls.length, 0);
-    assert.strictEqual(snapshot(db, campaignUserId).generations, 1);
-    assert.strictEqual(snapshot(db, campaignUserId).usageEvents, 1);
-    assert.strictEqual(snapshot(db, campaignUserId).usageCount, 1);
+    assert.deepStrictEqual(snapshot(db, campaignUserId), campaignBefore,
+      'unsupported campaign submissions must not persist or consume usage');
   });
 
   resetGeneratorState();

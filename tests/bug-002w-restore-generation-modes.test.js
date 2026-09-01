@@ -212,7 +212,9 @@ async function run() {
     assert.match(dashboard.body, /data-mode-trigger="campaign"/);
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="quick"/);
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="bundle"/);
-    assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="campaign"/);
+    assert.doesNotMatch(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="campaign"/);
+    assert.match(dashboard.body, /Start a Guided Objective/);
+    assert.match(dashboard.body, /href="\/welcome"/);
     assert.match(dashboard.body, /Try Now/);
     assert.match(dashboard.body, /data-mode-trigger="quick"/);
     assert.match(dashboard.body, /function getJourneyMode/);
@@ -247,18 +249,22 @@ async function run() {
       campaignSections: 'email',
       goal: 'Launch a product'
     }));
-    assert.strictEqual(campaign.res.statusCode, 200);
+    assert.strictEqual(campaign.res.statusCode, 409);
+    const campaignBody = JSON.parse(campaign.body);
+    assert.strictEqual(campaignBody.code, 'CAMPAIGN_OBJECTIVE_REQUIRED');
+    assert.strictEqual(campaignBody.actionUrl, '/welcome');
   });
 
   const usage = readUsage(db, generationUser);
-  assert.deepStrictEqual(usage.generations.map((g) => g.generation_type), ['quick', 'bundle', 'campaign']);
+  assert.deepStrictEqual(usage.generations.map((g) => g.generation_type), ['quick', 'bundle']);
   assert.strictEqual(usage.generations[0].content_type, 'ad_headline');
   assert.strictEqual(usage.generations[1].content_type, 'bundle');
-  assert.strictEqual(usage.generations[2].content_type, 'campaign');
-  assert(usage.generations[2].results.includes('[Email Marketing]'), 'campaign mode should use campaign section output');
-  assert.strictEqual(usage.usageEvents, 3);
-  assert.strictEqual(usage.usageCount, 3);
-  assert.strictEqual(usage.legacyUsed, 3);
+  assert.strictEqual(usage.usageEvents, 2);
+  assert.strictEqual(usage.usageCount, 2);
+  assert.strictEqual(usage.legacyUsed, 2);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generation_requests WHERE user_id = ? AND operation = ?')
+    .get(generationUser, 'dashboard_generation').count, 0,
+  'unsupported campaign submissions must not claim an idempotency record');
   assert.strictEqual(generatorState.calls.filter((call) => call.contentType === 'ad_headline').length, 1);
   assert(generatorState.calls.some((call) => call.contentType === 'subject_line'));
   assert(generatorState.calls.some((call) => call.contentType === 'social_post'));

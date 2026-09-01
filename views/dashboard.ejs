@@ -354,76 +354,21 @@
                     <div class="card p-4">
                         <div class="mode-panel-header">
                             <h2>🚀 Complete Campaign</h2>
-                            <p class="mode-panel-desc">Generate an entire multi-channel campaign from one idea.</p>
+                            <p class="mode-panel-desc">Build customer-ready campaign deliverables from a guided objective and validated production plan.</p>
                         </div>
-                        <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="campaign">
-                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                            <input type="hidden" name="idempotencyKey" value="<%= requestKeys.campaign %>">
-                            <div class="form-group">
-                                <label for="campaignProduct">Product / Service</label>
-                                <textarea id="campaignProduct" name="productDescription" rows="2" placeholder="Describe your product or service..." required></textarea>
-                            </div>
-                            <div class="form-grid form-grid-2">
-                                <div class="form-group custom-select-wrap">
-                                    <label for="campaignTargetAudience">Target Audience</label>
-                                    <select id="campaignTargetAudience" name="targetAudience" data-custom="campaign-audience-custom">
-                                        <% audiencePresets.forEach(function(a){ %>
-                                            <option value="<%= a %>"><%= a %></option>
-                                        <% }); %>
-                                    </select>
-                                    <div id="campaign-audience-custom" class="custom-field-hidden">
-                                        <textarea name="targetAudienceCustom" rows="2" placeholder="Example: Busy working mothers aged 25–45 looking for natural wellness products."></textarea>
-                                    </div>
-                                </div>
-                                <div class="form-group custom-select-wrap">
-                                    <label for="campaignVoice">Brand Voice</label>
-                                    <select id="campaignVoice" name="tone" data-custom="campaign-voice-custom">
-                                        <% brandVoices.forEach(function(v){ %>
-                                            <option value="<%= v %>"><%= v %></option>
-                                        <% }); %>
-                                    </select>
-                                    <div id="campaign-voice-custom" class="custom-field-hidden">
-                                        <textarea name="toneCustom" rows="2" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."></textarea>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="form-group custom-select-wrap">
-                                <label for="campaignGoal">Campaign Goal</label>
-                                <select id="campaignGoal" name="goal" data-custom="campaign-goal-custom">
-                                    <% goals.forEach(function(g){ %>
-                                        <option value="<%= g %>"><%= g %></option>
-                                    <% }); %>
-                                </select>
-                                <div id="campaign-goal-custom" class="custom-field-hidden">
-                                    <textarea name="goalCustom" rows="2" placeholder="Example: Promote our new turmeric supplement to existing customers before Black Friday."></textarea>
-                                </div>
-                            </div>
-                            <div class="campaign-sections-select">
-                                <label>Campaign Sections</label>
-                                <div class="campaign-section-btns">
-                                    <% campaignSections.forEach(function(s, i){ %>
-                                        <button type="button" class="campaign-sec-btn <%= i === 0 ? 'active' : '' %>" data-section="<%= s.id %>">
-                                            <%= s.icon %> <%= s.label %>
-                                        </button>
-                                    <% }); %>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-block btn-lg gen-btn campaign-cta">🚀 Build My Campaign</button>
-                        </form>
+                        <p>CopyQuick will first understand the objective, then build a production plan whose deliverables are validated before they are presented as complete.</p>
+                        <a href="/welcome" class="btn btn-primary btn-block btn-lg campaign-cta">Start a Guided Objective →</a>
                     </div>
                 </div>
                 <div class="campaign-deliverables-col">
                     <div class="card p-4 deliverables-card">
                         <div class="deliverables-header">
-                            <h3 id="deliverables-title">✉️ Email Marketing Includes</h3>
+                            <h3>Quality before generation</h3>
                         </div>
-                        <div class="deliverables-list" id="deliverables-list">
-                            <% campaignSections[0].deliverables.forEach(function(d){ %>
-                                <div class="deliverable-item">• <%= d %></div>
-                            <% }); %>
-                        </div>
-                        <div class="deliverables-footer">
-                            <span class="deliverables-count" id="deliverables-count"><%= campaignSections[0].deliverables.length %> assets</span>
+                        <div class="deliverables-list">
+                            <div class="deliverable-item">• Grounded in confirmed business context</div>
+                            <div class="deliverable-item">• Sequenced through a reviewed plan</div>
+                            <div class="deliverable-item">• Checked for customer-facing quality</div>
                         </div>
                     </div>
                 </div>

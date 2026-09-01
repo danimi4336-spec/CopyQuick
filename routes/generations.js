@@ -328,6 +328,25 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
   const isAjax = req.xhr || req.headers.accept?.includes('json');
   const genType = generationType || 'quick';
   let generationRequest = { enabled: false };
+
+  // The legacy campaign mode has never generated customer-ready work. Do not
+  // persist or charge for its historical future-build placeholders; direct
+  // customers to the validated Objective -> Production workflow instead.
+  if (genType === 'campaign') {
+    const message = 'Complete campaigns are created through the guided Objective workflow.';
+    if (isAjax) return res.status(409).json({
+      error: message,
+      code: 'CAMPAIGN_OBJECTIVE_REQUIRED',
+      actionUrl: '/welcome'
+    });
+    return res.status(409).render('error', {
+      errorStatus: 409,
+      title: 'Start a Guided Objective - CopyQuick',
+      currentPage: 'dashboard',
+      message
+    });
+  }
+
   const getDashboardCounts = function(currentUserId) {
     return {
       favorites: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(currentUserId)?.count || 0,
@@ -354,7 +373,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     if (!cleanProductDescription) {
       throw new GenerationValidationError('Product description is required');
     }
-    if (!['quick', 'bundle', 'campaign'].includes(genType)) {
+    if (!['quick', 'bundle'].includes(genType)) {
       throw new GenerationValidationError('Unsupported generation type');
     }
     if (genType === 'bundle') {
@@ -490,24 +509,6 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         results = generateCopy({ productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: 'sales_message', tone: cleanTone, customToneGuidance });
         wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
       }
-    } else if (genType === 'campaign') {
-      // Generate campaign content based on selected sections
-      const activeSections = requestedCampaignSections || 'email';
-      const sectionList = activeSections.split(',');
-      sectionList.forEach(sectionId => {
-        const section = campaignSections.find(s => s.id === sectionId);
-        if (section) {
-          section.deliverables.forEach((deliverable, idx) => {
-            results.push({
-              text: `[${section.label}] ${deliverable}\n\nBased on your product "${cleanProductDescription}"${cleanTargetAudience ? ' targeting ' + cleanTargetAudience : ''} with goal: ${goal || 'Increase Sales'}.\n\nThis ${deliverable.toLowerCase()} for the ${section.label.toLowerCase()} channel will be generated in Build #3 when the full AI campaign engine goes live. Your Brand Brain data and campaign settings have been saved for a seamless transition.`,
-              tone: cleanTone || 'professional',
-              assetLabel: deliverable,
-              assetType: sectionId
-            });
-          });
-        }
-      });
-      wordCount = results.reduce((sum, r) => sum + r.text.split(/\s+/).filter(Boolean).length, 0);
     }
 
     const resultsJson = JSON.stringify(results);

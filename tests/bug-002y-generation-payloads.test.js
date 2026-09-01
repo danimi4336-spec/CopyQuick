@@ -320,12 +320,11 @@ async function run() {
       campaignSections: 'email',
       goal: 'Launch Product'
     });
-    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(response.res.statusCode, 409);
     const body = parseJson(response);
-    assert(body.results.length > 0);
-    assert(body.results.every((result) => result.tone === 'professional'));
-    assertNoUndefinedValues(body.results);
-    assert.strictEqual(snapshot(db, customCampaignUserId).usageEvents, 1);
+    assert.strictEqual(body.code, 'CAMPAIGN_OBJECTIVE_REQUIRED');
+    assert.strictEqual(body.actionUrl, '/welcome');
+    assert.strictEqual(snapshot(db, customCampaignUserId).usageEvents, 0);
   });
 
   const emptyToneUserId = createUser(db, { monthly_limit: 20 });
