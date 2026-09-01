@@ -5,23 +5,13 @@ const path = require('path');
 function run() {
   const dashboard = fs.readFileSync(path.join(__dirname, '..', 'views', 'dashboard.ejs'), 'utf8');
 
-  assert.match(dashboard, /selectedJourneyId==='launch_product'/);
-  assert.match(dashboard, /Start Launch a New Product →/);
-  assert.match(dashboard, /href','\/welcome\?goal=launch_product'/);
-  assert.match(dashboard, /fetch\('\/welcome'/);
-  assert.match(dashboard, /body: 'goal=launch_product'/);
-  assert.match(dashboard, /window\.CopyQuickCsrf\.headers/);
-  assert.match(dashboard, /window\.location\.assign\(response\.url \|\| '\/discovery'\)/);
-  assert.match(dashboard, /window\.location\.assign\('\/welcome\?goal=launch_product'\)/);
-
-  const clickHandlerStart = dashboard.indexOf("bjCtaBtn.addEventListener('click'");
-  const launchBranchStart = dashboard.indexOf("if(selectedJourneyId==='launch_product')", clickHandlerStart);
-  const legacySaveStart = dashboard.indexOf('if(selectedJourneyId){', launchBranchStart);
-  const launchBranch = dashboard.slice(launchBranchStart, legacySaveStart);
-  assert.doesNotMatch(launchBranch, /brand-brain|dashboard\/update-goal/);
-
-  assert.match(dashboard, /if\(brainPct<100\)return'Continue to Brand Brain'/,
-    'legacy objectives should retain their current Brand Brain path');
+  assert.match(dashboard, /href="\/welcome"[^>]*>🚀 Start a Guided Objective →<\/a>/);
+  assert.match(dashboard, /href="\/welcome"[^>]*id="mode-campaign-trigger"/);
+  assert.match(dashboard, /Add Brand Context/);
+  assert.match(dashboard, /Update Brand Context/);
+  assert.doesNotMatch(dashboard, /Continue to Brand Brain/);
+  assert.doesNotMatch(dashboard, /selectedJourneyId|bjCtaBtn|dashboard\/update-goal/);
+  assert.doesNotMatch(dashboard, /Estimated Assets|Estimated Time|Select a Business Journey/);
   console.log('Story 3.26 Objective Entry Consolidation tests passed');
 }
 

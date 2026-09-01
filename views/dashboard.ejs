@@ -21,13 +21,8 @@
             <h1 class="bc-greeting"><span id="greeting"></span>, <%= user.name || 'there' %> 👋</h1>
             <p class="bc-tagline">Ready to build something amazing today?</p>
             <div class="bc-action-row">
-                <% if (brainPct === 0) { %>
-                    <a href="/brand-brain" class="btn btn-primary btn-lg">🧠 Start Your Brand Brain →</a>
-                <% } else if (campaignCount === 0) { %>
-                    <a href="#mode-campaign" class="btn btn-primary btn-lg mode-trigger" data-mode-trigger="campaign">🚀 Launch Your First Campaign →</a>
-                <% } else { %>
-                    <a href="#mode-quick" class="btn btn-primary btn-lg mode-trigger" data-mode-trigger="quick">⚡ Generate New Copy →</a>
-                <% } %>
+                <a href="/welcome" class="btn btn-primary btn-lg">🚀 Start a Guided Objective →</a>
+                <a href="/brand-brain" class="btn btn-outline btn-lg">🧠 <%= brainPct === 0 ? 'Add Brand Context' : 'Update Brand Context' %></a>
             </div>
         </div>
         <div class="bc-welcome-right">
@@ -100,28 +95,22 @@
     <section class="bc-recommendation fade-in">
         <div class="bc-rec-card">
             <div class="bc-rec-icon">
-                <% if (brainPct === 0) { %>🧠<% } else if (brainPct < 100) { %>📋<% } else if (quickCount === 0) { %>⚡<% } else if (bundleCount === 0) { %>📦<% } else if (campaignCount === 0) { %>🚀<% } else { %>🎯<% } %>
+                <% if (quickCount === 0) { %>⚡<% } else if (bundleCount === 0) { %>📦<% } else { %>🚀<% } %>
             </div>
             <div class="bc-rec-body">
                 <span class="bc-rec-label">Next Recommended Action</span>
                 <span class="bc-rec-text">
-                    <% if (brainPct === 0) { %>
-                        Set up your Brand Brain — CopyQuick needs to learn about your business
-                    <% } else if (brainPct < 100) { %>
-                        Complete your Brand Brain profile for better AI suggestions
-                    <% } else if (quickCount === 0) { %>
+                    <% if (quickCount === 0) { %>
                         Start with a Quick Generate to see CopyQuick in action
                     <% } else if (bundleCount === 0) { %>
                         Try a Marketing Bundle — generate multiple assets at once
-                    <% } else if (campaignCount === 0) { %>
-                        Launch your first Complete Campaign
                     <% } else { %>
-                        You're on a roll! Create another campaign or try something new
+                        Start a guided objective to turn your business context into a validated production plan
                     <% } %>
                 </span>
             </div>
-            <a href="<%= brainPct === 0 || brainPct < 100 ? '/brand-brain' : quickCount === 0 ? '#mode-quick' : bundleCount === 0 ? '#mode-bundle' : '#mode-campaign' %>" class="btn btn-primary bc-rec-btn <%= brainPct >= 100 ? 'mode-trigger' : '' %>" <%= brainPct >= 100 ? 'data-mode-trigger="' + (quickCount === 0 ? 'quick' : bundleCount === 0 ? 'bundle' : 'campaign') + '"' : '' %>>
-                <% if (brainPct === 0) { %>Set Up Now<% } else if (brainPct < 100) { %>Continue<% } else if (quickCount === 0) { %>Try Now<% } else if (bundleCount === 0) { %>Try Bundle<% } else if (campaignCount === 0) { %>Build Campaign<% } else { %>Keep Going<% } %> →
+            <a href="<%= quickCount === 0 ? '#mode-quick' : bundleCount === 0 ? '#mode-bundle' : '/welcome' %>" class="btn btn-primary bc-rec-btn <%= quickCount === 0 || bundleCount === 0 ? 'mode-trigger' : '' %>" <%= quickCount === 0 || bundleCount === 0 ? 'data-mode-trigger="' + (quickCount === 0 ? 'quick' : 'bundle') + '"' : '' %>>
+                <% if (quickCount === 0) { %>Try Now<% } else if (bundleCount === 0) { %>Try Bundle<% } else { %>Choose Objective<% } %> →
             </a>
         </div>
     </section>
@@ -143,69 +132,11 @@
                 <strong>Marketing Bundle</strong>
                 <span>Generate a coordinated bundle of related assets.</span>
             </a>
-            <a href="#mode-campaign" class="mode-launch-card mode-trigger" id="mode-campaign-trigger" data-mode-trigger="campaign">
+            <a href="/welcome" class="mode-launch-card" id="mode-campaign-trigger">
                 <span class="mode-launch-icon">🚀</span>
-                <strong>Complete Campaign</strong>
-                <span>Generate a complete multi-channel campaign.</span>
+                <strong>Guided Objective</strong>
+                <span>Build a validated strategy, plan, and production-ready set of deliverables.</span>
             </a>
-        </div>
-    </section>
-
-    <!-- ===== BUSINESS JOURNEYS (Left Panel) ===== -->
-    <section class="bj-section fade-in">
-        <div class="bj-layout">
-            <!-- Left: Journey Groups -->
-            <div class="bj-left">
-                <h2 class="bj-heading">What would you like to build today?</h2>
-                <% var groups = typeof journeyGroupsData !== 'undefined' ? journeyGroupsData : []; %>
-                <% groups.forEach(function(group){ %>
-                    <div class="bj-group">
-                        <div class="bj-group-header"><%= group.icon %> <%= group.label %></div>
-                        <div class="bj-group-cards">
-                            <% group.journeys.forEach(function(j){ %>
-                                <div class="bj-card" data-journey="<%= j.id %>" data-icon="<%= j.icon %>">
-                                    <div class="bj-card-icon"><%= j.icon %></div>
-                                    <div class="bj-card-body">
-                                        <div class="bj-card-title"><%= j.title %></div>
-                                        <div class="bj-card-desc"><%= j.description %></div>
-                                    </div>
-                                    <div class="bj-card-check">✓</div>
-                                </div>
-                            <% }); %>
-                        </div>
-                    </div>
-                <% }); %>
-            </div>
-            <!-- Right: Blueprint Preview -->
-            <div class="bj-right" id="bjBlueprintPanel">
-                <!-- Default placeholder (shown when no journey selected) -->
-                <div class="bj-blueprint-placeholder" id="bpPlaceholder">
-                    <div class="bj-placeholder-icon">👆</div>
-                    <div class="bj-placeholder-text">Select a Business Journey above to see your Blueprint</div>
-                </div>
-                <!-- Dynamic blueprint content (shown on selection) -->
-                <div class="bj-blueprint-content" id="bpContent" style="display:none;">
-                    <div class="bp-header">
-                        <span class="bp-icon" id="bpIcon"></span>
-                        <div class="bp-title-group">
-                            <h3 class="bp-title" id="bpTitle"></h3>
-                            <p class="bp-tagline" id="bpTagline"></p>
-                        </div>
-                    </div>
-                    <div class="bp-platforms" id="bpPlatforms"></div>
-                    <div class="bp-groups" id="bpGroups"></div>
-                    <div class="bp-footer">
-                        <div class="bp-stats">
-                            <span class="bp-stat" id="bpAssetCount"></span>
-                            <span class="bp-stat" id="bpTimeEstimate"></span>
-                        </div>
-                        <p class="bp-outcome" id="bpOutcome"></p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="bj-cta-row">
-            <a href="<%= brainPct >= 100 ? '#mode-campaign' : '/brand-brain' %>" class="btn btn-primary btn-lg <%= brainPct >= 100 ? 'mode-trigger' : '' %>" id="bjCtaBtn" <%= brainPct >= 100 ? 'data-mode-trigger="campaign"' : '' %>>🚀 Start Building →</a>
         </div>
     </section>
 
@@ -632,8 +563,6 @@
 
   // ===== Campaign Section Buttons =====
   var sections = <%- JSON.stringify(campaignSections).replace(/</g, '\\u003c') %>;
-  var __journeys = <%- journeysData %>;
-  var brainPct = <%= brainPct %>;
   var secBtns=document.querySelectorAll('.campaign-sec-btn');
   var titleEl=document.getElementById('deliverables-title');
   var listEl=document.getElementById('deliverables-list');
@@ -797,126 +726,6 @@
       window.copyText(btn.getAttribute('data-copy-text') || '',btn);
     });
   });
-
-  // ===== Business Journey Card Selection =====
-	  var journeyCards = document.querySelectorAll('.bj-card');
-	  var bjCtaBtn = document.getElementById('bjCtaBtn');
-	  var selectedJourneyId = null;
-	  function getJourneyMode(id){
-	    if(id==='individual_assets')return'quick';
-	    if(id==='build_brand'||id==='promote_service'||id==='expand_marketplaces'||id==='scale_product')return'bundle';
-	    return'campaign';
-	  }
-	  function getJourneyCtaLabel(mode){
-	    if(selectedJourneyId==='launch_product')return'Start Launch a New Product →';
-	    if(brainPct<100)return'Continue to Brand Brain';
-	    if(mode==='quick')return'⚡ Generate Individual Asset';
-	    if(mode==='bundle')return'📦 Generate Marketing Bundle';
-	    return'🚀 Build Complete Campaign';
-	  }
-
-	  function renderBlueprint(id) {
-	    var journey = __journeys.find(function(j){ return j.id === id; });
-	    if (!journey) return;
-	    var journeyMode=getJourneyMode(id);
-
-    // Toggle placeholder vs content
-    document.getElementById('bpPlaceholder').style.display = 'none';
-    document.getElementById('bpContent').style.display = 'block';
-
-    // Header
-    document.getElementById('bpIcon').textContent = journey.icon;
-    document.getElementById('bpTitle').textContent = journey.title;
-    document.getElementById('bpTagline').textContent = journey.description;
-
-    // Platforms
-    var platformsEl = document.getElementById('bpPlatforms');
-    if (journey.platforms && journey.platforms.length > 0) {
-      platformsEl.replaceChildren();
-      journey.platforms.forEach(function(p){
-        var chip=document.createElement('span');chip.className='bp-platform-chip';chip.textContent=p;platformsEl.appendChild(chip);
-      });
-      platformsEl.style.display = '';
-    } else {
-      platformsEl.replaceChildren();
-      platformsEl.style.display = 'none';
-    }
-
-    // Blueprint groups
-    var groupsEl = document.getElementById('bpGroups');
-    groupsEl.replaceChildren();
-    journey.blueprint.forEach(function(cat){
-      var group=document.createElement('div');group.className='bp-group';var category=document.createElement('div');category.className='bp-group-category';category.textContent=cat.category;group.appendChild(category);var items=document.createElement('div');items.className='bp-group-items';
-      cat.items.forEach(function(item){
-        var chip=document.createElement('span');chip.className='bp-item-chip';chip.textContent=item;items.appendChild(chip);
-      });
-      group.appendChild(items);groupsEl.appendChild(group);
-    });
-
-    // Stats
-    document.getElementById('bpAssetCount').textContent = 'Estimated Assets: ' + journey.estimatedAssets;
-    document.getElementById('bpTimeEstimate').textContent = 'Estimated Time: ' + (journey.estimatedTime || '≈ 30 seconds');
-
-    // Outcome
-    document.getElementById('bpOutcome').textContent = 'Everything needed to ' + journey.title.toLowerCase() + '.';
-
-	    // CTA text
-	    bjCtaBtn.textContent=getJourneyCtaLabel(journeyMode);
-	    if(id==='launch_product'){
-	      bjCtaBtn.setAttribute('href','/welcome?goal=launch_product');
-	      bjCtaBtn.removeAttribute('data-mode-trigger');
-	      bjCtaBtn.classList.remove('mode-trigger');
-	    }else if(brainPct>=100){
-	      bjCtaBtn.setAttribute('href','#mode-'+journeyMode);
-	      bjCtaBtn.setAttribute('data-mode-trigger',journeyMode);
-	      bjCtaBtn.classList.add('mode-trigger');
-	    }else{
-	      bjCtaBtn.setAttribute('href','/brand-brain');
-	      bjCtaBtn.removeAttribute('data-mode-trigger');
-	      bjCtaBtn.classList.remove('mode-trigger');
-	    }
-	  }
-
-  journeyCards.forEach(function(card){
-    card.addEventListener('click', function(e){
-      e.stopPropagation();
-      var id = card.getAttribute('data-journey');
-      selectedJourneyId = id;
-      journeyCards.forEach(function(c){ c.classList.remove('selected'); });
-      card.classList.add('selected');
-      renderBlueprint(id);
-    });
-  });
-
-	  // CTA click saves selection then navigates
-	  bjCtaBtn.addEventListener('click', function(e){
-	    if(selectedJourneyId==='launch_product'){
-	      e.preventDefault();
-	      fetch('/welcome', {
-	        method: 'POST',
-	        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded'}),
-	        body: 'goal=launch_product'
-	      }).then(function(response){
-	        if(!response.ok)throw new Error('Objective start failed');
-	        window.location.assign(response.url || '/discovery');
-	      }).catch(function(){
-	        window.location.assign('/welcome?goal=launch_product');
-	      });
-	      return;
-	    }
-	    if(selectedJourneyId){
-	      fetch('/dashboard/update-goal', {
-	        method: 'POST',
-	        headers: window.CopyQuickCsrf.headers({'Content-Type':'application/x-www-form-urlencoded','Accept':'application/json'}),
-	        body: 'goal=' + encodeURIComponent(selectedJourneyId)
-	      }).catch(function(err){ console.warn('Goal save:', err); });
-	    }
-	    var mode=bjCtaBtn.getAttribute('data-mode-trigger');
-	    if(mode&&modeTitles[mode]){
-	      e.preventDefault();
-	      showMode(mode);
-	    }
-	  });
 
   // Fade-in
   var o=new IntersectionObserver(function(e){e.forEach(function(e){if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:0.1});

@@ -203,13 +203,13 @@ async function run() {
 
     assert.match(dashboard.body, /Quick Generate/);
     assert.match(dashboard.body, /Marketing Bundle/);
-    assert.match(dashboard.body, /Complete Campaign/);
+    assert.match(dashboard.body, /Guided Objective/);
     assert.match(dashboard.body, /id="mode-quick-trigger"/);
     assert.match(dashboard.body, /id="mode-bundle-trigger"/);
     assert.match(dashboard.body, /id="mode-campaign-trigger"/);
     assert.match(dashboard.body, /data-mode-trigger="quick"/);
     assert.match(dashboard.body, /data-mode-trigger="bundle"/);
-    assert.match(dashboard.body, /data-mode-trigger="campaign"/);
+    assert.doesNotMatch(dashboard.body, /data-mode-trigger="campaign"/);
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="quick"/);
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="bundle"/);
     assert.doesNotMatch(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="campaign"/);
@@ -223,10 +223,8 @@ async function run() {
     assert.match(dashboard.body, /href="\/welcome"/);
     assert.match(dashboard.body, /Try Now/);
     assert.match(dashboard.body, /data-mode-trigger="quick"/);
-    assert.match(dashboard.body, /function getJourneyMode/);
-    assert.match(dashboard.body, /id==='build_brand'\|\|id==='promote_service'/);
-    assert.match(dashboard.body, /Generate Marketing Bundle/);
-    assert.doesNotMatch(dashboard.body, /bjCtaBtn\.textContent = brainPct >= 100 \? 'Build My Campaign'/);
+    assert.doesNotMatch(dashboard.body, /function getJourneyMode|bjCtaBtn|Select a Business Journey/);
+    assert.match(dashboard.body, /Build a validated strategy, plan, and production-ready set of deliverables/);
     assert.match(dashboard.body, /<script src="\/js\/dashboardResults\.js"><\/script>/);
   });
 

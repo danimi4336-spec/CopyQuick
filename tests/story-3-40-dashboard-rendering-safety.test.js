@@ -16,6 +16,6 @@ assert(!view.includes('listEl.innerHTML=sec.deliverables'));
 assert(!view.includes('platformsEl.innerHTML = chips'));
 assert(!view.includes('groupsEl.innerHTML = h'));
 assert.match(view, /item\.textContent='• '\+d/);
-assert.match(view, /category\.textContent=cat\.category/);
+assert.doesNotMatch(view, /bjBlueprintPanel|renderBlueprint|bpGroups/);
 assert.match(view, /JSON\.stringify\(campaignSections\)\.replace/);
 console.log('Story 3.40 dashboard rendering safety tests passed');
