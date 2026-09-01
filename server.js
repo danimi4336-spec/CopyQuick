@@ -39,6 +39,7 @@ const { createRequestContextMiddleware } = require('./lib/requestContext');
 const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
+const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
@@ -94,6 +95,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session(createSessionConfig({ store: new SQLiteStore() })));
+app.use(createSensitiveResponseCacheMiddleware());
 
 // Passport initialization
 app.use(passport.initialize());
