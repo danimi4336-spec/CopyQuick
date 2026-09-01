@@ -42,7 +42,10 @@ const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
 const { closeApplicationServices } = require('./lib/httpShutdown');
-const { BROWSER_REQUEST_BODY_LIMIT } = require('./lib/requestBodyLimits');
+const {
+  BROWSER_REQUEST_BODY_LIMIT,
+  BROWSER_FORM_PARAMETER_LIMIT
+} = require('./lib/requestBodyLimits');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
@@ -95,7 +98,11 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Middleware
 app.use(express.json({ limit: BROWSER_REQUEST_BODY_LIMIT }));
-app.use(express.urlencoded({ extended: true, limit: BROWSER_REQUEST_BODY_LIMIT }));
+app.use(express.urlencoded({
+  extended: true,
+  limit: BROWSER_REQUEST_BODY_LIMIT,
+  parameterLimit: BROWSER_FORM_PARAMETER_LIMIT
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(session(createSessionConfig({ store: new SQLiteStore() })));
 app.use(createSensitiveResponseCacheMiddleware());

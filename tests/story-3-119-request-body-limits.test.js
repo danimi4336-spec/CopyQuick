@@ -63,7 +63,7 @@ async function run() {
   const serverSource = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const webhookSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'webhook.js'), 'utf8');
   assert.match(serverSource, /express\.json\(\{ limit: BROWSER_REQUEST_BODY_LIMIT \}\)/);
-  assert.match(serverSource, /express\.urlencoded\(\{ extended: true, limit: BROWSER_REQUEST_BODY_LIMIT \}\)/);
+  assert.match(serverSource, /express\.urlencoded\(\{[\s\S]*limit: BROWSER_REQUEST_BODY_LIMIT,[\s\S]*parameterLimit: BROWSER_FORM_PARAMETER_LIMIT/);
   assert.match(webhookSource, /limit: STRIPE_WEBHOOK_BODY_LIMIT/);
   assert(serverSource.indexOf('app.use(express.json') > serverSource.indexOf("app.use('/', webhookRoutes)"));
 
