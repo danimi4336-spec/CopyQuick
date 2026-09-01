@@ -6,6 +6,7 @@ const { executeNextProductionJob } = require('../lib/productionExecution');
 const { generationActionRateLimit } = require('../lib/generationProtection');
 const { requireGenerationAvailable } = require('../lib/generationControls');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
 
 const router = express.Router();
 
@@ -61,7 +62,14 @@ router.post('/production/start', requireAuth, requireGenerationAvailable, genera
   try {
     result = initializeProduction({ db, user, discoverySession: req.session.discoverySession });
   } catch (err) {
-    console.error('Production initialization failed.');
+    writeOperationalEvent({
+      event: 'production_initialization_failed',
+      requestId: req.requestId,
+      method: req.method,
+      route: req.route?.path || 'unmatched',
+      statusCode: 500,
+      code: 'PRODUCTION_INITIALIZATION_FAILED'
+    });
     return res.status(500).render('error', {
       title: 'Production Error - CopyQuick',
       currentPage: 'production',
