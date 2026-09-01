@@ -5,10 +5,15 @@ const users = new Map([
   [45, { id: 45, email: 'bound@example.com' }],
   [46, { id: 46, email: 'legacy@example.com' }]
 ]);
+const checkoutIntents = new Set(['46:cs_legacy_46']);
 const db = {
   prepare(sql) {
     return {
-      get(value) {
+      get(...values) {
+        if (/subscription_checkout_intents/.test(sql)) {
+          return checkoutIntents.has(`${values[0]}:${values[1]}`) ? { 1: 1 } : undefined;
+        }
+        const value = values[0];
         if (/WHERE id/.test(sql)) return users.get(value);
         return Array.from(users.values()).find(user => user.email === value);
       }
@@ -38,10 +43,24 @@ resolved = resolveCheckoutUser(db, {
 assert.strictEqual(resolved.valid, false);
 assert.strictEqual(resolved.user, null);
 
-resolved = resolveCheckoutUser(db, { customer_email: ' LEGACY@EXAMPLE.COM ' });
+resolved = resolveCheckoutUser(db, {
+  id: 'cs_legacy_46',
+  customer_email: ' LEGACY@EXAMPLE.COM '
+});
 assert.strictEqual(resolved.valid, true);
 assert.strictEqual(resolved.legacy, true);
 assert.strictEqual(resolved.user.id, 46);
+
+for (const session of [
+  { id: 'cs_unrecorded_46', customer_email: 'legacy@example.com' },
+  { customer_email: 'legacy@example.com' },
+  { id: 'cs_legacy_46', customer_email: 'unknown@example.com' }
+]) {
+  resolved = resolveCheckoutUser(db, session);
+  assert.strictEqual(resolved.valid, false,
+    'legacy email identity must be bound to an exact durable Checkout intent');
+  assert.strictEqual(resolved.user, null);
+}
 
 const stripeSource = require('fs').readFileSync(require.resolve('../lib/stripe'), 'utf8');
 assert.match(stripeSource, /client_reference_id: userReference/);

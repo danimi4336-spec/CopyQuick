@@ -36,6 +36,11 @@ customer, and that customer is exclusively owned by the same local user. New
 subscribers continue to create their initial Customer through Checkout. Mixed,
 mismatched, or shared customer history fails closed before a Checkout Session is
 created.
+Legacy Checkout sessions that predate immutable user metadata are never trusted
+by email alone. Their exact Stripe Checkout Session ID must already be recorded
+in a durable checkout intent owned by the resolved local user; otherwise the
+webhook is rejected for entitlement mutation and reconciliation remains the
+authoritative recovery path.
 For intents created before this cleanup existed, a completed session may rotate
 only when its exact local user/subscription relationship is authoritatively
 `canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,

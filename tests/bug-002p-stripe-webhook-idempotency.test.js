@@ -227,7 +227,8 @@ async function run() {
     '2026-01-02T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
   );
   const mismatchUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('mismatch@example.com', 'Mismatch User').lastInsertRowid;
-  db.prepare('INSERT INTO users (email, name) VALUES (?, ?)').run('legacy@example.com', 'Legacy Checkout User');
+  const legacyUserId = db.prepare('INSERT INTO users (email, name) VALUES (?, ?)')
+    .run('legacy@example.com', 'Legacy Checkout User').lastInsertRowid;
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('fail@example.com', 'Fail User', 'cus_fail');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('stale@example.com', 'Stale User', 'cus_stale');
   db.prepare('INSERT INTO users (email, name, stripe_customer_id) VALUES (?, ?, ?)').run('other@example.com', 'Other User', 'cus_other');
@@ -299,6 +300,28 @@ async function run() {
     assert.strictEqual(getUser(db, 'mismatch@example.com').plan_tier, 'free');
     assert.strictEqual(db.prepare('SELECT status FROM stripe_webhook_events WHERE event_id = ?').get('evt_checkout_mismatch').status, 'invalid');
 
+    subscriptionStates.set('sub_legacy_unbound', makeStripeSubscription({
+      id: 'sub_legacy_unbound', customer: 'cus_legacy_unbound'
+    }));
+    response = await request(server, checkoutEvent({
+      id: 'evt_checkout_legacy_unbound', created: 115, email: 'legacy@example.com',
+      customer: 'cus_legacy_unbound', subscription: 'sub_legacy_unbound'
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.strictEqual(getUser(db, 'legacy@example.com').plan_tier, 'free',
+      'email alone must not bind an unrecorded legacy Checkout Session');
+    assert.strictEqual(db.prepare('SELECT status FROM stripe_webhook_events WHERE event_id = ?')
+      .get('evt_checkout_legacy_unbound').status, 'invalid');
+
+    db.prepare(`
+      INSERT INTO subscription_checkout_intents(
+        user_id, plan_tier, price_id, idempotency_key, stripe_checkout_session_id,
+        expires_at, created_at, updated_at
+      ) VALUES (?, 'pro', ?, 'legacy-checkout-intent', 'cs_evt_checkout_legacy', ?, ?, ?)
+    `).run(
+      legacyUserId, process.env.STRIPE_PRO_PRICE,
+      '2026-01-02T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z'
+    );
     subscriptionStates.set('sub_legacy', makeStripeSubscription({ id: 'sub_legacy', customer: 'cus_legacy' }));
     response = await request(server, checkoutEvent({
       id: 'evt_checkout_legacy', created: 120, email: 'legacy@example.com',
