@@ -8,6 +8,11 @@ const {
   createLoginRateLimiter,
   createSignupRateLimiter
 } = require('../lib/authProtection');
+const {
+  destroyAuthenticatedSession,
+  establishAuthenticatedSession
+} = require('../lib/authSession');
+const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
 
 const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
 
@@ -40,7 +45,7 @@ function createAuthRouter(options = {}) {
       const result = db.prepare('INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)')
         .run(email, passwordHash, name);
 
-      req.session.userId = result.lastInsertRowid;
+      await establishAuthenticatedSession(req, result.lastInsertRowid);
       res.redirect('/welcome');
     } catch (err) {
       console.error('Signup failed.');
@@ -64,7 +69,7 @@ function createAuthRouter(options = {}) {
 
       if (user && passwordMatches) {
         loginLimiter.recordSuccess(req);
-        req.session.userId = user.id;
+        await establishAuthenticatedSession(req, user.id);
         const db2 = getDatabase();
         const hasGoal = db2.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
         res.redirect(hasGoal?.builder_goal ? '/dashboard' : '/welcome');
@@ -75,6 +80,18 @@ function createAuthRouter(options = {}) {
     } catch (err) {
       console.error('Login failed.');
       res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login' });
+    }
+  });
+
+  authRouter.post('/logout', async (req, res) => {
+    try {
+      await destroyAuthenticatedSession(req, res, {
+        cookieOptions: getSessionCookieClearOptions(process.env)
+      });
+      res.redirect('/');
+    } catch (err) {
+      console.error('Logout failed.');
+      res.status(500).send('Unable to log out safely. Please try again.');
     }
   });
 
@@ -128,11 +145,5 @@ router.get('/auth/google/callback',
     })(req, res, next);
   }
 );
-
-// Logout
-router.post('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
-});
 
 module.exports = { createAuthRouter, router, requireAuth };

@@ -295,10 +295,11 @@ async function run() {
     await postLogin(reset.agent, resetToken, { password: 'bad-one' });
     const resetSuccess = await postLogin(reset.agent, resetToken);
     assert.strictEqual(resetSuccess.res.statusCode, 302);
-    await postLogin(reset.agent, resetToken, { password: 'bad-two' });
-    const afterResetAttempt = await postLogin(reset.agent, resetToken, { password: 'bad-three' });
+    const rotatedResetToken = await getToken(reset.agent);
+    await postLogin(reset.agent, rotatedResetToken, { password: 'bad-two' });
+    const afterResetAttempt = await postLogin(reset.agent, rotatedResetToken, { password: 'bad-three' });
     assert.strictEqual(afterResetAttempt.res.statusCode, 200);
-    const ipStillCounts = await postLogin(reset.agent, resetToken, { email: 'third@example.com', password: 'bad-four' });
+    const ipStillCounts = await postLogin(reset.agent, rotatedResetToken, { email: 'third@example.com', password: 'bad-four' });
     assert.strictEqual(ipStillCounts.res.statusCode, 429);
     reset.close();
 
@@ -319,10 +320,12 @@ async function run() {
     assert.strictEqual(signupSuccess.res.headers.location, '/welcome');
     assert.strictEqual(signup.calls.hash, 1);
     assert.strictEqual(countUsers(db), initialUsers + 1);
-    await postSignup(signup.agent, signupToken, { email: 'second-signup@example.com' });
+    const secondSignupToken = await getToken(signup.agent);
+    await postSignup(signup.agent, secondSignupToken, { email: 'second-signup@example.com' });
     const usersBeforeBlockedSignup = countUsers(db);
     const hashBeforeBlockedSignup = signup.calls.hash;
-    const signupBlocked = await postSignup(signup.agent, signupToken, { email: 'third-signup@example.com' });
+    const thirdSignupToken = await getToken(signup.agent);
+    const signupBlocked = await postSignup(signup.agent, thirdSignupToken, { email: 'third-signup@example.com' });
     assert.strictEqual(signupBlocked.res.statusCode, 429);
     assert.strictEqual(signup.calls.hash, hashBeforeBlockedSignup);
     assert.strictEqual(countUsers(db), usersBeforeBlockedSignup);
@@ -331,7 +334,8 @@ async function run() {
     const signupIps = await createTestAgent({ maxSignupAttempts: 1 });
     const signupIpToken = await getToken(signupIps.agent);
     await postSignup(signupIps.agent, signupIpToken, { email: 'ip-one@example.com' }, { 'X-Forwarded-For': '198.51.100.1' });
-    const otherIpSignup = await postSignup(signupIps.agent, signupIpToken, { email: 'ip-two@example.com' }, { 'X-Forwarded-For': '198.51.100.2' });
+    const rotatedSignupIpToken = await getToken(signupIps.agent);
+    const otherIpSignup = await postSignup(signupIps.agent, rotatedSignupIpToken, { email: 'ip-two@example.com' }, { 'X-Forwarded-For': '198.51.100.2' });
     assert.strictEqual(otherIpSignup.res.statusCode, 302);
     signupIps.close();
 
@@ -339,10 +343,11 @@ async function run() {
     const expiry = await createTestAgent({ maxSignupAttempts: 1, windowMs: 100, now: () => now });
     const expiryToken = await getToken(expiry.agent);
     await postSignup(expiry.agent, expiryToken, { email: 'window-one@example.com' });
-    const windowBlocked = await postSignup(expiry.agent, expiryToken, { email: 'window-two@example.com' });
+    const rotatedExpiryToken = await getToken(expiry.agent);
+    const windowBlocked = await postSignup(expiry.agent, rotatedExpiryToken, { email: 'window-two@example.com' });
     assert.strictEqual(windowBlocked.res.statusCode, 429);
     now += 101;
-    const afterWindow = await postSignup(expiry.agent, expiryToken, { email: 'window-three@example.com' });
+    const afterWindow = await postSignup(expiry.agent, rotatedExpiryToken, { email: 'window-three@example.com' });
     assert.strictEqual(afterWindow.res.statusCode, 302);
     expiry.close();
 
@@ -375,10 +380,11 @@ async function run() {
       headers: { Accept: 'application/json' },
       body: { _csrf: signupJsonToken, name: 'Json User', email: 'json-one@example.com', password: 'signup-password' }
     });
+    const rotatedSignupJsonToken = await getToken(signupJson.agent);
     const signupJsonBlocked = await request(signupJson.agent, 'POST', '/signup', {
       contentType: 'application/json',
       headers: { Accept: 'application/json' },
-      body: { _csrf: signupJsonToken, name: 'Json User', email: 'json-two@example.com', password: 'signup-password' }
+      body: { _csrf: rotatedSignupJsonToken, name: 'Json User', email: 'json-two@example.com', password: 'signup-password' }
     });
     assert.strictEqual(signupJsonBlocked.res.statusCode, 429);
     assert.deepStrictEqual(JSON.parse(signupJsonBlocked.body), { error: AUTH_LIMIT_ERROR });

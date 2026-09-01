@@ -63,7 +63,10 @@ function createAuthApp() {
   const app = express();
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
-    req.session = {};
+    req.session = {
+      regenerate: (done) => done(),
+      destroy: (done) => done()
+    };
     req.logIn = (user, done) => {
       req.user = user;
       done();
