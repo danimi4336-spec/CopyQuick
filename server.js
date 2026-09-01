@@ -33,6 +33,7 @@ const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
 const { requireCompatibleMigrationState } = require('./lib/migrationStartupGate');
 const { startApplicationAfterMigrationGate } = require('./lib/applicationStartup');
 const { createBillingReconciliationScheduler } = require('./lib/billingReconciliationScheduler');
+const { createOperationalHealthWatcher } = require('./lib/operationalHealthWatcher');
 const { createRequestContextMiddleware } = require('./lib/requestContext');
 const { writeOperationalEvent } = require('./lib/operationalLogger');
 
@@ -170,6 +171,7 @@ let productionWorker = null;
 let offsiteBackupScheduler = null;
 let backupHealthWatcher = null;
 let billingReconciliationScheduler = null;
+let operationalHealthWatcher = null;
 let shuttingDown = false;
 async function shutdown(signal) {
   if (shuttingDown) return;
@@ -179,7 +181,8 @@ async function shutdown(signal) {
     productionWorker?.stop(),
     offsiteBackupScheduler?.stop(),
     backupHealthWatcher?.stop(),
-    billingReconciliationScheduler?.stop()
+    billingReconciliationScheduler?.stop(),
+    operationalHealthWatcher?.stop()
   ]);
   const finish = () => {
     stopRuntimeLockHeartbeat();
@@ -227,6 +230,11 @@ async function startApplication() {
       const scheduler = createBillingReconciliationScheduler({ db });
       scheduler.start();
       return scheduler;
+    },
+    startOperationalHealthWatcher: db => {
+      const watcher = createOperationalHealthWatcher({ db });
+      watcher.start();
+      return watcher;
     }
   });
   if (started.stoppedBeforeServices) return;
@@ -235,6 +243,7 @@ async function startApplication() {
   offsiteBackupScheduler = started.offsiteBackupScheduler;
   backupHealthWatcher = started.backupHealthWatcher;
   billingReconciliationScheduler = started.billingReconciliationScheduler;
+  operationalHealthWatcher = started.operationalHealthWatcher;
   console.log('Existing SQLite database opened without reset.');
 }
 

@@ -176,7 +176,8 @@ async function run() {
       startHttp: () => calls.push('http'),
       startProductionWorker: () => calls.push('worker'),
       startOffsiteBackupScheduler: () => calls.push('scheduler'),
-      startBackupHealthWatcher: () => calls.push('watcher')
+      startBackupHealthWatcher: () => calls.push('watcher'),
+      startOperationalHealthWatcher: () => calls.push('operational-watcher')
     }), error => error.code === 'MIGRATION_REQUIRED');
     assert.deepStrictEqual(calls, ['gate']);
 
@@ -189,9 +190,14 @@ async function run() {
       startHttp: () => { safeCalls.push('http'); return {}; },
       startProductionWorker: () => { safeCalls.push('worker'); return {}; },
       startOffsiteBackupScheduler: () => { safeCalls.push('scheduler'); return {}; },
-      startBackupHealthWatcher: () => { safeCalls.push('watcher'); return {}; }
+      startBackupHealthWatcher: () => { safeCalls.push('watcher'); return {}; },
+      startBillingReconciliationScheduler: () => { safeCalls.push('billing-scheduler'); return {}; },
+      startOperationalHealthWatcher: () => { safeCalls.push('operational-watcher'); return {}; }
     });
-    assert.deepStrictEqual(safeCalls, ['gate', 'runtime', 'http', 'worker', 'scheduler', 'watcher']);
+    assert.deepStrictEqual(safeCalls, [
+      'gate', 'runtime', 'http', 'worker', 'scheduler', 'watcher',
+      'billing-scheduler', 'operational-watcher'
+    ]);
   }
 
   // migrations:check is read-only, succeeds only for a safe state, and reports normalized failure.
