@@ -17,9 +17,16 @@ const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
 const { createApprovedProductionSet, createDefaultSelection, planFingerprint } = require('../lib/buildPlanApproval');
 const { initializeProduction } = require('../lib/productionInitialization');
-const { claimNextRunnableJob, renewJobLease } = require('../lib/productionExecution');
+const {
+  DEFAULT_LEASE_SECONDS, DEFAULT_RETRY_BASE_SECONDS, MAX_LEASE_SECONDS, MAX_RETRY_BASE_SECONDS,
+  claimNextRunnableJob, leaseSeconds, renewJobLease, retryBaseSeconds
+} = require('../lib/productionExecution');
 const { MAX_CYCLE_WORK, eligibleRuns, maxConcurrency, recoverActiveRuns, runOrchestratorCycle } = require('../lib/productionOrchestrator');
-const { createProductionWorker } = require('../lib/productionWorker');
+const {
+  DEFAULT_BUSY_DELAY_MS, DEFAULT_IDLE_DELAY_MS, DEFAULT_SHUTDOWN_GRACE_MS,
+  MAX_BUSY_DELAY_MS, MAX_IDLE_DELAY_MS, MAX_SHUTDOWN_GRACE_MS,
+  boundedPositiveInteger, createProductionWorker
+} = require('../lib/productionWorker');
 const productionRoutes = require('../routes/production');
 
 function confirmed(value, label = value) {
@@ -126,6 +133,16 @@ function request(agent, method, url, body) {
 async function run() {
   initDb();
   const db = getDb();
+  assert.strictEqual(leaseSeconds(MAX_LEASE_SECONDS + 1), DEFAULT_LEASE_SECONDS);
+  assert.strictEqual(retryBaseSeconds(MAX_RETRY_BASE_SECONDS + 1), DEFAULT_RETRY_BASE_SECONDS);
+  assert.strictEqual(
+    boundedPositiveInteger(MAX_SHUTDOWN_GRACE_MS + 1, DEFAULT_SHUTDOWN_GRACE_MS, MAX_SHUTDOWN_GRACE_MS),
+    DEFAULT_SHUTDOWN_GRACE_MS
+  );
+  assert.deepStrictEqual(createProductionWorker({
+    db: {}, idleDelayMs: MAX_IDLE_DELAY_MS + 1, busyDelayMs: MAX_BUSY_DELAY_MS + 1,
+    runCycle: async () => ({ workPerformed: 0 })
+  }).config, { idleDelayMs: DEFAULT_IDLE_DELAY_MS, busyDelayMs: DEFAULT_BUSY_DELAY_MS });
   assert.strictEqual(maxConcurrency(), 1);
   assert.strictEqual(maxConcurrency('999999'), MAX_CYCLE_WORK);
 
