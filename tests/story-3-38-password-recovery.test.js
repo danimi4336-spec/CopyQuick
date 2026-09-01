@@ -2,6 +2,7 @@ const assert = require('assert');
 const bcrypt = require('bcrypt');
 const Database = require('better-sqlite3');
 const {
+  RESET_TOKEN_MAX_LENGTH,
   createPasswordResetToken,
   resetPassword,
   validatePasswordResetToken
@@ -35,6 +36,9 @@ async function run() {
   assert(!token.includes(oldHash));
   assert.strictEqual(validatePasswordResetToken(db, token, { env, now }).id, 38);
   assert.strictEqual(validatePasswordResetToken(db, `${token}tampered`, { env, now }), null);
+  assert.strictEqual(validatePasswordResetToken(db, 'x'.repeat(RESET_TOKEN_MAX_LENGTH + 1), { env, now }), null);
+  assert.strictEqual(validatePasswordResetToken(db, [token], { env, now }), null);
+  assert.strictEqual(validatePasswordResetToken(db, `${token.split('.')[0]}.not+base64url`, { env, now }), null);
   assert.strictEqual(validatePasswordResetToken(db, token, { env, now: new Date('2026-08-31T13:00:00.001Z') }), null);
 
   assert.deepStrictEqual(await resetPassword(db, token, 'short', { env, now }), { ok: false, code: 'PASSWORD_INVALID' });
