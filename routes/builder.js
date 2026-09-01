@@ -47,11 +47,6 @@ router.post('/welcome', requireAuth, (req, res) => {
     });
   }
   db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
-  // Ensure brand_brain row exists
-  const existing = db.prepare('SELECT id FROM brand_brain WHERE user_id = ?').get(req.session.userId);
-  if (!existing) {
-    db.prepare('INSERT INTO brand_brain (user_id) VALUES (?)').run(req.session.userId);
-  }
   if (goal === 'launch_product') {
     delete req.session.discoverySession;
     return res.redirect('/discovery');

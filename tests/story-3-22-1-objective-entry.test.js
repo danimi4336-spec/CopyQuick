@@ -132,9 +132,11 @@ async function run() {
     assert.strictEqual(freshDiscovery.res.statusCode, 200);
     assert.match(freshDiscovery.body, /What are you building\?/);
     assert.doesNotMatch(freshDiscovery.body, /Old blocked idea/);
-    const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId);
-    assert(brain, 'the legacy empty Brand Brain row may be created without requiring completion');
-    assert.strictEqual(brain.business_name, '');
+    assert.strictEqual(
+      db.prepare('SELECT id FROM brand_brain WHERE user_id = ?').get(userId),
+      undefined,
+      'starting Discovery must not create unrelated Brand Brain state'
+    );
 
     console.log('Story 3.22.1 Reliable Objective Entry tests passed');
   } finally {
