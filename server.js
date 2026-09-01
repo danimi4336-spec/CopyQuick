@@ -41,7 +41,7 @@ const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
-const { closeHttpServer, drainShutdownOperations } = require('./lib/httpShutdown');
+const { closeApplicationServices } = require('./lib/httpShutdown');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
@@ -181,20 +181,25 @@ async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`Received ${signal}. Stopping production scheduling safely.`);
-  const componentShutdown = await drainShutdownOperations({
-    production_worker: productionWorker?.stop(),
-    offsite_backup_scheduler: offsiteBackupScheduler?.stop(),
-    backup_health_watcher: backupHealthWatcher?.stop(),
-    billing_reconciliation_scheduler: billingReconciliationScheduler?.stop(),
-    operational_health_watcher: operationalHealthWatcher?.stop(),
-    transactional_email: defaultEmailDeliveryTracker.drain()
-  }, writeOperationalEvent);
+  const serviceShutdown = await closeApplicationServices({
+    server,
+    operations: {
+      production_worker: productionWorker?.stop(),
+      offsite_backup_scheduler: offsiteBackupScheduler?.stop(),
+      backup_health_watcher: backupHealthWatcher?.stop(),
+      billing_reconciliation_scheduler: billingReconciliationScheduler?.stop(),
+      operational_health_watcher: operationalHealthWatcher?.stop(),
+      transactional_email: defaultEmailDeliveryTracker.drain()
+    },
+    logger: writeOperationalEvent
+  });
+  const componentShutdown = serviceShutdown.components;
   writeOperationalEvent({
     event: 'shutdown_components_completed',
     drained: componentShutdown.drained,
     failureCount: componentShutdown.failedComponents.length
   });
-  const httpShutdown = await closeHttpServer(server);
+  const httpShutdown = serviceShutdown.http;
   writeOperationalEvent({ event: 'http_shutdown_completed', drained: httpShutdown.drained, forced: httpShutdown.forced });
   stopRuntimeLockHeartbeat();
   const release = releaseDatabaseRuntimeLock();
