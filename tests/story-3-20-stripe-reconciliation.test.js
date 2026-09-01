@@ -262,6 +262,17 @@ async function run() {
         db: value.db, stripeClient: fakeStripe(pages, { failAtCall: 2 }), mode: 'apply', env, pageSize: 1, now: () => now, logger: () => {}
       }), error => error.code === 'STRIPE_API_UNAVAILABLE');
       assert.strictEqual(value.db.prepare("SELECT COUNT(*) count FROM users WHERE id IN (?,?) AND plan_tier='pro'").get(first.userId, second.userId).count, 0);
+
+      const repeated = fakeStripe([
+        { data: [remote({ id: 'sub_1', customer: 'cus_1' })], has_more: true },
+        { data: [remote({ id: 'sub_1', customer: 'cus_1' })], has_more: true }
+      ]);
+      await assert.rejects(() => reconcileBilling({
+        db: value.db, stripeClient: repeated, mode: 'apply', env, pageSize: 1, now: () => now, logger: () => {}
+      }), error => error.code === 'STRIPE_PAGINATION_INVALID');
+      assert.strictEqual(repeated.calls.length, 2, 'a repeated Stripe cursor must stop reconciliation immediately');
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(first.userId).plan_tier, 'free');
+      assert.strictEqual(getBillingReconciliationStatus(value.db).lastFailureCode, 'STRIPE_PAGINATION_INVALID');
     } finally { closeFixture(value); }
   }
 
