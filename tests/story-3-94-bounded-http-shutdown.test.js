@@ -39,12 +39,17 @@ async function run() {
   const components = await drainShutdownOperations({
     worker: Promise.resolve({ drained: true }),
     scheduler: Promise.reject(new Error('private scheduler failure')),
+    timed_out_worker: Promise.resolve({ drained: false }),
     watcher: undefined
   }, event => events.push(event));
-  assert.deepStrictEqual(components, { drained: false, failedComponents: ['scheduler'] });
-  assert.deepStrictEqual(events, [{
-    event: 'shutdown_component_failed', component: 'scheduler', code: 'SHUTDOWN_DRAIN_FAILED'
-  }]);
+  assert.deepStrictEqual(components, {
+    drained: false,
+    failedComponents: ['scheduler', 'timed_out_worker']
+  });
+  assert.deepStrictEqual(events, [
+    { event: 'shutdown_component_failed', component: 'scheduler', code: 'SHUTDOWN_DRAIN_FAILED' },
+    { event: 'shutdown_component_failed', component: 'timed_out_worker', code: 'SHUTDOWN_DRAIN_FAILED' }
+  ]);
   assert.doesNotMatch(JSON.stringify(events), /private scheduler failure/);
 
   console.log('Story 3.94 Bounded HTTP Shutdown tests passed');
