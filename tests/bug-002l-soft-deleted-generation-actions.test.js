@@ -168,6 +168,15 @@ async function run() {
     assert.strictEqual(favoriteRestored.res.statusCode, 200);
     assert.strictEqual(parseJson(favoriteRestored).favorite, true);
 
+    const oversizedTitle = await request(server, 'POST', `/generation/${deletedId}/title`, { title: 'x'.repeat(201) });
+    assert.strictEqual(oversizedTitle.res.statusCode, 400);
+    const malformedTags = await request(server, 'POST', `/generation/${deletedId}/tags`, { tags: { invalid: true } });
+    assert.strictEqual(malformedTags.res.statusCode, 400);
+    assert.deepStrictEqual(
+      db.prepare('SELECT title, tags FROM generations WHERE id = ?').get(deletedId),
+      { title: 'Deleted title', tags: 'old' }
+    );
+
     const tagsRestored = await request(server, 'POST', `/generation/${deletedId}/tags`, { tags: 'restored' });
     assert.strictEqual(tagsRestored.res.statusCode, 200);
     assert.strictEqual(parseJson(tagsRestored).success, true);

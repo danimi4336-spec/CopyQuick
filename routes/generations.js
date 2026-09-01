@@ -12,6 +12,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
+const { GENERATION_METADATA_LIMITS, boundedQueryText, validateOptionalText } = require('../lib/generationMetadata');
 const {
   getCurrentUsageSnapshot,
   getCurrentUsageSnapshotReadOnly,
@@ -647,11 +648,11 @@ router.get('/history', requireAuth, (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const perPage = 20;
   const offset = (page - 1) * perPage;
-  const search = req.query.search || '';
-  const type = req.query.type || '';
-  const sort = req.query.sort || 'newest';
-  const favorite = req.query.favorite || '';
-  const language = req.query.language || '';
+  const search = boundedQueryText(req.query.search);
+  const type = boundedQueryText(req.query.type, 80);
+  const sort = boundedQueryText(req.query.sort, 20) || 'newest';
+  const favorite = boundedQueryText(req.query.favorite, 2);
+  const language = boundedQueryText(req.query.language, 80);
 
   let where = 'WHERE user_id = ? AND is_deleted = 0';
   let params = [userId];
@@ -794,8 +795,10 @@ router.post('/generation/:id/tags', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
   const { tags } = req.body;
+  const validated = validateOptionalText(tags, GENERATION_METADATA_LIMITS.tags);
+  if (!validated.valid) return res.status(400).json({ error: 'Invalid tags.' });
 
-  const result = db.prepare('UPDATE generations SET tags = ? WHERE id = ? AND user_id = ? AND is_deleted = 0').run(tags || '', req.params.id, userId);
+  const result = db.prepare('UPDATE generations SET tags = ? WHERE id = ? AND user_id = ? AND is_deleted = 0').run(validated.value, req.params.id, userId);
   if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
@@ -805,10 +808,12 @@ router.post('/generation/:id/title', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
   const { title } = req.body;
+  const validated = validateOptionalText(title, GENERATION_METADATA_LIMITS.title);
+  if (!validated.valid) return res.status(400).json({ error: 'Invalid title.' });
 
-  const result = db.prepare("UPDATE generations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ? AND is_deleted = 0").run(title || '', req.params.id, userId);
+  const result = db.prepare("UPDATE generations SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ? AND is_deleted = 0").run(validated.value, req.params.id, userId);
   if (result.changes === 0) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true, title });
+  res.json({ success: true, title: validated.value });
 });
 
 // ====== Regenerate ======
@@ -945,7 +950,7 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
 router.get('/api/search', requireAuth, (req, res) => {
   const db = getDb();
   const userId = res.locals.user.id;
-  const q = req.query.q || '';
+  const q = boundedQueryText(req.query.q);
 
   if (!q || q.length < 2) return res.json([]);
 
