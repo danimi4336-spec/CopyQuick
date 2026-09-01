@@ -290,6 +290,8 @@ async function run() {
 
   const statusOwner = createUser(db);
   const statusRun = startProduction(db, statusOwner);
+  db.prepare("UPDATE production_runs SET strategy_snapshot = '{malformed' WHERE id = ?").run(statusRun);
+  db.prepare("UPDATE production_jobs SET strategy_snapshot = '{malformed' WHERE production_run_id = ? AND sequence_order = 0").run(statusRun);
   const otherUser = createUser(db);
   const app = express();
   app.set('view engine', 'ejs');
@@ -312,6 +314,7 @@ async function run() {
     assert.strictEqual(payload.completedCount, 0);
     assert(!JSON.stringify(payload).includes('claim_token'));
     assert(!JSON.stringify(payload).includes('lease_expires_at'));
+    assert(!JSON.stringify(payload).includes('malformed'));
     await request(otherAgent, 'GET', `/test/authenticate/${otherUser}`);
     assert.strictEqual((await request(otherAgent, 'GET', `/production/${statusRun}/status`)).res.statusCode, 404);
     const studio = await request(ownerAgent, 'GET', `/production/${statusRun}`);
