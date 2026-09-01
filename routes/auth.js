@@ -78,11 +78,11 @@ function createAuthRouter(options = {}) {
         res.redirect(authSuccessPath(hasGoal, returnTo));
       } else {
         loginLimiter.recordFailure(req);
-        res.render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login', returnTo });
+        res.status(401).render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login', returnTo });
       }
     } catch (err) {
       console.error('Login failed.');
-      res.render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login', returnTo });
+      res.status(500).render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login', returnTo });
     }
   });
 

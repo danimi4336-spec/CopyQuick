@@ -222,8 +222,8 @@ async function run() {
     const failureToken = await getToken(failure.agent);
     const wrongPassword = await postLogin(failure.agent, failureToken, { password: 'wrong-password' });
     const missingAccount = await postLogin(failure.agent, failureToken, { email: 'missing@example.com', password: 'wrong-password' });
-    assert.strictEqual(wrongPassword.res.statusCode, 200);
-    assert.strictEqual(missingAccount.res.statusCode, 200);
+    assert.strictEqual(wrongPassword.res.statusCode, 401);
+    assert.strictEqual(missingAccount.res.statusCode, 401);
     assert(wrongPassword.body.includes(LOGIN_FAILURE_ERROR));
     assert.strictEqual(wrongPassword.body, missingAccount.body);
     assert.strictEqual(failure.calls.compare, 2);
@@ -253,7 +253,7 @@ async function run() {
     assert.strictEqual(emailLimited.calls.compare, beforeEmailBlockedCompare);
     assert.strictEqual(emailLimited.calls.userLookups, 2);
     const otherAccount = await postLogin(emailLimited.agent, emailToken, { email: 'other@example.com', password: 'bad' }, { 'X-Forwarded-For': '203.0.113.13' });
-    assert.strictEqual(otherAccount.res.statusCode, 200);
+    assert.strictEqual(otherAccount.res.statusCode, 401);
     emailLimited.close();
 
     const concurrentIp = await createTestAgent({ maxIpFailures: 2, maxEmailFailures: 10, compareDelayMs: 60 });
@@ -264,7 +264,7 @@ async function run() {
       postLogin(concurrentIp.agent, concurrentIpToken, { email: 'missing-one@example.com', password: 'bad-3' }),
       postLogin(concurrentIp.agent, concurrentIpToken, { email: 'missing-two@example.com', password: 'bad-4' })
     ]);
-    assert.strictEqual(countStatus(concurrentIpResponses, 200), 2);
+    assert.strictEqual(countStatus(concurrentIpResponses, 401), 2);
     assert.strictEqual(countStatus(concurrentIpResponses, 429), 2);
     assert.strictEqual(concurrentIp.calls.compare, 2);
     assert.strictEqual(concurrentIp.calls.userLookups, 2);
@@ -281,7 +281,7 @@ async function run() {
       postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-3' }, { 'X-Forwarded-For': '203.0.113.23' }),
       postLogin(concurrentEmail.agent, concurrentEmailToken, { password: 'bad-4' }, { 'X-Forwarded-For': '203.0.113.24' })
     ]);
-    assert.strictEqual(countStatus(concurrentEmailResponses, 200), 2);
+    assert.strictEqual(countStatus(concurrentEmailResponses, 401), 2);
     assert.strictEqual(countStatus(concurrentEmailResponses, 429), 2);
     assert.strictEqual(concurrentEmail.calls.compare, 2);
     assert.strictEqual(concurrentEmail.calls.userLookups, 2);
@@ -298,7 +298,7 @@ async function run() {
     const rotatedResetToken = await getToken(reset.agent);
     await postLogin(reset.agent, rotatedResetToken, { password: 'bad-two' });
     const afterResetAttempt = await postLogin(reset.agent, rotatedResetToken, { password: 'bad-three' });
-    assert.strictEqual(afterResetAttempt.res.statusCode, 200);
+    assert.strictEqual(afterResetAttempt.res.statusCode, 401);
     const ipStillCounts = await postLogin(reset.agent, rotatedResetToken, { email: 'third@example.com', password: 'bad-four' });
     assert.strictEqual(ipStillCounts.res.statusCode, 429);
     reset.close();
@@ -309,7 +309,7 @@ async function run() {
     assert.strictEqual(csrf.calls.compare, 0);
     const csrfToken = await getToken(csrf.agent);
     const afterCsrf = await postLogin(csrf.agent, csrfToken, { password: 'bad' });
-    assert.strictEqual(afterCsrf.res.statusCode, 200);
+    assert.strictEqual(afterCsrf.res.statusCode, 401);
     csrf.close();
 
     const signup = await createTestAgent({ maxSignupAttempts: 2 });
