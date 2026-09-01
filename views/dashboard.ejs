@@ -221,7 +221,7 @@
             <div class="card p-4">
                 <div class="mode-panel-header">
                     <h2>⚡ Quick Generate</h2>
-                    <p class="mode-panel-desc">Generate a single piece of content in seconds.</p>
+                    <p class="mode-panel-desc">Create a single focused content draft.</p>
                 </div>
                 <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error"><%= error %><% if (typeof errorAction !== 'undefined' && errorAction) { %> <a href="<%= errorAction.href %>"><%= errorAction.label %></a><% } %></div><% } %>
                 <form class="gen-form" action="/dashboard/generate" method="POST" data-mode="quick">
