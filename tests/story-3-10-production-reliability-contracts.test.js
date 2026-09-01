@@ -300,6 +300,41 @@ async function run() {
   assert.doesNotMatch(`${ambiguousJob.error_message} ${ambiguousJob.recovery_reason}`, /sensitive|upstream detail/);
   assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE production_run_id = ? AND event_type = 'production_reversal'").get(ambiguousRun).count, 0);
 
+  const persistenceUser = createUser(db);
+  const persistenceRun = createRun(db, persistenceUser, [{ id: 'customer_profile' }]);
+  let persistenceProviderCalls = 0;
+  db.exec(`
+    CREATE TRIGGER story_3191_fail_generation_persistence
+    BEFORE INSERT ON generations
+    BEGIN
+      SELECT RAISE(ABORT, 'sensitive persistence failure');
+    END;
+  `);
+  const persistenceResult = await executeNextProductionJob({
+    db,
+    userId: persistenceUser,
+    productionRunId: persistenceRun,
+    generatorApi: successfulGenerator({ push() { persistenceProviderCalls += 1; } })
+  });
+  db.exec('DROP TRIGGER story_3191_fail_generation_persistence');
+  assert.strictEqual(persistenceResult.outcome, 'recovery_required');
+  assert.strictEqual(persistenceProviderCalls, 1);
+  const persistenceJob = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ?').get(persistenceRun);
+  assert.strictEqual(persistenceJob.status, 'recovery_required');
+  assert.strictEqual(persistenceJob.last_error_code, 'PRODUCTION_RESULT_PERSISTENCE_FAILED');
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(persistenceUser).count, 0);
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE production_run_id = ? AND event_type = 'production_reversal'").get(persistenceRun).count, 0);
+  assert.doesNotMatch(`${persistenceJob.error_message} ${persistenceJob.recovery_reason}`, /sensitive|persistence failure/i);
+  const persistenceRepeat = await executeNextProductionJob({
+    db,
+    userId: persistenceUser,
+    productionRunId: persistenceRun,
+    generatorApi: successfulGenerator({ push() { persistenceProviderCalls += 1; } })
+  });
+  assert.strictEqual(persistenceRepeat.outcome, 'no_runnable_job');
+  assert.strictEqual(persistenceProviderCalls, 1,
+    'completed provider work must not be repeated automatically after persistence fails');
+
   const routeUser = createUser(db);
   const routeRun = createRun(db, routeUser, [{ id: 'customer_profile' }]);
   db.prepare(`
