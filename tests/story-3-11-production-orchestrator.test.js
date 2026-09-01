@@ -285,6 +285,18 @@ async function run() {
   assert.strictEqual(afterPoison.results[0].productionRunId, healthyRun);
   assert.strictEqual(afterPoison.results[0].outcome, 'completed', 'poison jobs cannot block later healthy work');
 
+  db.prepare("UPDATE production_runs SET status = 'completed' WHERE status IN ('queued', 'running')").run();
+  const missingOutputOwner = createUser(db);
+  const missingOutputRun = startProduction(db, missingOutputOwner);
+  const missingOutputJobs = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order').all(missingOutputRun);
+  db.prepare("UPDATE production_jobs SET status = 'completed', generation_id = NULL WHERE id = ?").run(missingOutputJobs[0].id);
+  db.prepare("UPDATE production_jobs SET status = 'queued' WHERE id = ?").run(missingOutputJobs[1].id);
+  const missingOutputCalls = [];
+  const missingOutputResult = await runOrchestratorCycle({ db, generatorApi: generator(missingOutputCalls), concurrency: 1 });
+  assert.strictEqual(missingOutputResult.results[0].outcome, 'permanent_failure');
+  assert.strictEqual(missingOutputCalls.length, 0, 'missing persisted prerequisite output never reaches the provider');
+  assert.strictEqual(db.prepare('SELECT last_error_code FROM production_jobs WHERE id = ?').get(missingOutputJobs[1].id).last_error_code, 'DEPENDENCY_OUTPUT_MISSING');
+
   const eventTypes = db.prepare(`
     SELECT DISTINCT event_type FROM production_job_events WHERE production_run_id = ?
   `).all(runId).map((row) => row.event_type);
