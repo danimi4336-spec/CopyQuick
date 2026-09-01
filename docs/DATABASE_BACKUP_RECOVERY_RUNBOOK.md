@@ -98,6 +98,12 @@ contact R2. Do not make stale backups fail readiness; use the watcher and
 
 Thresholds are configurable through the documented environment variables. Low space never causes application data deletion. Only expired, recognized backup files are eligible for retention cleanup.
 
+Local retention inspection is bounded to 10,000 directory entries by default
+and each run removes at most 100 expired recognized backups. Both limits are
+configurable up to 100,000 entries and 1,000 deletes. Cleanup stops after the
+first filesystem deletion failure; later verified backup runs continue any
+remaining backlog without touching unrelated files.
+
 While CopyQuick is running, never manually delete or replace:
 
 - `/var/data/copyquick.db`
