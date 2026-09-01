@@ -142,7 +142,7 @@ app.get('/about', (req, res) => {
 });
 
 app.get('/contact', (req, res) => {
-  res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, error: null });
+  res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, confirmationSent: false, error: null });
 });
 
 app.post('/contact', createContactRateLimiter(), createContactHandler({ sendContactFormEmails }));

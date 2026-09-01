@@ -15,7 +15,12 @@
                     <div class="alert alert-success" style="text-align:center;padding:2rem;">
                         <div style="font-size:3rem;margin-bottom:1rem;">✅</div>
                         <h3 style="margin-bottom:0.5rem;">Message Sent!</h3>
-                        <p style="max-width:none;font-size:1rem;">Thanks for reaching out! We've sent a confirmation to your email. We'll get back to you within 24 business hours.</p>
+                        <p style="max-width:none;font-size:1rem;">Thanks for reaching out! Our team received your message and will review it as soon as possible.</p>
+                        <% if (confirmationSent) { %>
+                            <p style="max-width:none;font-size:0.9rem;">A confirmation was sent to your email.</p>
+                        <% } else { %>
+                            <p style="max-width:none;font-size:0.9rem;">We could not send the email confirmation, but your message was delivered to our team.</p>
+                        <% } %>
                     </div>
                 <% } else { %>
                     <% if (locals.error) { %>
@@ -47,7 +52,7 @@
                 <div class="contact-info-card">
                     <h3>Support</h3>
                     <p class="contact-detail"><strong>Email:</strong> <a href="mailto:support@copyquick.co">support@copyquick.co</a></p>
-                    <p class="contact-response">We typically respond within <strong>24 hours</strong> during business days.</p>
+                    <p class="contact-response">Our team reviews support messages as soon as possible.</p>
                 </div>
                 <div class="contact-info-card">
                     <h3>Feature Requests</h3>

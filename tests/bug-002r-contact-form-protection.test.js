@@ -87,7 +87,7 @@ async function createTestAgent(options = {}) {
   const sent = [];
   const sendContactFormEmails = options.sendContactFormEmails || (async (payload) => {
     sent.push(payload);
-    return { ticketNumber: 'CQ-20260712-00001' };
+    return { ticketNumber: 'CQ-20260712-00001', autoReplyDelivered: true };
   });
 
   const app = express();
@@ -106,7 +106,7 @@ async function createTestAgent(options = {}) {
     res.json({ csrfToken: req.csrfToken() });
   });
   app.get('/contact', (req, res) => {
-    res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, error: null });
+    res.render('contact', { title: 'Contact - CopyQuick', currentPage: 'contact', sent: false, confirmationSent: false, error: null });
   });
   app.post('/contact',
     createContactRateLimiter({ max: options.max || 10, windowMs: options.windowMs || 15 * 60 * 1000 }),
