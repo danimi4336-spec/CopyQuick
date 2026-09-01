@@ -36,6 +36,11 @@ only when its exact local user/subscription relationship is authoritatively
 `canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,
 missing, malformed, and mismatched states remain fail-closed to prevent a
 duplicate paid subscription.
+If Stripe reports more than one concurrently entitled subscription for one
+CopyQuick user, reconciliation preserves the strongest valid local entitlement
+but records `MULTIPLE_ENTITLED_SUBSCRIPTIONS` as an unresolved operator issue.
+CopyQuick never guesses which Stripe subscription to cancel and never changes
+Stripe-side billing state.
 
 ## Commands
 

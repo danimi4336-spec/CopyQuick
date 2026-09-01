@@ -451,6 +451,51 @@ async function run() {
     } finally { closeFixture(value); }
   }
 
+  // Concurrent entitled subscriptions preserve access but are always surfaced
+  // as a durable operator issue because CopyQuick cannot choose one to cancel.
+  {
+    const value = fixture();
+    try {
+      const ids = insertRelationship(value.db, {
+        customer: 'cus_duplicate_paid', subscription: 'sub_duplicate_pro',
+        status: 'active', subscriptionPlan: 'pro', userPlan: 'pro', userLimit: 200
+      });
+      value.db.prepare(`
+        INSERT INTO subscriptions(
+          user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier, price_id,
+          current_period_start, current_period_end
+        ) VALUES (?, 'cus_duplicate_paid', 'sub_duplicate_unlimited', 'active', 'unlimited', ?, ?, ?)
+      `).run(
+        ids.userId, env.STRIPE_UNLIMITED_PRICE,
+        '2026-01-01T00:00:00.000Z', '2026-02-01T00:00:00.000Z'
+      );
+      const result = await reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{
+          data: [
+            remote({ id: 'sub_duplicate_pro', customer: 'cus_duplicate_paid' }),
+            remote({ id: 'sub_duplicate_unlimited', customer: 'cus_duplicate_paid', price: env.STRIPE_UNLIMITED_PRICE })
+          ],
+          has_more: false
+        }]),
+        mode: 'apply', env, now: () => now, logger: () => {}
+      });
+      assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(ids.userId).plan_tier, 'unlimited');
+      assert(result.unresolvedCount >= 1);
+      assert.deepStrictEqual(value.db.prepare(`
+        SELECT issue_type, desired_entitlement, resolution_status
+        FROM billing_reconciliation_issues
+        WHERE issue_type='MULTIPLE_ENTITLED_SUBSCRIPTIONS'
+      `).get(), {
+        issue_type: 'MULTIPLE_ENTITLED_SUBSCRIPTIONS',
+        desired_entitlement: 'unlimited',
+        resolution_status: 'unresolved'
+      });
+      assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM subscriptions WHERE user_id=?').get(ids.userId).count, 2,
+        'reconciliation must never cancel or delete Stripe subscription relationships');
+    } finally { closeFixture(value); }
+  }
+
   // Unknown/malformed authority and relationship mismatch never mutate entitlement.
   for (const subscription of [
     remote({ price: 'price_unknown' }), remote({ status: 'future_status' }), remote({ items: { data: [] } }),
