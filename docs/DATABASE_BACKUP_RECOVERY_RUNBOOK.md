@@ -103,6 +103,9 @@ and each run removes at most 100 expired recognized backups. Both limits are
 configurable up to 100,000 entries and 1,000 deletes. Cleanup stops after the
 first filesystem deletion failure; later verified backup runs continue any
 remaining backlog without touching unrelated files.
+The current remaining count is derived during private storage health inspection
+and surfaced as the sanitized `LOCAL_BACKUP_RETENTION_BACKLOG` warning until
+bounded cleanup catches up.
 
 While CopyQuick is running, never manually delete or replace:
 

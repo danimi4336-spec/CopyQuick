@@ -113,6 +113,13 @@ async function run() {
     assert(['healthy', 'warning', 'critical'].includes(health.status));
     assert.strictEqual(health.database.quickCheck, 'ok');
     assert.strictEqual(health.backups.recognizedCount, 2);
+    assert.strictEqual(health.backups.retentionRemainingCount, 0);
+    const backlogHealth = inspectStorageHealth({
+      env: { ...env, DATABASE_BACKUP_RETENTION: '1' },
+      db: sourceDb
+    });
+    assert.strictEqual(backlogHealth.backups.retentionRemainingCount, 1);
+    assert.strictEqual(backlogHealth.status, 'warning');
     assert(health.backups.latestVerifiedBackupAt);
     assert(!fs.existsSync(`${validRestoreSource}-wal`));
     assert(!fs.existsSync(`${validRestoreSource}-shm`));

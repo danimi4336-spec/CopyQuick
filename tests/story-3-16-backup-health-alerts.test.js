@@ -20,7 +20,7 @@ function healthy(overrides = {}) {
     status: 'healthy',
     database: { quickCheck: 'ok', readable: true, writable: true },
     capacity: { status: 'healthy' },
-    backups: { status: 'healthy', directoryStatus: 'writable', recognizedCount: 1, latestVerifiedBackupAt: '2026-08-27T00:00:00.000Z' },
+    backups: { status: 'healthy', directoryStatus: 'writable', recognizedCount: 1, latestVerifiedBackupAt: '2026-08-27T00:00:00.000Z', retentionRemainingCount: 0 },
     offsiteBackup: {
       enabled: true, status: 'healthy', scheduleEnabled: true,
       lastSuccessAt: '2026-08-27T00:00:00.000Z', lastFailureCode: null,
@@ -68,6 +68,9 @@ async function run() {
     assert(ids(healthy({ capacity: { status: 'critical' } })).includes('DATABASE_STORAGE_CRITICAL'));
     assert(ids(healthy({ backups: { status: 'unavailable', directoryStatus: 'unavailable' } })).includes('LOCAL_BACKUP_DIRECTORY_UNWRITABLE'));
     assert(ids(healthy({ backups: { status: 'missing', directoryStatus: 'writable' } })).includes('LOCAL_BACKUP_MISSING_OR_INVALID'));
+    assert(ids(healthy({ backups: {
+      ...healthy().backups, retentionRemainingCount: 3
+    } })).includes('LOCAL_BACKUP_RETENTION_BACKLOG'));
     assert(ids(healthy({ offsiteBackup: {
       ...healthy().offsiteBackup, retentionRemainingCount: 4
     } })).includes('OFFSITE_RETENTION_BACKLOG'));
