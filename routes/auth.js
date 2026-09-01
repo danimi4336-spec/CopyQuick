@@ -156,17 +156,20 @@ router.get('/auth/google', (req, res, next) => {
   }
   const returnTo = normalizeAuthReturnPath(req.query.next);
   if (returnTo) req.session.authReturnTo = returnTo;
+  else delete req.session.authReturnTo;
   passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
 });
 
 router.get('/auth/google/callback',
   (req, res, next) => {
     if (!passport.isGoogleOAuthConfigured()) {
+      if (req.session) delete req.session.authReturnTo;
       return res.redirect('/login');
     }
 
     passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }, (err, user, info) => {
       if (err) {
+        if (req.session) delete req.session.authReturnTo;
         writeOperationalEvent({
           event: 'auth_google_callback_failed', requestId: req.requestId, method: req.method,
           route: '/auth/google/callback', statusCode: 500, code: 'GOOGLE_AUTHENTICATION_FAILED'
@@ -174,6 +177,7 @@ router.get('/auth/google/callback',
         return res.status(500).send('Authentication error. Please try again.');
       }
       if (!user) {
+        if (req.session) delete req.session.authReturnTo;
         writeOperationalEvent({
           event: 'auth_google_callback_rejected', requestId: req.requestId, method: req.method,
           route: '/auth/google/callback', statusCode: 401, code: 'GOOGLE_USER_UNAVAILABLE'
