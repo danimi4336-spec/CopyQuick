@@ -23,6 +23,7 @@ const {
   inspectBillingCheckoutReturn
 } = require('../lib/billingCheckoutReturn');
 const { resolveOwnedPortalCustomerId } = require('../lib/billingPortalAccess');
+const { billingActionRateLimit } = require('../lib/billingRateLimit');
 
 function logBillingFailure(req, event, code, statusCode) {
   writeOperationalEvent({
@@ -55,7 +56,7 @@ router.get('/subscribe', requireAuth, (req, res) => {
   res.redirect('/pricing');
 });
 
-router.get('/billing/return', requireAuth, async (req, res) => {
+router.get('/billing/return', requireAuth, billingActionRateLimit, async (req, res) => {
   const user = res.locals.user;
   const db = req.app.locals.copyquickDb || getDb();
   const result = await inspectBillingCheckoutReturn({
@@ -72,7 +73,7 @@ router.get('/billing/return', requireAuth, async (req, res) => {
 });
 
 // POST /subscribe (alternate version if using form)
-router.post('/subscribe', requireAuth, async (req, res) => {
+router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) => {
   if (rejectWhenBillingDisabled(res)) return;
 
   const { price, checkoutKey } = req.body;
@@ -180,7 +181,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
 });
 
 // POST /manage
-router.post('/manage', requireAuth, async (req, res) => {
+router.post('/manage', requireAuth, billingActionRateLimit, async (req, res) => {
   if (rejectWhenBillingDisabled(res)) return;
 
   const user = res.locals.user;
