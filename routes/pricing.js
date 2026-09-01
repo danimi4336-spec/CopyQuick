@@ -117,9 +117,22 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
         return res.status(502).send('Billing status could not be verified safely. Please try again later.');
       }
       if (conflictingSession?.status === 'complete') {
-        return res.redirect(303, '/profile?billing=pending');
+        const conflictingSubscriptionId = typeof conflictingSession.subscription === 'string'
+          ? conflictingSession.subscription
+          : conflictingSession.subscription?.id;
+        if (!conflictingSubscriptionId || !canReplaceCompletedCheckoutIntent(db, {
+          userId: user.id,
+          stripeSubscriptionId: conflictingSubscriptionId
+        }) || !clearSubscriptionCheckoutIntentIfMatches(db, {
+          userId: user.id,
+          planTier: conflictingIntent.planTier,
+          idempotencyKey: conflictingIntent.idempotencyKey,
+          stripeCheckoutSessionId: conflictingIntent.stripeCheckoutSessionId
+        })) {
+          return res.redirect(303, '/profile?billing=pending');
+        }
       }
-      if (conflictingSession?.status === 'open') {
+      else if (conflictingSession?.status === 'open') {
         const conflictingRedirect = getTrustedStripeRedirect(conflictingSession.url, 'checkout');
         if (!conflictingRedirect) {
           logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
@@ -127,7 +140,7 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
         }
         return res.redirect(conflictingRedirect);
       }
-      if (conflictingSession?.status !== 'expired' || !clearSubscriptionCheckoutIntentIfMatches(db, {
+      else if (conflictingSession?.status !== 'expired' || !clearSubscriptionCheckoutIntentIfMatches(db, {
         userId: user.id,
         planTier: conflictingIntent.planTier,
         idempotencyKey: conflictingIntent.idempotencyKey,

@@ -52,6 +52,10 @@ Checkout intent. CopyQuick first retrieves the old session and resumes it when
 open, waits for synchronization when complete, and adopts the new price only
 after Stripe reports the old session expired. Pricing configuration rollouts
 therefore cannot create overlapping subscriptions from one checkout history.
+A completed historical Checkout for another plan may be replaced only when its
+exact locally bound subscription is already `canceled` or
+`incomplete_expired`. This mirrors same-plan recovery, while completed active,
+missing, or mismatched relationships remain pending and fail closed.
 For intents created before this cleanup existed, a completed session may rotate
 only when its exact local user/subscription relationship is authoritatively
 `canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,

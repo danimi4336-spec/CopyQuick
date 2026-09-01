@@ -128,6 +128,45 @@ async function run() {
     assert.strictEqual(checkoutCalls.length, 2,
       'an in-flight cross-plan operation must block before its Stripe session ID is recorded');
 
+    db.prepare('DELETE FROM subscription_checkout_intents WHERE user_id=188').run();
+    db.prepare("UPDATE users SET stripe_customer_id='cus_story_3188' WHERE id=188").run();
+    db.prepare(`
+      INSERT INTO subscriptions(
+        user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+        price_id, current_period_start, current_period_end
+      ) VALUES (188, 'cus_story_3188', 'sub_story_3188_terminal', 'canceled', 'pro', ?, ?, ?)
+    `).run(
+      process.env.STRIPE_PRO_PRICE,
+      '2026-08-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'
+    );
+    db.prepare(`
+      INSERT INTO subscription_checkout_intents(
+        user_id, plan_tier, price_id, idempotency_key, stripe_checkout_session_id,
+        expires_at, created_at, updated_at
+      ) VALUES (188, 'pro', ?, 'terminal-pro-188', 'cs_story_3188_terminal', ?, ?, ?)
+    `).run(
+      process.env.STRIPE_PRO_PRICE,
+      '2026-09-02T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z'
+    );
+    retrievedSession = {
+      id: 'cs_story_3188_terminal',
+      status: 'complete',
+      subscription: 'sub_story_3188_terminal'
+    };
+    const terminalRecovery = await post(server, 'unlimited');
+    assert.strictEqual(terminalRecovery.statusCode, 302);
+    assert.strictEqual(terminalRecovery.headers.location,
+      'https://checkout.stripe.com/c/pay/cs_story_3188_unlimited');
+    assert.strictEqual(checkoutCalls.length, 3,
+      'an exact terminal cross-plan subscription may be safely replaced');
+    assert.deepStrictEqual(db.prepare(`
+      SELECT plan_tier, stripe_checkout_session_id
+      FROM subscription_checkout_intents WHERE user_id=188
+    `).get(), {
+      plan_tier: 'unlimited',
+      stripe_checkout_session_id: 'cs_story_3188_unlimited'
+    });
+
     console.log('Story 3.188 Cross-Plan Checkout Exclusivity tests passed');
   } finally {
     await new Promise(resolve => server.close(resolve));
