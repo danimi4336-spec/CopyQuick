@@ -140,6 +140,17 @@ async function withAgent(options, fn) {
 }
 
 async function runRouteTests() {
+  let limiterNow = 0;
+  const boundedLimiter = createContactRateLimiter({ max: 2, windowMs: 1000, maxKeys: 2, now: () => limiterNow });
+  const pass = () => {};
+  boundedLimiter({ ip: '198.51.100.1' }, {}, pass);
+  boundedLimiter({ ip: '198.51.100.2' }, {}, pass);
+  boundedLimiter({ ip: '198.51.100.3' }, {}, pass);
+  assert.strictEqual(boundedLimiter.store.buckets.size, 2, 'contact limiter keys must remain bounded');
+  limiterNow = 1001;
+  boundedLimiter({ ip: '198.51.100.4' }, {}, pass);
+  assert.deepStrictEqual([...boundedLimiter.store.buckets.keys()], ['198.51.100.4'], 'expired contact buckets should be pruned');
+
   await withAgent({}, async ({ agent, sent }) => {
     const token = await getToken(agent);
     const response = await postContact(agent, validBody(), token);
