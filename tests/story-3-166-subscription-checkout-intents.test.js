@@ -29,7 +29,9 @@ async function run() {
     now: new Date(startedAt.getTime() + 60 * 60 * 1000), randomUUID
   });
   assert.strictEqual(first.reused, false);
+  assert.strictEqual(first.requiresInspection, false);
   assert.strictEqual(repeated.reused, true);
+  assert.strictEqual(repeated.requiresInspection, false);
   assert.strictEqual(repeated.idempotencyKey, first.idempotencyKey,
     'separate browser sessions must share one user/plan Stripe operation');
   assert.strictEqual(first.expiresAt.getTime(), startedAt.getTime() + CHECKOUT_INTENT_TTL_MS);
@@ -64,25 +66,35 @@ async function run() {
     userId: 166, planTier: 'pro', priceId: 'price_pro_v2',
     now: new Date(startedAt.getTime() + 2 * 60 * 60 * 1000), randomUUID
   });
-  assert.strictEqual(changedPrice.reused, false);
-  assert.notStrictEqual(changedPrice.idempotencyKey, first.idempotencyKey,
-    'changed Stripe request parameters require a new idempotency key');
+  assert.strictEqual(changedPrice.reused, true);
+  assert.strictEqual(changedPrice.requiresInspection, true);
+  assert.strictEqual(changedPrice.idempotencyKey, first.idempotencyKey,
+    'changed Stripe request parameters must inspect the prior Checkout before rotating');
+
+  const replacedChangedPrice = acquireSubscriptionCheckoutIntent(db, {
+    userId: 166, planTier: 'pro', priceId: 'price_pro_v2',
+    now: new Date(startedAt.getTime() + 2 * 60 * 60 * 1000), randomUUID,
+    allowExpiredReplacement: true
+  });
+  assert.strictEqual(replacedChangedPrice.reused, false);
+  assert.notStrictEqual(replacedChangedPrice.idempotencyKey, first.idempotencyKey);
 
   const expired = acquireSubscriptionCheckoutIntent(db, {
     userId: 166, planTier: 'pro', priceId: 'price_pro_v2',
-    now: new Date(changedPrice.expiresAt.getTime()), randomUUID
+    now: new Date(replacedChangedPrice.expiresAt.getTime()), randomUUID
   });
   assert.strictEqual(expired.reused, true);
   assert.strictEqual(expired.expired, true);
-  assert.strictEqual(expired.idempotencyKey, changedPrice.idempotencyKey,
+  assert.strictEqual(expired.requiresInspection, true);
+  assert.strictEqual(expired.idempotencyKey, replacedChangedPrice.idempotencyKey,
     'expired intents must not rotate before authoritative Stripe inspection');
   const replaced = acquireSubscriptionCheckoutIntent(db, {
     userId: 166, planTier: 'pro', priceId: 'price_pro_v2',
-    now: new Date(changedPrice.expiresAt.getTime()), randomUUID,
+    now: new Date(replacedChangedPrice.expiresAt.getTime()), randomUUID,
     allowExpiredReplacement: true
   });
   assert.strictEqual(replaced.reused, false);
-  assert.notStrictEqual(replaced.idempotencyKey, changedPrice.idempotencyKey);
+  assert.notStrictEqual(replaced.idempotencyKey, replacedChangedPrice.idempotencyKey);
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM subscription_checkout_intents').get().count, 2);
 
   assert.throws(() => acquireSubscriptionCheckoutIntent(db, {

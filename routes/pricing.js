@@ -142,7 +142,7 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
       planTier,
       priceId
     });
-    if (checkoutIntent.expired) {
+    if (checkoutIntent.requiresInspection) {
       if (!checkoutIntent.stripeCheckoutSessionId) {
         logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 409);
         return res.status(409).send('A previous billing request still needs review. Please contact support before trying again.');
