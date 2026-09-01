@@ -41,6 +41,12 @@ by email alone. Their exact Stripe Checkout Session ID must already be recorded
 in a durable checkout intent owned by the resolved local user; otherwise the
 webhook is rejected for entitlement mutation and reconciliation remains the
 authoritative recovery path.
+Only one subscription plan Checkout may be in flight for a user. A request for
+a different plan resumes the already-open authoritative Checkout, reports a
+completed Checkout as pending synchronization, and replaces it only after
+Stripe authoritatively reports that session expired. This cross-plan exclusion
+prevents concurrent Pro and Unlimited sessions from becoming duplicate paid
+subscriptions.
 For intents created before this cleanup existed, a completed session may rotate
 only when its exact local user/subscription relationship is authoritatively
 `canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,

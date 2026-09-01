@@ -4,6 +4,8 @@ const { runMigrationEngine } = require('../db/migrations');
 const {
   CHECKOUT_INTENT_TTL_MS,
   acquireSubscriptionCheckoutIntent,
+  clearSubscriptionCheckoutIntentIfMatches,
+  getConflictingSubscriptionCheckoutIntent,
   recordSubscriptionCheckoutSession
 } = require('../lib/subscriptionCheckoutIntent');
 const { createCheckoutSessionWithClient } = require('../lib/stripe');
@@ -42,6 +44,21 @@ async function run() {
     userId: 166, planTier: 'unlimited', priceId: 'price_unlimited', now: startedAt, randomUUID
   });
   assert.notStrictEqual(otherPlan.idempotencyKey, first.idempotencyKey);
+  assert.deepStrictEqual(getConflictingSubscriptionCheckoutIntent(db, {
+    userId: 166,
+    planTier: 'unlimited'
+  }), {
+    planTier: 'pro',
+    idempotencyKey: first.idempotencyKey,
+    stripeCheckoutSessionId: 'cs_test_checkout_intent_166',
+    expiresAt: first.expiresAt.toISOString()
+  });
+  assert.strictEqual(clearSubscriptionCheckoutIntentIfMatches(db, {
+    userId: 166,
+    planTier: 'pro',
+    idempotencyKey: 'wrong-key',
+    stripeCheckoutSessionId: 'cs_test_checkout_intent_166'
+  }), false);
 
   const changedPrice = acquireSubscriptionCheckoutIntent(db, {
     userId: 166, planTier: 'pro', priceId: 'price_pro_v2',

@@ -16,6 +16,8 @@ const { getDb } = require('../db/database');
 const {
   acquireSubscriptionCheckoutIntent,
   canReplaceCompletedCheckoutIntent,
+  clearSubscriptionCheckoutIntentIfMatches,
+  getConflictingSubscriptionCheckoutIntent,
   recordSubscriptionCheckoutSession
 } = require('../lib/subscriptionCheckoutIntent');
 const {
@@ -101,6 +103,40 @@ router.post('/subscribe', requireAuth, billingActionRateLimit, async (req, res) 
 
   try {
     const planTier = price === 'pro_price' ? 'pro' : price === 'unlimited_price' ? 'unlimited' : price;
+    const conflictingIntent = getConflictingSubscriptionCheckoutIntent(db, {
+      userId: user.id,
+      planTier
+    });
+    if (conflictingIntent) {
+      if (!conflictingIntent.stripeCheckoutSessionId) {
+        return res.redirect(303, '/profile?billing=pending');
+      }
+      const conflictingSession = await retrieveCheckoutSession(conflictingIntent.stripeCheckoutSessionId);
+      if (conflictingSession?.id !== conflictingIntent.stripeCheckoutSessionId) {
+        logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 502);
+        return res.status(502).send('Billing status could not be verified safely. Please try again later.');
+      }
+      if (conflictingSession?.status === 'complete') {
+        return res.redirect(303, '/profile?billing=pending');
+      }
+      if (conflictingSession?.status === 'open') {
+        const conflictingRedirect = getTrustedStripeRedirect(conflictingSession.url, 'checkout');
+        if (!conflictingRedirect) {
+          logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
+          return res.status(502).send('Billing provider returned an invalid response. Please try again.');
+        }
+        return res.redirect(conflictingRedirect);
+      }
+      if (conflictingSession?.status !== 'expired' || !clearSubscriptionCheckoutIntentIfMatches(db, {
+        userId: user.id,
+        planTier: conflictingIntent.planTier,
+        idempotencyKey: conflictingIntent.idempotencyKey,
+        stripeCheckoutSessionId: conflictingIntent.stripeCheckoutSessionId
+      })) {
+        logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 409);
+        return res.status(409).send('Billing status could not be verified safely. Please try again later.');
+      }
+    }
     let checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
       userId: user.id,
       planTier,
