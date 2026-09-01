@@ -2,6 +2,7 @@ const assert = require('assert');
 const {
   DEFAULT_CONNECTION_TIMEOUT_MS,
   DEFAULT_MAX_ATTEMPTS,
+  DEFAULT_MAX_LISTED_OBJECTS,
   DEFAULT_REQUEST_TIMEOUT_MS,
   MAX_ATTEMPTS,
   MAX_CONNECTION_TIMEOUT_MS,
@@ -14,7 +15,8 @@ const defaults = resolveOffsiteTransportConfig({});
 assert.deepStrictEqual(defaults, {
   connectionTimeoutMs: DEFAULT_CONNECTION_TIMEOUT_MS,
   requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
-  maxAttempts: DEFAULT_MAX_ATTEMPTS
+  maxAttempts: DEFAULT_MAX_ATTEMPTS,
+  maxListedObjects: DEFAULT_MAX_LISTED_OBJECTS
 });
 assert.deepStrictEqual(resolveOffsiteTransportConfig({
   OFFSITE_STORAGE_CONNECTION_TIMEOUT_MS: String(MAX_CONNECTION_TIMEOUT_MS),
@@ -23,7 +25,8 @@ assert.deepStrictEqual(resolveOffsiteTransportConfig({
 }), {
   connectionTimeoutMs: MAX_CONNECTION_TIMEOUT_MS,
   requestTimeoutMs: MAX_REQUEST_TIMEOUT_MS,
-  maxAttempts: MAX_ATTEMPTS
+  maxAttempts: MAX_ATTEMPTS,
+  maxListedObjects: DEFAULT_MAX_LISTED_OBJECTS
 });
 assert.deepStrictEqual(resolveOffsiteTransportConfig({
   OFFSITE_STORAGE_CONNECTION_TIMEOUT_MS: String(MAX_CONNECTION_TIMEOUT_MS + 1),

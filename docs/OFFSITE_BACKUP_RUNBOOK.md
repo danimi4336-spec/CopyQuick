@@ -27,6 +27,7 @@ OFFSITE_BACKUP_MAX_ARTIFACT_BYTES=67108864
 OFFSITE_STORAGE_CONNECTION_TIMEOUT_MS=5000
 OFFSITE_STORAGE_REQUEST_TIMEOUT_MS=120000
 OFFSITE_STORAGE_MAX_ATTEMPTS=3
+OFFSITE_STORAGE_MAX_LISTED_OBJECTS=10000
 BACKUP_HEALTH_ALERTS_ENABLED=true
 BACKUP_ALERT_EMAIL=<private operator recipient>
 BACKUP_ALERT_REMINDER_HOURS=24
@@ -43,6 +44,12 @@ overrides are restricted to 1–30 seconds for connection setup, 5–300 seconds
 per request attempt, and 1–5 attempts. Request timeouts raise failures rather
 than only warnings, allowing the scheduler and CLI to record a normalized
 failure instead of hanging indefinitely.
+
+Remote retention listing is capped at 10,000 objects by default and 100,000 at
+most. Pagination tokens may not repeat, and a listing may not exceed 1,000
+pages. Crossing a bound fails before retention deletes anything, preventing a
+polluted prefix or malformed S3 response from causing unbounded memory use or a
+partial-inventory retention decision.
 
 Generate a key outside Render and the object-storage provider:
 
