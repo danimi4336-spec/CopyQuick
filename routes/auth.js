@@ -14,6 +14,7 @@ const {
 } = require('../lib/authSession');
 const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
 const { authSuccessPath, normalizeAuthReturnPath } = require('../lib/authReturnPath');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
 
 const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
 const SIGNUP_INTERNAL_ERROR = 'Unable to create your account. Please try again.';
@@ -55,8 +56,17 @@ function createAuthRouter(options = {}) {
       await establishAuthenticatedSession(req, result.lastInsertRowid);
       res.redirect(authSuccessPath(null, returnTo));
     } catch (err) {
-      console.error('Signup failed.');
       const duplicate = isDuplicateSignupError(err);
+      if (!duplicate) {
+        writeOperationalEvent({
+          event: 'auth_signup_failed',
+          requestId: req.requestId,
+          method: req.method,
+          route: '/signup',
+          statusCode: 500,
+          code: 'AUTH_SIGNUP_FAILED'
+        });
+      }
       res.status(duplicate ? 409 : 500).render('signup', {
         title: 'Sign Up - CopyQuick',
         error: duplicate ? SIGNUP_FAILURE_ERROR : SIGNUP_INTERNAL_ERROR,
@@ -92,7 +102,14 @@ function createAuthRouter(options = {}) {
         res.status(401).render('login', { title: 'Login - CopyQuick', error: LOGIN_FAILURE_ERROR, currentPage: 'login', returnTo });
       }
     } catch (err) {
-      console.error('Login failed.');
+      writeOperationalEvent({
+        event: 'auth_login_failed',
+        requestId: req.requestId,
+        method: req.method,
+        route: '/login',
+        statusCode: 500,
+        code: 'AUTH_LOGIN_FAILED'
+      });
       res.status(500).render('login', { title: 'Login - CopyQuick', error: 'An error occurred. Please try again.', currentPage: 'login', returnTo });
     }
   });
@@ -104,7 +121,14 @@ function createAuthRouter(options = {}) {
       });
       res.redirect('/');
     } catch (err) {
-      console.error('Logout failed.');
+      writeOperationalEvent({
+        event: 'auth_logout_failed',
+        requestId: req.requestId,
+        method: req.method,
+        route: '/logout',
+        statusCode: 500,
+        code: 'AUTH_LOGOUT_FAILED'
+      });
       res.status(500).send('Unable to log out safely. Please try again.');
     }
   });
@@ -120,11 +144,15 @@ router.get('/auth/google', (req, res, next) => {
     return res.status(503).send('Google login is currently unavailable. Please log in with email and password.');
   }
 
-  const hasGoogleCallbackUrl = Boolean(String(process.env.GOOGLE_CALLBACK_URL || '').trim());
-  console.log(`🔀 Google OAuth initiating...`);
-  console.log(`🔀 GOOGLE_CALLBACK_URL: ${hasGoogleCallbackUrl ? 'present' : 'missing'}`);
   if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.startsWith('https://')) {
-    console.error(`❌ GOOGLE_CALLBACK_URL does NOT start with https:// — Google will reject this!`);
+    writeOperationalEvent({
+      event: 'auth_google_configuration_failed',
+      requestId: req.requestId,
+      method: req.method,
+      route: '/auth/google',
+      statusCode: 500,
+      code: 'GOOGLE_CALLBACK_URL_INSECURE'
+    });
   }
   const returnTo = normalizeAuthReturnPath(req.query.next);
   if (returnTo) req.session.authReturnTo = returnTo;
@@ -139,25 +167,32 @@ router.get('/auth/google/callback',
 
     passport.authenticate('google', { failureRedirect: '/login', failureMessage: true }, (err, user, info) => {
       if (err) {
-        console.error('❌ Google OAuth callback error.');
+        writeOperationalEvent({
+          event: 'auth_google_callback_failed', requestId: req.requestId, method: req.method,
+          route: '/auth/google/callback', statusCode: 500, code: 'GOOGLE_AUTHENTICATION_FAILED'
+        });
         return res.status(500).send('Authentication error. Please try again.');
       }
       if (!user) {
-        console.error('❌ Google OAuth callback: no user returned.');
+        writeOperationalEvent({
+          event: 'auth_google_callback_rejected', requestId: req.requestId, method: req.method,
+          route: '/auth/google/callback', statusCode: 401, code: 'GOOGLE_USER_UNAVAILABLE'
+        });
         return res.redirect('/login');
       }
-      console.log('✅ Google OAuth success.');
       const returnTo = normalizeAuthReturnPath(req.session?.authReturnTo);
       req.logIn(user, (loginErr) => {
         if (loginErr) {
-          console.error('❌ Passport login error.');
+          writeOperationalEvent({
+            event: 'auth_google_session_failed', requestId: req.requestId, method: req.method,
+            route: '/auth/google/callback', statusCode: 500, code: 'GOOGLE_SESSION_FAILED'
+          });
           return res.status(500).send('Session error. Please try again.');
         }
         req.session.userId = user.id;
         delete req.session.authReturnTo;
         const dbCb = getDb();
         const hasGoal = dbCb.prepare('SELECT builder_goal FROM users WHERE id = ?').get(user.id);
-        console.log('✅ Session set after Google OAuth.');
         return res.redirect(authSuccessPath(hasGoal, returnTo));
       });
     })(req, res, next);

@@ -222,8 +222,7 @@ async function run() {
     }
   });
   assertNoCredentialLeak(configuredRoute.output);
-  assert.match(configuredRoute.output, /Google OAuth initiating/);
-  assert.match(configuredRoute.output, /GOOGLE_CALLBACK_URL:\s+present/);
+  assert.doesNotMatch(configuredRoute.output, /Google OAuth initiating|GOOGLE_CALLBACK_URL/);
   assert.strictEqual(configuredRoute.result.res.statusCode, 302);
   assert.match(configuredRoute.result.res.headers.location, /^https:\/\/accounts\.google\.com\//);
 
