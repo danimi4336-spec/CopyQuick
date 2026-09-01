@@ -15,6 +15,7 @@ const { writeOperationalEvent } = require('../lib/operationalLogger');
 const { getDb } = require('../db/database');
 const {
   acquireSubscriptionCheckoutIntent,
+  canReplaceCompletedCheckoutIntent,
   recordSubscriptionCheckoutSession
 } = require('../lib/subscriptionCheckoutIntent');
 
@@ -89,9 +90,23 @@ router.post('/subscribe', requireAuth, async (req, res) => {
       }
       const previousSession = await retrieveCheckoutSession(checkoutIntent.stripeCheckoutSessionId);
       if (previousSession?.status === 'complete') {
-        return res.redirect(303, '/profile?billing=pending');
+        const previousSubscriptionId = typeof previousSession.subscription === 'string'
+          ? previousSession.subscription
+          : previousSession.subscription?.id;
+        if (!canReplaceCompletedCheckoutIntent(db, {
+          userId: user.id,
+          stripeSubscriptionId: previousSubscriptionId
+        })) {
+          return res.redirect(303, '/profile?billing=pending');
+        }
+        checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
+          userId: user.id,
+          planTier,
+          priceId,
+          allowExpiredReplacement: true
+        });
       }
-      if (previousSession?.status === 'open') {
+      else if (previousSession?.status === 'open') {
         const previousRedirect = getTrustedStripeRedirect(previousSession.url, 'checkout');
         if (!previousRedirect) {
           logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
@@ -99,16 +114,18 @@ router.post('/subscribe', requireAuth, async (req, res) => {
         }
         return res.redirect(previousRedirect);
       }
-      if (previousSession?.status !== 'expired') {
+      else if (previousSession?.status !== 'expired') {
         logBillingFailure(req, 'billing_checkout_state_unresolved', 'STRIPE_CHECKOUT_STATE_UNKNOWN', 502);
         return res.status(502).send('Billing status could not be verified safely. Please try again later.');
       }
-      checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
-        userId: user.id,
-        planTier,
-        priceId,
-        allowExpiredReplacement: true
-      });
+      else {
+        checkoutIntent = acquireSubscriptionCheckoutIntent(db, {
+          userId: user.id,
+          planTier,
+          priceId,
+          allowExpiredReplacement: true
+        });
+      }
     }
     const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCheckoutSession(

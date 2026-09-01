@@ -31,6 +31,11 @@ state, it retires that user's now-obsolete Checkout intents. Subscriber guards s
 duplicate active subscriptions, while a customer who later cancels can start a
 fresh same-plan Checkout instead of being trapped behind the historical
 completed session.
+For intents created before this cleanup existed, a completed session may rotate
+only when its exact local user/subscription relationship is authoritatively
+`canceled` or `incomplete_expired`. Active, trialing, past-due, paused, unpaid,
+missing, malformed, and mismatched states remain fail-closed to prevent a
+duplicate paid subscription.
 
 ## Commands
 
