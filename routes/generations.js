@@ -11,7 +11,7 @@ const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
-const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
+const { getGroupsWithJourneys, getAllJourneys } = require('../lib/businessJourneys');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
@@ -271,21 +271,6 @@ router.get('/dashboard', requireAuth, (req, res) => {
       res.status(500).send('Dashboard error. Please check server logs.');
     }
   }
-});
-
-// ====== Update Builder Goal ======
-router.post('/dashboard/update-goal', requireAuth, (req, res) => {
-  const goal = typeof req.body.goal === 'string' ? req.body.goal.trim() : '';
-  const isAjax = req.xhr || req.headers.accept?.includes('json');
-  if (!getJourney(goal)) {
-    if (isAjax) return res.status(400).json({ error: 'Invalid business journey.' });
-    return res.status(400).send('Invalid business journey.');
-  }
-
-  const db = getDb();
-  db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
-  if (isAjax) return res.json({ success: true, goal });
-  res.redirect('/dashboard');
 });
 
 // ====== Generate Copy ======

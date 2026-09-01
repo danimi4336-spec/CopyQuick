@@ -397,8 +397,8 @@ async function run() {
       headers: { Accept: 'application/json', 'X-CSRF-Token': token },
       body: { goal: 'start_store' }
     });
-    assert.strictEqual(valid.res.statusCode, 200);
-    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'start_store');
+    assert.strictEqual(valid.res.statusCode, 404);
+    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');
 
     token = await getToken(agent);
     const invalidGoal = await request(agent, 'POST', '/dashboard/update-goal', {
@@ -406,8 +406,8 @@ async function run() {
       headers: { Accept: 'application/json', 'X-CSRF-Token': token },
       body: { goal: 'operator_only_journey' }
     });
-    assert.strictEqual(invalidGoal.res.statusCode, 400);
-    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'start_store');
+    assert.strictEqual(invalidGoal.res.statusCode, 404);
+    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');
 
     token = await getToken(agent);
     const malformedGoal = await request(agent, 'POST', '/dashboard/update-goal', {
@@ -415,8 +415,8 @@ async function run() {
       headers: { Accept: 'application/json', 'X-CSRF-Token': token },
       body: { goal: { id: 'start_store' } }
     });
-    assert.strictEqual(malformedGoal.res.statusCode, 400);
-    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'start_store');
+    assert.strictEqual(malformedGoal.res.statusCode, 404);
+    assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');
 
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/logout', {
