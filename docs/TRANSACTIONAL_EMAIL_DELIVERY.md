@@ -9,10 +9,14 @@ Each admin notification and customer acknowledgement receives a distinct
 provider idempotency key. Transient failures are retried up to three times by
 default with bounded exponential backoff, always using the same key so an
 ambiguous retry cannot intentionally create duplicate mail. Permanent provider
-rejections are not retried. Configure the bounds with:
+rejections are not retried. Each provider attempt also has a fixed duration
+bound; a timeout is treated as an unavailable provider and retried with the
+same idempotency key. The same controls protect password-reset delivery.
+Configure the bounds with:
 
 - `EMAIL_DELIVERY_MAX_ATTEMPTS` (default `3`)
 - `EMAIL_DELIVERY_RETRY_BASE_MS` (default `250`)
+- `EMAIL_DELIVERY_TIMEOUT_MS` (default `10000`)
 
 The support notification is authoritative. If it succeeds but the customer
 acknowledgement exhausts retries, the contact submission remains successful and

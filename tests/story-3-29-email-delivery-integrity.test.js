@@ -54,6 +54,27 @@ async function run() {
   }), error => error.code === 'EMAIL_PROVIDER_UNAVAILABLE');
   assert.strictEqual(ambiguousCalls, 2, 'an ambiguous provider response must never be treated as accepted delivery');
 
+  const timeoutCalls = [];
+  const timeoutDelays = [];
+  const timeoutLogs = [];
+  await assert.rejects(() => sendEmailWithRetry({
+    client: { emails: { send: async (payload, options) => {
+      timeoutCalls.push({ payload, options });
+      return new Promise(() => {});
+    } } },
+    payload: { subject: 'Bounded attempt' }, idempotencyKey: 'timeout-key', operation: 'password_reset',
+    maxAttempts: 2, retryBaseMs: 1, attemptTimeoutMs: 25,
+    sleep: async milliseconds => timeoutDelays.push(milliseconds),
+    setTimeoutFn: callback => { callback(); return 1; }, clearTimeoutFn: () => {},
+    logger: event => timeoutLogs.push(event)
+  }), error => error.code === 'EMAIL_PROVIDER_UNAVAILABLE');
+  assert.strictEqual(timeoutCalls.length, 2, 'timed-out attempts should retry only within the configured bound');
+  assert.deepStrictEqual(timeoutCalls.map(call => call.options.idempotencyKey), ['timeout-key', 'timeout-key']);
+  assert.deepStrictEqual(timeoutDelays, [1]);
+  assert.deepStrictEqual(timeoutLogs, [{
+    event: 'email_delivery_failed', operation: 'password_reset', code: 'EMAIL_PROVIDER_UNAVAILABLE'
+  }]);
+
   const sent = [];
   const partialLogs = [];
   const partial = await sendContactFormEmails(contact(), {
