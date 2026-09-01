@@ -4,6 +4,11 @@ Stripe is CopyQuick's billing authority. SQLite stores the operational subscript
 
 CopyQuick currently uses Stripe Node SDK `22.2.2` without an application-level `apiVersion` override, so the Stripe account's configured API version governs returned subscription fields. The policy validates every required field before mutation and fails closed if that contract is incomplete.
 
+Production startup requires a Stripe API key, a webhook signing secret, and two
+valid, distinct configured price IDs. An incomplete billing configuration fails
+before the HTTP service or background workers start; errors identify only the
+missing configuration field and never print configured secret values.
+
 ## Entitlement policy
 
 - `active` and `trialing`: entitled to the recognized Stripe price's CopyQuick plan.

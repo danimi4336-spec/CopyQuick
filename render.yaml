@@ -13,6 +13,8 @@ services:
         generateValue: true
       - key: STRIPE_KEY
         sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: PUBLIC_APP_ORIGIN
         sync: false
       - key: STRIPE_PRO_PRICE
