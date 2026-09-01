@@ -25,7 +25,7 @@ const { contentTypes } = require('./lib/contentTypes');
 const { createAuthenticatedUserMiddleware } = require('./lib/authUser');
 const { createGlobalErrorHandler } = require('./lib/errorHandler');
 const { createCsrfProtection } = require('./lib/csrf');
-const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
+const { createSessionConfig } = require('./lib/sessionConfig');
 const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
 const { createProductionWorker } = require('./lib/productionWorker');
 const { DEFAULT_LEASE_MS, acquireRuntimeLock, startRuntimeLockHeartbeat } = require('./lib/databaseRuntimeLock');
@@ -67,13 +67,11 @@ validateBillingReturnOrigin(process.env);
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
 const hasGoogleClientSecret = Boolean(String(process.env.GOOGLE_CLIENT_SECRET || '').trim());
-const hasGoogleCallbackUrl = Boolean(String(process.env.GOOGLE_CALLBACK_URL || '').trim());
-console.log('🔐 Auth Configuration:');
-console.log(`  GOOGLE_CLIENT_ID:     ${hasGoogleClientId ? 'present' : 'missing'}`);
-console.log(`  GOOGLE_CLIENT_SECRET: ${hasGoogleClientSecret ? 'present' : 'missing'}`);
-console.log(`  GOOGLE_CALLBACK_URL:  ${hasGoogleCallbackUrl ? 'present' : 'missing'}`);
-console.log(`  Google OAuth:         ${hasGoogleClientId && hasGoogleClientSecret ? 'configured' : 'disabled'}`);
-console.log(`  SESSION_SECRET:       ${getSessionSecretStatus(process.env)}`);
+writeOperationalEvent({
+  event: 'auth_configuration_loaded',
+  operation: 'google_oauth',
+  outcome: hasGoogleClientId && hasGoogleClientSecret ? 'configured' : 'disabled'
+});
 
 // Validate storage before opening SQLite. Production never falls back to a local path.
 const databaseStorage = getDatabaseStorage();
@@ -93,10 +91,11 @@ let stopRuntimeLockHeartbeat = startRuntimeLockHeartbeat(releaseDatabaseRuntimeL
   }
 });
 const databaseDiagnostics = safeStorageDiagnostics(databaseStorage);
-console.log('Database storage:');
-console.log(`  mode:     ${databaseDiagnostics.mode}`);
-if (databaseDiagnostics.path) console.log(`  path:     ${databaseDiagnostics.path}`);
-console.log(`  writable: ${databaseDiagnostics.writable ? 'yes' : 'no'}`);
+writeOperationalEvent({
+  event: 'database_storage_ready',
+  operation: databaseDiagnostics.mode,
+  outcome: databaseDiagnostics.writable ? 'writable' : 'read_only'
+});
 
 // Correlation starts before every route, including raw-body Stripe webhooks.
 app.use(createRequestContextMiddleware({ logger: writeOperationalEvent }));

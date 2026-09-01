@@ -235,10 +235,11 @@ async function run() {
 
   const startupOutput = await runServerStartupSmoke();
   assertNoCredentialLeak(startupOutput);
-  assert.match(startupOutput, /GOOGLE_CLIENT_ID:\s+present/);
-  assert.match(startupOutput, /GOOGLE_CLIENT_SECRET:\s+present/);
-  assert.match(startupOutput, /Google OAuth:\s+configured/);
-  assert.match(startupOutput, /SESSION_SECRET:\s+present/);
+  assert.match(startupOutput, /"event":"auth_configuration_loaded"/);
+  assert.match(startupOutput, /"operation":"google_oauth"/);
+  assert.match(startupOutput, /"outcome":"configured"/);
+  assert.match(startupOutput, /"event":"database_storage_ready"/);
+  assert.doesNotMatch(startupOutput, /copyquick-bug-002o-startup\.sqlite/);
 
   console.log('BUG-002O OAuth credential logging tests passed');
 }
