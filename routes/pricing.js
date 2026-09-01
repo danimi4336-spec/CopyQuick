@@ -6,6 +6,18 @@ const { getPublicAppOrigin } = require('../lib/publicAppOrigin');
 const { issueCheckoutKeys, validateCheckoutKey } = require('../lib/checkoutIdempotency');
 const { canStartSubscriptionCheckout } = require('../lib/subscriptionCheckoutPolicy');
 const { getTrustedStripeRedirect } = require('../lib/stripeRedirect');
+const { writeOperationalEvent } = require('../lib/operationalLogger');
+
+function logBillingFailure(req, event, code, statusCode) {
+  writeOperationalEvent({
+    event,
+    requestId: req.requestId,
+    method: req.method,
+    route: req.route?.path || 'unmatched',
+    statusCode,
+    code
+  });
+}
 
 function rejectWhenBillingDisabled(res) {
   if (isBillingEnabled !== false) return false;
@@ -64,7 +76,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
     );
     const redirectUrl = getTrustedStripeRedirect(session.url, 'checkout');
     if (!redirectUrl) {
-      console.error('Checkout session returned an invalid redirect URL.');
+      logBillingFailure(req, 'billing_checkout_redirect_failed', 'STRIPE_CHECKOUT_REDIRECT_INVALID', 502);
       return res.status(502).send('Billing provider returned an invalid response. Please try again.');
     }
     res.redirect(redirectUrl);
@@ -72,7 +84,7 @@ router.post('/subscribe', requireAuth, async (req, res) => {
     if (err?.code === 'BILLING_DISABLED') {
       return res.status(503).send('Billing is unavailable in local development until STRIPE_KEY is configured.');
     }
-    console.error('Checkout session creation failed.');
+    logBillingFailure(req, 'billing_checkout_failed', 'STRIPE_CHECKOUT_SESSION_FAILED', 500);
     res.status(500).send('Error creating checkout session.');
   }
 });
@@ -95,7 +107,7 @@ router.post('/manage', requireAuth, async (req, res) => {
     );
     const redirectUrl = getTrustedStripeRedirect(session.url, 'portal');
     if (!redirectUrl) {
-      console.error('Customer portal returned an invalid redirect URL.');
+      logBillingFailure(req, 'billing_portal_redirect_failed', 'STRIPE_PORTAL_REDIRECT_INVALID', 502);
       return res.status(502).send('Billing provider returned an invalid response. Please try again.');
     }
     res.redirect(redirectUrl);
@@ -103,7 +115,7 @@ router.post('/manage', requireAuth, async (req, res) => {
     if (err?.code === 'BILLING_DISABLED') {
       return res.status(503).send('Billing is unavailable in local development until STRIPE_KEY is configured.');
     }
-    console.error('Customer portal session creation failed.');
+    logBillingFailure(req, 'billing_portal_failed', 'STRIPE_PORTAL_SESSION_FAILED', 500);
     res.status(500).send('Error creating portal session.');
   }
 });
