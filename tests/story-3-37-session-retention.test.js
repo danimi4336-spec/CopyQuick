@@ -71,12 +71,14 @@ async function run() {
   const TestStore = require('../lib/sessionStore');
 
   try {
+    const operationalEvents = [];
     insertSession(storeDb, 'abandoned-one', '2026-08-01T00:00:00.000Z');
     insertSession(storeDb, 'abandoned-two', '2026-08-02T00:00:00.000Z');
     const store = new TestStore({
       pruneEveryWrites: 2,
       pruneLimit: 1,
-      now: () => now
+      now: () => now,
+      operationalLogger: event => operationalEvents.push(event)
     });
 
     await callSet(store, 'current-one', {
@@ -115,6 +117,22 @@ async function run() {
     assert.strictEqual(await callGet(store, 'invalid-shape'), null);
     assert.strictEqual(storeDb.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id IN ('corrupt-json', 'invalid-shape')").get().count, 0);
     assert.deepStrictEqual(await callGet(store, 'valid-session'), { userId: 5, cookie: {} });
+    assert.deepStrictEqual(operationalEvents, [
+      { event: 'session_data_rejected', statusCode: 422, code: 'SESSION_DATA_INVALID', outcome: 'discarded' },
+      { event: 'session_data_rejected', statusCode: 422, code: 'SESSION_DATA_INVALID', outcome: 'discarded' }
+    ]);
+
+    const cleanupEvents = [];
+    const cleanupFailureStore = new TestStore({
+      pruneEveryWrites: 1,
+      now: () => new Date('invalid'),
+      operationalLogger: event => cleanupEvents.push(event)
+    });
+    await callSet(cleanupFailureStore, 'cleanup-still-saves', { cookie: {}, userId: 6 });
+    assert.strictEqual(storeDb.prepare('SELECT COUNT(*) AS count FROM sessions WHERE id = ?').get('cleanup-still-saves').count, 1);
+    assert.deepStrictEqual(cleanupEvents, [
+      { event: 'session_cleanup_failed', code: 'SESSION_CLEANUP_FAILED' }
+    ]);
 
     console.log('Story 3.37 bounded session retention tests passed');
   } finally {
