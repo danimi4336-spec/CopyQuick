@@ -22,7 +22,7 @@ const { createPasswordRecoveryRouter } = require('./routes/passwordRecovery');
 const { createHealthRouter } = require('./routes/health');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
-const { getAuthenticatedUserById } = require('./lib/authUser');
+const { createAuthenticatedUserMiddleware } = require('./lib/authUser');
 const { createGlobalErrorHandler } = require('./lib/errorHandler');
 const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig, getSessionSecretStatus } = require('./lib/sessionConfig');
@@ -104,18 +104,9 @@ app.use(passport.session());
 // Central CSRF protection for browser-originated state changes.
 app.use(createCsrfProtection());
 
-// Provide user to all templates
-app.use((req, res, next) => {
-  const userId = req.session?.userId || req.session?.passport?.user || req.user?.id;
-  if (userId) {
-    const db = getDb();
-    const user = getAuthenticatedUserById(db, userId);
-    res.locals.user = user;
-  } else {
-    res.locals.user = null;
-  }
-  next();
-});
+// Resolve authenticated identity once. Sessions whose user no longer exists
+// are revoked before protected routes can treat a stale user ID as valid.
+app.use(createAuthenticatedUserMiddleware({ getDb }));
 
 // Wrapper for layout
 app.use((req, res, next) => {
