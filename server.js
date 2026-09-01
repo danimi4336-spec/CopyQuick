@@ -47,6 +47,18 @@ const {
   BROWSER_FORM_PARAMETER_LIMIT
 } = require('./lib/requestBodyLimits');
 
+function operationalCode(value, fallback) {
+  return typeof value === 'string' && /^[A-Z0-9_:-]+$/.test(value) ? value : fallback;
+}
+
+function logRuntimeLockReleaseFailure(release, operation) {
+  writeOperationalEvent({
+    event: 'database_runtime_lock_release_failed',
+    operation,
+    code: operationalCode(release?.code, release?.ownershipLost ? 'OWNERSHIP_LOST' : 'RUNTIME_LOCK_RELEASE_FAILED')
+  });
+}
+
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
 configureBrowserSecurity(app);
@@ -73,7 +85,10 @@ const releaseDatabaseRuntimeLock = acquireRuntimeLock(databaseStorage.databasePa
 });
 let stopRuntimeLockHeartbeat = startRuntimeLockHeartbeat(releaseDatabaseRuntimeLock, {
   onFailure: () => {
-    console.error('Database runtime lock heartbeat failed. Shutting down to preserve restore safety.');
+    writeOperationalEvent({
+      event: 'database_runtime_lock_heartbeat_failed',
+      code: 'RUNTIME_LOCK_HEARTBEAT_FAILED'
+    });
     shutdown('runtime-lock-failure');
   }
 });
@@ -212,7 +227,7 @@ async function shutdown(signal) {
   stopRuntimeLockHeartbeat();
   const release = releaseDatabaseRuntimeLock();
   if (!release.released || release.cleanupFailed) {
-    console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
+    logRuntimeLockReleaseFailure(release, 'shutdown');
   }
   process.exit(0);
 }
@@ -269,11 +284,14 @@ async function startApplication() {
 }
 
 startApplication().catch(error => {
-  console.error(`Database startup failed: ${error.code || 'DATABASE_STARTUP_FAILED'}`);
+  writeOperationalEvent({
+    event: 'application_startup_failed',
+    code: operationalCode(error?.code, 'DATABASE_STARTUP_FAILED')
+  });
   stopRuntimeLockHeartbeat();
   const release = releaseDatabaseRuntimeLock();
   if (!release.released || release.cleanupFailed) {
-    console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
+    logRuntimeLockReleaseFailure(release, 'startup_failure');
   }
   process.exitCode = 1;
 });

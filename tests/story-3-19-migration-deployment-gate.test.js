@@ -257,7 +257,7 @@ async function run() {
         timeout: 10000
       });
       assert.strictEqual(result.status, 1, result.stderr);
-      assert.match(result.stderr, /Database startup failed: MIGRATION_INCOMPATIBLE/);
+      assert.match(result.stderr, /"event":"application_startup_failed","code":"MIGRATION_INCOMPATIBLE"/);
       assert.doesNotMatch(result.stdout + result.stderr, new RegExp(value.directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       assert.strictEqual(fs.existsSync(`${value.databasePath}.runtime-lock`), false);
       value.db = new Database(value.databasePath);
