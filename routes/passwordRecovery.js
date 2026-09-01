@@ -9,11 +9,20 @@ const { destroyAuthenticatedSession } = require('../lib/authSession');
 const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
 
 const GENERIC_REQUEST_MESSAGE = 'If an account exists for that email, a password reset link has been sent.';
+const DEFAULT_REQUEST_RESPONSE_DELAY_MS = 750;
+
+function sleep(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
 
 function createPasswordRecoveryRouter(options = {}) {
   const router = express.Router();
   const database = options.getDb || getDb;
   const sendResetEmail = options.sendPasswordResetEmail || sendPasswordResetEmail;
+  const responseDelayMs = Number.isFinite(options.responseDelayMs)
+    ? Math.max(0, options.responseDelayMs)
+    : DEFAULT_REQUEST_RESPONSE_DELAY_MS;
+  const wait = options.sleep || sleep;
   const requestBuckets = createExpiringBucketStore({
     windowMs: options.windowMs || 60 * 60 * 1000,
     maxKeys: options.maxKeys,
@@ -42,11 +51,17 @@ function createPasswordRecoveryRouter(options = {}) {
       if (user) {
         const token = createPasswordResetToken(user, { env: options.env || process.env });
         const origin = options.publicOrigin || getPublicAppOrigin({ env: options.env || process.env, req });
-        await sendResetEmail({ email: user.email, resetUrl: `${origin}/reset-password?token=${encodeURIComponent(token)}` }, options.emailOptions);
+        void Promise.resolve(sendResetEmail({
+          email: user.email,
+          resetUrl: `${origin}/reset-password?token=${encodeURIComponent(token)}`
+        }, options.emailOptions)).catch(() => {
+          console.warn('Password reset request could not be delivered.');
+        });
       }
     } catch (err) {
       console.warn('Password reset request could not be delivered.');
     }
+    await wait(responseDelayMs);
     res.render('forgot-password', {
       title: 'Reset Password - CopyQuick', currentPage: 'login', message: GENERIC_REQUEST_MESSAGE
     });
@@ -92,4 +107,8 @@ function createPasswordRecoveryRouter(options = {}) {
   return router;
 }
 
-module.exports = { GENERIC_REQUEST_MESSAGE, createPasswordRecoveryRouter };
+module.exports = {
+  DEFAULT_REQUEST_RESPONSE_DELAY_MS,
+  GENERIC_REQUEST_MESSAGE,
+  createPasswordRecoveryRouter
+};
