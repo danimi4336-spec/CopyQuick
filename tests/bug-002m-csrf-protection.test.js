@@ -52,11 +52,11 @@ function installMocks() {
     exports: {
       createCheckoutSession: async (customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId) => {
         checkoutCalls.push({ customerEmail, priceId, successUrl, cancelUrl, idempotencyKey, userId });
-        return { url: '/mock-checkout-session' };
+        return { url: 'https://checkout.stripe.com/c/pay/mock-session' };
       },
       createCustomerPortalSession: async (customerId, returnUrl) => {
         portalCalls.push({ customerId, returnUrl });
-        return { url: '/mock-portal-session' };
+        return { url: 'https://billing.stripe.com/p/session/mock-session' };
       },
       stripe: {
         webhooks: {
@@ -347,7 +347,7 @@ async function run() {
       body: { price: 'pro', checkoutKey, _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 302);
-    assert.strictEqual(valid.res.headers.location, '/mock-checkout-session');
+    assert.strictEqual(valid.res.headers.location, 'https://checkout.stripe.com/c/pay/mock-session');
     assert.strictEqual(mocks.checkoutCalls.length, checkoutBeforeGet + 1);
     assert.strictEqual(mocks.checkoutCalls.at(-1).priceId, process.env.STRIPE_PRO_PRICE);
     assert.match(mocks.checkoutCalls.at(-1).idempotencyKey, /^checkout:\d+:/);
@@ -359,7 +359,7 @@ async function run() {
       body: { _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 302);
-    assert.strictEqual(valid.res.headers.location, '/mock-portal-session');
+    assert.strictEqual(valid.res.headers.location, 'https://billing.stripe.com/p/session/mock-session');
     assert.strictEqual(mocks.portalCalls.at(-1).customerId, 'cus_owner_123');
 
     token = await getToken(agent);

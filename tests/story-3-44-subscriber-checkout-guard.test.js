@@ -22,9 +22,9 @@ require.cache[stripeModuleId] = {
     isBillingEnabled: true,
     createCheckoutSession: async (...args) => {
       checkoutCalls.push(args);
-      return { url: '/checkout' };
+      return { url: 'https://checkout.stripe.com/c/pay/test-session' };
     },
-    createCustomerPortalSession: async () => ({ url: '/portal' })
+    createCustomerPortalSession: async () => ({ url: 'https://billing.stripe.com/p/session/test-session' })
   }
 };
 
@@ -80,7 +80,7 @@ async function run() {
 
     const free = await post(server, { plan_tier: 'free' });
     assert.strictEqual(free.statusCode, 302);
-    assert.strictEqual(free.headers.location, '/checkout');
+    assert.strictEqual(free.headers.location, 'https://checkout.stripe.com/c/pay/test-session');
     assert.strictEqual(checkoutCalls.length, 1);
   } finally {
     await new Promise(resolve => server.close(resolve));

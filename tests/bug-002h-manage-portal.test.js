@@ -28,7 +28,7 @@ require.cache[stripeModuleId] = {
     },
     createCustomerPortalSession: async (customerId, returnUrl) => {
       portalCalls.push({ customerId, returnUrl });
-      return { url: '/stripe-portal-session' };
+      return { url: 'https://billing.stripe.com/p/session/test-session' };
     },
     stripe: {}
   }
@@ -89,7 +89,7 @@ async function run() {
   try {
     const paidResponse = await request(server, 'POST', '/manage');
     assert.strictEqual(paidResponse.statusCode, 302);
-    assert.strictEqual(paidResponse.headers.location, '/stripe-portal-session');
+    assert.strictEqual(paidResponse.headers.location, 'https://billing.stripe.com/p/session/test-session');
     assert.strictEqual(portalCalls.length, 1);
     assert.strictEqual(portalCalls[0].customerId, 'cus_paid_123');
     assert.match(portalCalls[0].returnUrl, /^http:\/\/127\.0\.0\.1:\d+\/profile$/);
