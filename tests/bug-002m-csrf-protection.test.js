@@ -184,6 +184,12 @@ async function run() {
     INSERT INTO users (email, password_hash, name, plan_tier, monthly_limit, generations_used, stripe_customer_id)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run('owner@example.com', passwordHash, 'Owner', 'pro', 200, 0, 'cus_owner_123').lastInsertRowid;
+  db.prepare(`
+    INSERT INTO subscriptions(
+      user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+      price_id, current_period_start, current_period_end
+    ) VALUES (?, 'cus_owner_123', 'sub_owner_123', 'active', 'pro', ?, ?, ?)
+  `).run(userId, process.env.STRIPE_PRO_PRICE, '2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
   const generationId = insertGeneration(db, userId);
   let currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 

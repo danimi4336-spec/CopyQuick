@@ -63,6 +63,12 @@ async function run() {
     INSERT INTO users (email, name, plan_tier, generations_used, monthly_limit, stripe_customer_id)
     VALUES (?, ?, ?, ?, ?, ?)
   `).run('paid@example.com', 'Paid User', 'pro', 7, 200, 'cus_paid_123').lastInsertRowid;
+  db.prepare(`
+    INSERT INTO subscriptions(
+      user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+      price_id, current_period_start, current_period_end
+    ) VALUES (?, 'cus_paid_123', 'sub_paid_123', 'active', 'pro', 'price_pro', ?, ?)
+  `).run(paidUserId, '2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
 
   const loadedPaidUser = getAuthenticatedUserById(db, paidUserId);
   assert.strictEqual(loadedPaidUser.email, 'paid@example.com');
@@ -96,6 +102,13 @@ async function run() {
     assert.match(portalCalls[0].returnUrl, /^http:\/\/127\.0\.0\.1:\d+\/profile$/);
 
     portalCalls.length = 0;
+    db.prepare("UPDATE users SET stripe_customer_id='cus_wrong_123' WHERE id=?").run(paidUserId);
+    currentUser = getAuthenticatedUserById(db, paidUserId);
+    const mismatchedResponse = await request(server, 'POST', '/manage');
+    assert.strictEqual(mismatchedResponse.statusCode, 302);
+    assert.strictEqual(mismatchedResponse.headers.location, '/pricing');
+    assert.deepStrictEqual(portalCalls, [], 'a mismatched cached customer must never open a billing portal');
+
     currentUser = {
       ...loadedPaidUser,
       id: paidUserId + 1,

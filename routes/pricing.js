@@ -22,6 +22,7 @@ const {
   createBillingReturnNotice,
   inspectBillingCheckoutReturn
 } = require('../lib/billingCheckoutReturn');
+const { resolveOwnedPortalCustomerId } = require('../lib/billingPortalAccess');
 
 function logBillingFailure(req, event, code, statusCode) {
   writeOperationalEvent({
@@ -183,15 +184,17 @@ router.post('/manage', requireAuth, async (req, res) => {
   if (rejectWhenBillingDisabled(res)) return;
 
   const user = res.locals.user;
-  
-  if (!user.stripe_customer_id) {
+  const db = req.app.locals.copyquickDb || getDb();
+  const portalCustomerId = resolveOwnedPortalCustomerId(db, user);
+  if (!portalCustomerId) {
+    logBillingFailure(req, 'billing_portal_relationship_rejected', 'STRIPE_CUSTOMER_RELATIONSHIP_INVALID', 302);
     return res.redirect('/pricing');
   }
 
   try {
     const publicOrigin = getPublicAppOrigin({ req });
     const session = await createCustomerPortalSession(
-      user.stripe_customer_id,
+      portalCustomerId,
       `${publicOrigin}/profile`
     );
     const redirectUrl = getTrustedStripeRedirect(session.url, 'portal');

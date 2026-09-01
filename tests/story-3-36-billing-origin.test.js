@@ -98,6 +98,12 @@ async function run() {
   db.pragma('foreign_keys = ON');
   runMigrationEngine(db, { logger: () => {} });
   db.prepare('INSERT INTO users(id, email, name) VALUES (?, ?, ?)').run(36, 'owner@example.com', 'Owner');
+  db.prepare(`
+    INSERT INTO subscriptions(
+      user_id, stripe_customer_id, stripe_subscription_id, status, plan_tier,
+      price_id, current_period_start, current_period_end
+    ) VALUES (36, 'cus_safe', 'sub_safe', 'active', 'pro', 'price_pro', ?, ?)
+  `).run('2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z');
   app.locals.copyquickDb = db;
   app.use(express.urlencoded({ extended: true }));
   app.use((req, res, next) => {
