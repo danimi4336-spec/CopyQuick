@@ -151,7 +151,7 @@ async function runOAuthLoggingTest(db) {
         id: 'BUG002U_GOOGLE_PROFILE_ID_MARKER',
         displayName: 'BUG002U_NAME_MARKER',
         name: { givenName: 'BUG002U_NAME_MARKER' },
-        emails: [{ value: 'BUG002U_EMAIL_MARKER@example.com' }],
+        emails: [{ value: 'BUG002U_EMAIL_MARKER@example.com', verified: true }],
         photos: [{ value: 'https://dummy.invalid/avatar/BUG002U_GOOGLE_PROFILE_ID_MARKER' }]
       }, (err, user) => {
         if (err) return reject(err);
@@ -167,7 +167,7 @@ async function runOAuthLoggingTest(db) {
     const output = capture.output();
     assert.match(output, /Google auth complete/);
     assertNoMarkers(output, 'OAuth logging');
-    assert(db.prepare('SELECT COUNT(*) AS count FROM users WHERE email = ?').get('BUG002U_EMAIL_MARKER@example.com').count === 1);
+    assert(db.prepare('SELECT COUNT(*) AS count FROM users WHERE email = ?').get('bug002u_email_marker@example.com').count === 1);
   } finally {
     capture.restore();
   }
