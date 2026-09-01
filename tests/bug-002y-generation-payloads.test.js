@@ -356,7 +356,8 @@ async function run() {
       console.warn = originalWarn;
     }
     assert.deepStrictEqual(snapshot(db, oversizedToneUserId), before);
-    assert(logs.some((line) => line.includes('Dashboard generation tone validation failed.')));
+    assert(logs.some((line) => line.includes('"event":"dashboard_generation_rejected"')
+      && line.includes('"code":"GENERATION_TONE_INVALID"')));
     assert(!logs.join('\n').includes(customTone));
   });
 
@@ -405,7 +406,8 @@ async function run() {
       db.exec('DROP TRIGGER IF EXISTS fail_002y_generation_insert');
     }
     assert.deepStrictEqual(snapshot(db, triggerUserId), before);
-    assert(logs.some((line) => line.includes('Dashboard generation failed.')));
+    assert(logs.some((line) => line.includes('"event":"dashboard_generation_failed"')
+      && line.includes('"code":"GENERATION_FAILED"')));
     assert(!logs.join('\n').includes('Turmeric Curcumin and Ginger'));
   });
 }

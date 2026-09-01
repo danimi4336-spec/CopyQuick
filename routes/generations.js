@@ -53,6 +53,17 @@ class GenerationValidationError extends Error {
   }
 }
 
+function logGenerationFailure(req, event, code, statusCode) {
+  writeOperationalEvent({
+    event,
+    requestId: req.requestId,
+    method: req.method,
+    route: req.route?.path || 'unmatched',
+    statusCode,
+    code
+  });
+}
+
 function normalizeField(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -257,8 +268,9 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     }
   } catch (err) {
     if (err instanceof GenerationValidationError || err.code === 'CUSTOM_TONE_TOO_LONG') {
-      console.warn(err.code === 'CUSTOM_TONE_TOO_LONG' ? 'Dashboard generation tone validation failed.' : 'Dashboard generation validation failed.');
       const statusCode = err.statusCode || 400;
+      const code = err.code === 'CUSTOM_TONE_TOO_LONG' ? 'GENERATION_TONE_INVALID' : 'GENERATION_REQUEST_INVALID';
+      logGenerationFailure(req, 'dashboard_generation_rejected', code, statusCode);
       if (isAjax) return res.status(statusCode).json({ error: 'Invalid generation request' });
       return res.status(statusCode).render('dashboard', {
         title: 'Dashboard - CopyQuick',
@@ -403,20 +415,25 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     if (generationRequest.enabled && !generationRequest.replay) {
       failGenerationRequest(db, generationRequest.requestId, err.code || 'GENERATION_FAILED');
     }
+    let failureCode = 'GENERATION_FAILED';
+    let failureStatus = 500;
     if (err instanceof GenerationValidationError) {
-      console.warn('Dashboard generation validation failed.');
-      if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
+      failureCode = 'GENERATION_REQUEST_INVALID';
+      failureStatus = err.statusCode;
     } else if (err.code === 'CUSTOM_TONE_TOO_LONG') {
-      console.warn('Dashboard generation tone validation failed.');
-      if (isAjax) return res.status(400).json({ error: 'Invalid generation request' });
+      failureCode = 'GENERATION_TONE_INVALID';
+      failureStatus = 400;
     } else if (err instanceof UsageLimitExceededError) {
-      console.warn('Dashboard generation limit rejected.');
+      failureCode = 'GENERATION_LIMIT_REACHED';
+      failureStatus = 403;
     } else if (err.message && err.message.includes('Invalid content type')) {
-      console.warn('Dashboard generation prompt mapping failed.');
+      failureCode = 'GENERATION_CONTENT_TYPE_INVALID';
     } else if (err.message && err.message.includes('Invalid tone')) {
-      console.warn('Dashboard generation prompt tone failed.');
-    } else {
-      console.error('Dashboard generation failed.');
+      failureCode = 'GENERATION_TONE_INVALID';
+    }
+    logGenerationFailure(req, 'dashboard_generation_failed', failureCode, failureStatus);
+    if (isAjax && (err instanceof GenerationValidationError || err.code === 'CUSTOM_TONE_TOO_LONG')) {
+      return res.status(failureStatus).json({ error: 'Invalid generation request' });
     }
     if (err instanceof UsageLimitExceededError) {
       if (isAjax) return res.status(403).json({
@@ -727,7 +744,11 @@ router.post('/generation/:id/regenerate', requireAuth, requireGenerationAvailabl
     if (generationRequest.enabled && !generationRequest.replay) {
       failGenerationRequest(db, generationRequest.requestId, err.code || 'GENERATION_FAILED');
     }
-    console.error('Generation regeneration failed.');
+    const failureStatus = err instanceof UsageLimitExceededError ? 403 : err.code === 'GENERATION_NOT_FOUND' ? 404 : 500;
+    const failureCode = err instanceof UsageLimitExceededError
+      ? 'GENERATION_LIMIT_REACHED'
+      : err.code === 'GENERATION_NOT_FOUND' ? 'GENERATION_NOT_FOUND' : 'REGENERATION_FAILED';
+    logGenerationFailure(req, 'generation_regeneration_failed', failureCode, failureStatus);
     if (err instanceof UsageLimitExceededError) {
       return res.status(403).json({ error: 'Monthly limit reached', retryWithNewRequestKey: generationRequest.enabled });
     }
