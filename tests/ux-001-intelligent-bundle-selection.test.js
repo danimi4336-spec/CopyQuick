@@ -172,16 +172,16 @@ class FakeDocument extends FakeElement {
 }
 
 const assetDefs = [
-  ['email_campaign:Email Drafts', 'Email Drafts', true],
-  ['social_post:Facebook Post Variations', 'Facebook Post Variations', true],
-  ['ad_headline:Facebook Ad Headlines', 'Facebook Ad Headlines', true],
-  ['social_post:Google Search Ad Headlines', 'Google Search Ad Headlines', true],
-  ['product_description:Product Description Variations', 'Product Description Variations', true],
-  ['subject_line:Amazon Product Description', 'Amazon Product Description', false],
-  ['blog_intro:SEO Article Introductions', 'SEO Article Introductions', false],
-  ['blog_intro:Blog Introductions', 'Blog Introductions', false],
-  ['cta:Landing Page CTAs', 'Landing Page CTAs', false],
-  ['sales_message:Video Sales Messages', 'Video Sales Messages', false]
+  ['email_drafts:Email Drafts', 'Email Drafts', true],
+  ['facebook_post_variations:Facebook Post Variations', 'Facebook Post Variations', true],
+  ['facebook_ad_headlines:Facebook Ad Headlines', 'Facebook Ad Headlines', true],
+  ['google_search_ad_headlines:Google Search Ad Headlines', 'Google Search Ad Headlines', true],
+  ['product_description_variations:Product Description Variations', 'Product Description Variations', true],
+  ['amazon_product_description:Amazon Product Description', 'Amazon Product Description', false],
+  ['seo_article_introductions:SEO Article Introductions', 'SEO Article Introductions', false],
+  ['blog_introductions:Blog Introductions', 'Blog Introductions', false],
+  ['landing_page_ctas:Landing Page CTAs', 'Landing Page CTAs', false],
+  ['video_sales_messages:Video Sales Messages', 'Video Sales Messages', false]
 ];
 
 function createBundleDocument(selectedIndexes = [0, 1, 2, 3, 4]) {

@@ -246,7 +246,7 @@ async function run() {
 
     const bundle = await postGenerate(agent, token, generationBody({
       generationType: 'bundle',
-      assets: 'subject_line:Email Subject Lines,social_post:Social Posts'
+      assets: 'email_drafts:Email Drafts,facebook_post_variations:Facebook Post Variations'
     }));
     assert.strictEqual(bundle.res.statusCode, 200);
 
@@ -272,7 +272,7 @@ async function run() {
     .get(generationUser, 'dashboard_generation').count, 0,
   'unsupported campaign submissions must not claim an idempotency record');
   assert.strictEqual(generatorState.calls.filter((call) => call.contentType === 'ad_headline').length, 1);
-  assert(generatorState.calls.some((call) => call.contentType === 'subject_line'));
+  assert(generatorState.calls.some((call) => call.contentType === 'email_campaign'));
   assert(generatorState.calls.some((call) => call.contentType === 'social_post'));
 }
 

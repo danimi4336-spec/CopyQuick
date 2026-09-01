@@ -259,7 +259,7 @@ async function run() {
   await withServer(bundleUserId, async (server) => {
     const response = await postGenerate(server, generationBody({
       generationType: 'bundle',
-      assets: 'subject_line:Subject Lines,sales_message:Sales Message'
+      assets: 'email_drafts:Email Drafts,video_sales_messages:Video Sales Messages'
     }));
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(generatorState.calls.length, 2);

@@ -10,7 +10,7 @@ const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
-const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets } = require('../lib/generatorModes');
+const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
 const { getGroupsWithJourneys, getJourney, getAllJourneys } = require('../lib/businessJourneys');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
@@ -65,48 +65,6 @@ class GenerationValidationError extends Error {
   }
 }
 
-const bundleAssetContentTypeByLabel = {
-  'Email Drafts': 'email_campaign',
-  'Email Campaign': 'email_campaign',
-  'Facebook Post Variations': 'social_post',
-  'Facebook Post': 'social_post',
-  'Facebook Ad Headlines': 'ad_headline',
-  'Facebook Ad': 'ad_headline',
-  'Google Search Ad Headlines': 'ad_headline',
-  'Google Search Ad': 'ad_headline',
-  'Product Description Variations': 'product_description',
-  'Product Description': 'product_description',
-  'Amazon Product Description': 'product_description',
-  'Amazon Listing': 'product_description',
-  'SEO Article Introductions': 'blog_intro',
-  'SEO Package': 'blog_intro',
-  'Blog Introductions': 'blog_intro',
-  'Blog Article': 'blog_intro',
-  'Landing Page CTAs': 'cta',
-  'Landing Page': 'cta',
-  'Video Sales Messages': 'sales_message',
-  'Video Package': 'sales_message'
-};
-
-const bundleAssetContentTypeById = {
-  email_campaign: 'email_campaign',
-  facebook_post: 'social_post',
-  social_post: 'social_post',
-  facebook_ad: 'ad_headline',
-  google_search_ad: 'ad_headline',
-  ad_headline: 'ad_headline',
-  subject_line: 'subject_line',
-  product_description: 'product_description',
-  amazon_listing: 'product_description',
-  seo_package: 'blog_intro',
-  blog_intro: 'blog_intro',
-  blog_article: 'blog_intro',
-  landing_page: 'cta',
-  cta: 'cta',
-  video_package: 'sales_message',
-  sales_message: 'sales_message'
-};
-
 function normalizeField(value) {
   if (value === null || value === undefined) return '';
   return String(value).trim();
@@ -140,20 +98,20 @@ function parseBundleAssets(rawAssets) {
     const rawLabel = separatorIndex === -1 ? '' : value.slice(separatorIndex + 1);
     const assetId = normalizeField(rawId);
     const label = normalizeField(rawLabel);
-    const contentType = bundleAssetContentTypeByLabel[label] || bundleAssetContentTypeById[assetId];
+    const asset = resolveBundleAsset(assetId, label);
 
-    if (!assetId || !contentType) {
+    if (!assetId || !label || !asset) {
       throw new GenerationValidationError('Unsupported bundle asset');
     }
 
-    const dedupeKey = `${assetId}:${label || contentType}`;
+    const dedupeKey = asset.id;
     if (seen.has(dedupeKey)) return null;
     seen.add(dedupeKey);
 
     return {
-      assetId,
-      label: label || assetId.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()),
-      contentType
+      assetId: asset.id,
+      label: asset.label,
+      contentType: asset.contentType
     };
   }).filter(Boolean);
 

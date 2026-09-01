@@ -281,6 +281,11 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 400);
     assert.strictEqual(parseJson(response).error, 'Invalid generation request');
     assert.deepStrictEqual(snapshot(db, malformedUserId), before);
+
+    const mismatched = await postGenerate(agent, token, bundleBody(['email_drafts:Amazon Product Description']));
+    assert.strictEqual(mismatched.res.statusCode, 400);
+    assert.strictEqual(parseJson(mismatched).error, 'Invalid generation request');
+    assert.deepStrictEqual(snapshot(db, malformedUserId), before);
   });
 
   const customQuickUserId = createUser(db, { monthly_limit: 20 });
