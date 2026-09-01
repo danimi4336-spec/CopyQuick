@@ -30,6 +30,12 @@ function callSet(store, sid, sess) {
   });
 }
 
+function callGet(store, sid) {
+  return new Promise((resolve, reject) => {
+    store.get(sid, (err, sess) => err ? reject(err) : resolve(sess));
+  });
+}
+
 async function run() {
   assert.strictEqual(DEFAULT_PRUNE_EVERY_WRITES, 100);
   assert.strictEqual(DEFAULT_PRUNE_LIMIT, 250);
@@ -97,6 +103,18 @@ async function run() {
       userId: 4
     });
     assert.strictEqual(storeDb.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id LIKE 'abandoned-%'").get().count, 0);
+
+    storeDb.prepare('INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)')
+      .run('corrupt-json', '{bad', '2026-09-05T00:00:00.000Z');
+    storeDb.prepare('INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)')
+      .run('invalid-shape', '[]', '2026-09-05T00:00:00.000Z');
+    storeDb.prepare('INSERT INTO sessions (id, data, expires_at) VALUES (?, ?, ?)')
+      .run('valid-session', JSON.stringify({ userId: 5, cookie: {} }), '2026-09-05T00:00:00.000Z');
+
+    assert.strictEqual(await callGet(store, 'corrupt-json'), null);
+    assert.strictEqual(await callGet(store, 'invalid-shape'), null);
+    assert.strictEqual(storeDb.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id IN ('corrupt-json', 'invalid-shape')").get().count, 0);
+    assert.deepStrictEqual(await callGet(store, 'valid-session'), { userId: 5, cookie: {} });
 
     console.log('Story 3.37 bounded session retention tests passed');
   } finally {
