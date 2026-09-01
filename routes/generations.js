@@ -234,28 +234,12 @@ router.get('/dashboard', requireAuth, (req, res) => {
       requestId: req.requestId,
       code: 'DASHBOARD_DATA_FAILED'
     });
-    try {
-      res.render('dashboard', {
-        title: 'Dashboard - CopyQuick',
-        contentTypes: getContentTypes(), tones: getTones(),
-        history: [], results: null,
-        totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0,
-        recent: [], typeBreakdown: [],
-        bundleAssets: bundleAssets,
-        brandVoices: brandVoices, audiencePresets: audiencePresets,
-        brain: {}, brainPct: 0, brainFilled: 0,
-        aiCredits: null,
-        currentPage: 'dashboard'
-      });
-    } catch(e2) {
-      writeOperationalEvent({
-        event: 'dashboard_render_failed',
-        requestId: req.requestId,
-        code: 'DASHBOARD_RENDER_FAILED'
-      });
-      res.status(500).send('Dashboard error. Please check server logs.');
-    }
+    return res.status(503).render('error', {
+      errorStatus: 503,
+      title: 'Dashboard Temporarily Unavailable - CopyQuick',
+      currentPage: 'dashboard',
+      message: 'Your dashboard data could not be loaded safely. Please try again shortly.'
+    });
   }
 });
 

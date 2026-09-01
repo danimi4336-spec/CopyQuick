@@ -10,7 +10,7 @@ assert(!routes.includes('Monthly generation limit reached. <a'));
 assert(!/console\.(?:warn|error)\([^\n]*(?:err|e|e2)\.(?:message|stack)/.test(routes));
 assert.match(routes, /event: 'dashboard_data_failed'/);
 assert.match(routes, /code: 'DASHBOARD_DATA_FAILED'/);
-assert.match(routes, /event: 'dashboard_render_failed'/);
+assert.match(routes, /res\.status\(503\)\.render\('error'/);
 assert.match(routes, /errorAction: \{ href: '\/pricing'/);
 assert(!view.includes('listEl.innerHTML=sec.deliverables'));
 assert(!view.includes('platformsEl.innerHTML = chips'));
