@@ -257,6 +257,17 @@ async function run() {
     const campaignBody = JSON.parse(campaign.body);
     assert.strictEqual(campaignBody.code, 'CAMPAIGN_OBJECTIVE_REQUIRED');
     assert.strictEqual(campaignBody.actionUrl, '/welcome');
+
+    const invalidBrowserSubmission = await request(agent, 'POST', '/dashboard/generate', {
+      headers: { 'X-CSRF-Token': token },
+      body: { ...generationBody({ generationType: 'quick' }), productDescription: '' }
+    });
+    assert.strictEqual(invalidBrowserSubmission.res.statusCode, 400);
+    assert.match(invalidBrowserSubmission.body, /Please check your generation request and try again/);
+    assert.match(invalidBrowserSubmission.body, /Choose Objective/,
+      'an invalid request must preserve the truthful quick and bundle completion state');
+    assert.match(invalidBrowserSubmission.body, /class="bc-brain-circle">100%/,
+      'an invalid request must preserve Brand Brain progress');
   });
 
   const usage = readUsage(db, generationUser);

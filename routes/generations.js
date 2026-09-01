@@ -141,6 +141,32 @@ function getAiCredits(db, user) {
   return formatAiCredits(getCurrentUsageSnapshotReadOnly(db, user), user);
 }
 
+const DASHBOARD_BRAIN_FIELDS = ['business_name', 'industry', 'target_audience', 'brand_voice', 'unique_value', 'competitors', 'goals', 'key_messages'];
+
+function loadDashboardSnapshot(db, user, options = {}) {
+  const userId = user.id;
+  const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId) || {};
+  const brainFilled = DASHBOARD_BRAIN_FIELDS.filter((field) => brain[field] && brain[field].trim()).length;
+
+  return {
+    history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId),
+    totalGenerations: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId).count,
+    favorites: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId).count,
+    thisMonth: db.prepare("SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId).count,
+    quickCount: db.prepare("SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(userId).count,
+    bundleCount: db.prepare("SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId).count,
+    recent: db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId),
+    typeBreakdown: db.prepare('SELECT content_type, COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId),
+    bundleAssets,
+    brandVoices,
+    audiencePresets,
+    brain,
+    brainFilled,
+    brainPct: Math.round((brainFilled / DASHBOARD_BRAIN_FIELDS.length) * 100),
+    aiCredits: Object.hasOwn(options, 'aiCredits') ? options.aiCredits : getAiCredits(db, user)
+  };
+}
+
 // ====== Dashboard ======
 router.get('/dashboard', requireAuth, (req, res) => {
   console.log('📊 Dashboard route called.');
@@ -260,13 +286,6 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     });
   }
 
-  const getDashboardCounts = function(currentUserId) {
-    return {
-      quickCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'quick'").get(currentUserId)?.count || 0,
-      bundleCount: db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(currentUserId)?.count || 0
-    };
-  };
-
   let cleanProductDescription;
   let cleanTargetAudience;
   let cleanContentType;
@@ -307,16 +326,9 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         title: 'Dashboard - CopyQuick',
         contentTypes: getContentTypes(),
         tones: getTones(),
-        history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+        ...loadDashboardSnapshot(db, user),
         results: null,
         error: 'Please check your generation request and try again.',
-        totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0,
-        recent: [], typeBreakdown: [],
-        bundleAssets, brandVoices, audiencePresets,
-        brain: db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {},
-        brainPct: 0, brainFilled: 0,
-        aiCredits: getAiCredits(db, user),
         input: { productDescription: cleanProductDescription || '', targetAudience: cleanTargetAudience || '', contentType: cleanContentType || 'sales_message', tone: cleanTone || 'professional' }
       });
     }
@@ -326,25 +338,14 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
   const usageSnapshot = getCurrentUsageSnapshot(db, user);
   if (usageSnapshot.isOverLimit) {
     if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
-    const { quickCount, bundleCount } = getDashboardCounts(user.id);
-    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
-    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
-    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
-    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
     return res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(),
       tones: getTones(),
-      history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+      ...loadDashboardSnapshot(db, user, { aiCredits: formatAiCredits(usageSnapshot, user) }),
       results: null,
       error: 'Monthly generation limit reached.',
       errorAction: { href: '/pricing', label: 'Upgrade your plan to continue.' },
-      totalGenerations: 0, favorites: 0, thisMonth: 0,
-      quickCount: 0, bundleCount: 0,
-      recent: [], typeBreakdown: [],
-      bundleAssets, brandVoices, audiencePresets,
-      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      aiCredits: formatAiCredits(usageSnapshot, user),
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
     });
   }
@@ -451,28 +452,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     res.locals.user = updatedUser;
     const updatedUsageSnapshot = getCurrentUsageSnapshot(db, updatedUser);
-    const { quickCount, bundleCount } = getDashboardCounts(user.id);
-    const totalGenerations = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count;
-    const favorites = db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count;
-    const thisMonth = db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count;
-    const recent = db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(user.id);
-    const typeBreakdown = db.prepare('SELECT content_type, COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(user.id);
-    const history = db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id);
-    // Safe Brand Brain context for render.
-    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
-    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
-    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
-    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
-      history, results,
-      totalGenerations, favorites, thisMonth,
-      quickCount, bundleCount,
-      recent, typeBreakdown,
-      bundleAssets, brandVoices, audiencePresets,
-      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser),
+      ...loadDashboardSnapshot(db, updatedUser, { aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser) }),
+      results,
       input: { productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone },
       genId,
       genMode: genType
@@ -504,25 +488,14 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
 
       const latestUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) || user;
       const latestUsageSnapshot = getCurrentUsageSnapshot(db, latestUser);
-      const { quickCount, bundleCount } = getDashboardCounts(user.id);
-      const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
-      const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
-      const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
-      const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
       return res.status(403).render('dashboard', {
         title: 'Dashboard - CopyQuick',
         contentTypes: getContentTypes(),
         tones: getTones(),
-        history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+        ...loadDashboardSnapshot(db, latestUser, { aiCredits: formatAiCredits(latestUsageSnapshot, latestUser) }),
         results: null,
         error: 'Monthly generation limit reached.',
         errorAction: { href: '/pricing', label: 'Upgrade your plan to continue.' },
-        totalGenerations: 0, favorites: 0, thisMonth: 0,
-        quickCount: 0, bundleCount: 0,
-        recent: [], typeBreakdown: [],
-        bundleAssets, brandVoices, audiencePresets,
-        brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-        aiCredits: formatAiCredits(latestUsageSnapshot, latestUser),
         input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
       });
     }
@@ -530,21 +503,11 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       error: 'Generation failed',
       retryWithNewRequestKey: generationRequest.enabled
     });
-    const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
-    const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
-    const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
-    const brainPctSafe = Math.round((brainFilledSafe / brainFields.length) * 100);
     res.render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
-      history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(user.id),
+      ...loadDashboardSnapshot(db, user, { aiCredits: null }),
       results: null, error: 'An error occurred',
-      totalGenerations: 0, favorites: 0, thisMonth: 0,
-      quickCount: 0, bundleCount: 0,
-      recent: [], typeBreakdown: [],
-      bundleAssets, brandVoices, audiencePresets,
-      brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
-      aiCredits: null
     });
   }
 });
