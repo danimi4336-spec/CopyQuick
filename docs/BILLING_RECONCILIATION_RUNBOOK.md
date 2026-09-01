@@ -42,14 +42,20 @@ The in-process scheduler is disabled by default and starts only after schema com
 ```env
 STRIPE_RECONCILIATION_ENABLED=false
 STRIPE_RECONCILIATION_INTERVAL_HOURS=24
+STRIPE_RECONCILIATION_MAX_DURATION_MS=300000
 STRIPE_PAST_DUE_GRACE_HOURS=72
 ```
 
 When enabled, it runs an apply reconciliation no more than once per configured interval. Due time is calculated only from the latest successfully completed apply run; a dry-run never postpones an automated apply. Manual and scheduled operations share a leased cross-process lock. Stripe outages are recorded as sanitized failures and do not fail `/healthz` or crash the web service.
 
+One reconciliation inventory has a five-minute wall-clock budget by default,
+configurable from one second through thirty minutes. Exceeding it records
+`RECONCILIATION_TIME_LIMIT_EXCEEDED` before the atomic entitlement-repair batch;
+no partial repair is applied.
+
 ## Normalized issues
 
-Important codes include `STRIPE_API_UNAVAILABLE`, `STRIPE_PAGINATION_INVALID`, `STRIPE_SUBSCRIPTION_MISSING`, `STRIPE_PRICE_UNKNOWN`, `STRIPE_STATUS_UNKNOWN`, `STRIPE_RECORD_INCOMPLETE`, `STRIPE_PAST_DUE_SINCE_UNKNOWN`, `LOCAL_SUBSCRIPTION_MISSING`, `LOCAL_ENTITLEMENT_DRIFT`, `CUSTOMER_SUBSCRIPTION_MISMATCH`, `RECONCILIATION_LOCKED`, and `RECONCILIATION_FAILED`. A repeated or missing Stripe continuation cursor fails inventory before any entitlement repair; investigate the provider response rather than retrying in a loop.
+Important codes include `STRIPE_API_UNAVAILABLE`, `STRIPE_PAGINATION_INVALID`, `RECONCILIATION_TIME_LIMIT_EXCEEDED`, `STRIPE_SUBSCRIPTION_MISSING`, `STRIPE_PRICE_UNKNOWN`, `STRIPE_STATUS_UNKNOWN`, `STRIPE_RECORD_INCOMPLETE`, `STRIPE_PAST_DUE_SINCE_UNKNOWN`, `LOCAL_SUBSCRIPTION_MISSING`, `LOCAL_ENTITLEMENT_DRIFT`, `CUSTOMER_SUBSCRIPTION_MISMATCH`, `RECONCILIATION_LOCKED`, and `RECONCILIATION_FAILED`. A repeated or missing Stripe continuation cursor or expired run deadline fails inventory before any entitlement repair; investigate the provider response rather than retrying in a loop.
 
 ## Schema and rollback
 

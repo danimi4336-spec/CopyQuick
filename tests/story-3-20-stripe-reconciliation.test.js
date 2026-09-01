@@ -16,8 +16,11 @@ const {
   runMigrationEngine
 } = require('../db/migrations');
 const {
+  DEFAULT_MAX_DURATION_MS,
+  MAX_DURATION_MS,
   getBillingReconciliationStatus,
-  reconcileBilling
+  reconcileBilling,
+  reconciliationMaxDurationMs
 } = require('../lib/billingReconciliation');
 const { createBillingReconciliationScheduler, resolveBillingScheduleConfig } = require('../lib/billingReconciliationScheduler');
 const { acquireBillingReconciliationLock } = require('../lib/billingReconciliationLock');
@@ -273,6 +276,41 @@ async function run() {
       assert.strictEqual(repeated.calls.length, 2, 'a repeated Stripe cursor must stop reconciliation immediately');
       assert.strictEqual(value.db.prepare('SELECT plan_tier FROM users WHERE id=?').get(first.userId).plan_tier, 'free');
       assert.strictEqual(getBillingReconciliationStatus(value.db).lastFailureCode, 'STRIPE_PAGINATION_INVALID');
+    } finally { closeFixture(value); }
+  }
+
+  // A complete inventory has an aggregate wall-clock bound. Expiry after a
+  // Stripe page still occurs before the atomic entitlement repair batch.
+  {
+    assert.strictEqual(reconciliationMaxDurationMs(undefined), DEFAULT_MAX_DURATION_MS);
+    assert.strictEqual(reconciliationMaxDurationMs('1000'), 1000);
+    assert.strictEqual(reconciliationMaxDurationMs(String(MAX_DURATION_MS)), MAX_DURATION_MS);
+    assert.strictEqual(reconciliationMaxDurationMs('999'), DEFAULT_MAX_DURATION_MS);
+    assert.strictEqual(reconciliationMaxDurationMs(String(MAX_DURATION_MS + 1)), DEFAULT_MAX_DURATION_MS);
+
+    const value = fixture();
+    try {
+      const relationship = insertRelationship(value.db, { userPlan: 'free', userLimit: 10 });
+      const clock = [0, 0, 1001];
+      await assert.rejects(() => reconcileBilling({
+        db: value.db,
+        stripeClient: fakeStripe([{ data: [remote()], has_more: false }]),
+        mode: 'apply',
+        env,
+        now: () => now,
+        monotonicNow: () => clock.length ? clock.shift() : 1001,
+        maxDurationMs: 1000,
+        logger: () => {}
+      }), error => error.code === 'RECONCILIATION_TIME_LIMIT_EXCEEDED');
+      assert.strictEqual(
+        value.db.prepare('SELECT plan_tier FROM users WHERE id = ?').get(relationship.userId).plan_tier,
+        'free',
+        'deadline expiry must not partially repair entitlement'
+      );
+      assert.strictEqual(
+        getBillingReconciliationStatus(value.db).lastFailureCode,
+        'RECONCILIATION_TIME_LIMIT_EXCEEDED'
+      );
     } finally { closeFixture(value); }
   }
 
