@@ -18,6 +18,7 @@ const webhookRoutes = require('./routes/webhook');
 const builderRoutes = require('./routes/builder');
 const discoveryRoutes = require('./routes/discovery');
 const productionRoutes = require('./routes/production');
+const { createPasswordRecoveryRouter } = require('./routes/passwordRecovery');
 const { createHealthRouter } = require('./routes/health');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
@@ -130,6 +131,7 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/', authRoutes);
+app.use('/', createPasswordRecoveryRouter());
 app.use('/', dashboardRoutes);
 app.use('/', pricingRoutes);
 app.use('/', builderRoutes);
