@@ -16,6 +16,11 @@ const { getSessionCookieClearOptions } = require('../lib/sessionConfig');
 const { authSuccessPath, normalizeAuthReturnPath } = require('../lib/authReturnPath');
 
 const DUMMY_PASSWORD_HASH = '$2b$10$oQsiX8feR0MdWIyOqAVa5.Uz3SQ1BetDaVSKI1Q4Y6.qavibTRRNq';
+const SIGNUP_INTERNAL_ERROR = 'Unable to create your account. Please try again.';
+
+function isDuplicateSignupError(error) {
+  return error?.code === 'SQLITE_CONSTRAINT_UNIQUE';
+}
 
 // Middleware to check if user is logged in
 function requireAuth(req, res, next) {
@@ -51,7 +56,13 @@ function createAuthRouter(options = {}) {
       res.redirect(authSuccessPath(null, returnTo));
     } catch (err) {
       console.error('Signup failed.');
-      res.render('signup', { title: 'Sign Up - CopyQuick', error: SIGNUP_FAILURE_ERROR, currentPage: 'signup', returnTo });
+      const duplicate = isDuplicateSignupError(err);
+      res.status(duplicate ? 409 : 500).render('signup', {
+        title: 'Sign Up - CopyQuick',
+        error: duplicate ? SIGNUP_FAILURE_ERROR : SIGNUP_INTERNAL_ERROR,
+        currentPage: 'signup',
+        returnTo
+      });
     }
   });
 
@@ -153,4 +164,4 @@ router.get('/auth/google/callback',
   }
 );
 
-module.exports = { createAuthRouter, router, requireAuth };
+module.exports = { createAuthRouter, isDuplicateSignupError, router, requireAuth };

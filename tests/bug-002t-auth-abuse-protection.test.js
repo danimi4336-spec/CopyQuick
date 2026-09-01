@@ -26,6 +26,7 @@ const { createCsrfProtection } = require('../lib/csrf');
 const {
   AUTH_LIMIT_ERROR,
   LOGIN_FAILURE_ERROR,
+  SIGNUP_FAILURE_ERROR,
   createExpiringBucketStore,
   createLoginRateLimiter,
   createSignupRateLimiter
@@ -141,6 +142,15 @@ async function createTestAgent(options = {}) {
       prepare: (sql) => {
         if (/SELECT \* FROM users WHERE email = \?/i.test(sql)) {
           calls.userLookups += 1;
+        }
+        if (options.signupDbFailure && /INSERT INTO users/i.test(sql)) {
+          return {
+            run: () => {
+              const error = new Error('BUG002T_INTERNAL_SIGNUP_MARKER');
+              error.code = 'SQLITE_IOERR';
+              throw error;
+            }
+          };
         }
         return getDb().prepare(sql);
       }
@@ -342,6 +352,25 @@ async function run() {
     assert.strictEqual(countUsers(db), usersBeforeWeakSignup);
     assert.strictEqual(weakSignup.calls.hash, 0);
     weakSignup.close();
+
+    const duplicateSignup = await createTestAgent();
+    const duplicateSignupToken = await getToken(duplicateSignup.agent);
+    const usersBeforeDuplicate = countUsers(db);
+    const duplicateSignupResponse = await postSignup(duplicateSignup.agent, duplicateSignupToken, {
+      email: 'founder@example.com'
+    });
+    assert.strictEqual(duplicateSignupResponse.res.statusCode, 409);
+    assert(duplicateSignupResponse.body.includes(SIGNUP_FAILURE_ERROR));
+    assert.strictEqual(countUsers(db), usersBeforeDuplicate);
+    duplicateSignup.close();
+
+    const failedSignup = await createTestAgent({ signupDbFailure: true });
+    const failedSignupToken = await getToken(failedSignup.agent);
+    const failedSignupResponse = await postSignup(failedSignup.agent, failedSignupToken);
+    assert.strictEqual(failedSignupResponse.res.statusCode, 500);
+    assert.match(failedSignupResponse.body, /Unable to create your account/);
+    assert.doesNotMatch(failedSignupResponse.body, /BUG002T_INTERNAL_SIGNUP_MARKER/);
+    failedSignup.close();
 
     const signupIps = await createTestAgent({ maxSignupAttempts: 1 });
     const signupIpToken = await getToken(signupIps.agent);
