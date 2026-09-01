@@ -63,6 +63,7 @@
     var runId = <%- JSON.stringify(production.id) %>;
     var terminal = ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'];
     var latestRunStatus = <%- JSON.stringify(production.status) %>;
+    var statusRequestTimeoutMs = 10000;
     function label(value) { return String(value || '').replace(/_/g, ' '); }
     function liveStatus(message) {
         var element = document.getElementById('production-live-status');
@@ -72,8 +73,13 @@
         if (!terminal.includes(latestRunStatus)) window.setTimeout(refreshProduction, 5000);
     }
     async function refreshProduction() {
+        var controller = new AbortController();
+        var requestTimeout = window.setTimeout(function () { controller.abort(); }, statusRequestTimeoutMs);
         try {
-            var response = await fetch('/production/' + runId + '/status', { headers: { Accept: 'application/json' } });
+            var response = await fetch('/production/' + runId + '/status', {
+                headers: { Accept: 'application/json' },
+                signal: controller.signal
+            });
             if (!response.ok) throw new Error('Production status request failed');
             var state = await response.json();
             latestRunStatus = state.runStatus;
@@ -106,6 +112,8 @@
         } catch (err) {
             liveStatus('Live updates are temporarily unavailable. Retrying automatically…');
             retryProduction();
+        } finally {
+            window.clearTimeout(requestTimeout);
         }
     }
     if (!terminal.includes(<%- JSON.stringify(production.status) %>)) window.setTimeout(refreshProduction, 3000);
