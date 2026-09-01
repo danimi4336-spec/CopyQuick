@@ -18,12 +18,19 @@ Configure the bounds with:
 - `EMAIL_DELIVERY_RETRY_BASE_MS` (default `250`, maximum `10000`)
 - `EMAIL_DELIVERY_TIMEOUT_MS` (default `10000`, maximum `60000`)
 - `EMAIL_DELIVERY_TOTAL_TIMEOUT_MS` (default `35000`, maximum `60000`)
+- `CONTACT_EMAIL_TOTAL_TIMEOUT_MS` (default `40000`, maximum `60000`)
 - `EMAIL_DELIVERY_DRAIN_TIMEOUT_MS` (default `15000`, valid range `1`–`60000`)
 
 The total timeout is authoritative across provider attempts and exponential
 backoff. Each attempt is capped by the remaining budget, and CopyQuick does not
 start a retry when its backoff would cross the deadline. This prevents otherwise
 valid individual settings from combining into a multi-minute customer request.
+The contact workflow also has one aggregate deadline across its two sequential
+deliveries. The authoritative support notification is attempted first. The
+optional visitor acknowledgement uses only the remaining time and is skipped
+with a sanitized operational event if the support delivery consumes the whole
+budget; a contact request can therefore no longer combine two full delivery
+budgets into a roughly 70-second wait.
 
 During graceful shutdown, CopyQuick stops accepting new HTTP requests first.
 It lets active requests finish, then drains password-reset delivery so a reset

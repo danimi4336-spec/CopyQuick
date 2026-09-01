@@ -1,5 +1,6 @@
 const assert = require('assert');
 const {
+  DEFAULT_CONTACT_TOTAL_TIMEOUT_MS,
   DEFAULT_EMAIL_ATTEMPT_TIMEOUT_MS,
   DEFAULT_EMAIL_MAX_ATTEMPTS,
   DEFAULT_EMAIL_RETRY_BASE_MS,
@@ -9,7 +10,9 @@ const {
   MAX_EMAIL_ATTEMPTS,
   MAX_EMAIL_RETRY_BASE_MS,
   MAX_EMAIL_TOTAL_TIMEOUT_MS,
+  MAX_CONTACT_TOTAL_TIMEOUT_MS,
   boundedPositiveInteger,
+  contactTotalTimeoutMs,
   normalizedEmailFailure,
   sendContactFormEmails,
   sendEmailWithRetry
@@ -32,6 +35,10 @@ async function run() {
     boundedPositiveInteger(MAX_EMAIL_TOTAL_TIMEOUT_MS + 1, DEFAULT_EMAIL_TOTAL_TIMEOUT_MS, MAX_EMAIL_TOTAL_TIMEOUT_MS),
     DEFAULT_EMAIL_TOTAL_TIMEOUT_MS
   );
+  assert.strictEqual(contactTotalTimeoutMs(undefined), DEFAULT_CONTACT_TOTAL_TIMEOUT_MS);
+  assert.strictEqual(contactTotalTimeoutMs('1000'), 1000);
+  assert.strictEqual(contactTotalTimeoutMs(String(MAX_CONTACT_TOTAL_TIMEOUT_MS)), MAX_CONTACT_TOTAL_TIMEOUT_MS);
+  assert.strictEqual(contactTotalTimeoutMs('0'), DEFAULT_CONTACT_TOTAL_TIMEOUT_MS);
 
   const unavailableLogs = [];
   await assert.rejects(
@@ -153,6 +160,26 @@ async function run() {
   assert(partialLogs.some(event => event.event === 'email_delivery_completed' && event.operation === 'contact_admin'));
   assert(partialLogs.some(event => event.event === 'email_delivery_failed' && event.operation === 'contact_reply'));
   assert(!JSON.stringify(partialLogs).includes('private provider detail'));
+
+  const deadlineCalls = [];
+  const deadlineLogs = [];
+  let contactClock = 0;
+  const deadlineResult = await sendContactFormEmails(contact(), {
+    resendClient: { emails: { send: async (payload, options) => {
+      deadlineCalls.push({ payload, options });
+      contactClock = 40000;
+      return { data: { id: 'admin-accepted' } };
+    } } },
+    operationKeyFactory: () => 'deadline-operation',
+    contactTotalTimeoutMs: 40000,
+    monotonicNow: () => contactClock,
+    logger: event => deadlineLogs.push(event)
+  });
+  assert.strictEqual(deadlineResult.adminDelivered, true);
+  assert.strictEqual(deadlineResult.autoReplyDelivered, false);
+  assert.strictEqual(deadlineCalls.length, 1, 'visitor acknowledgement must not start after the aggregate deadline');
+  assert(deadlineLogs.some(event => event.event === 'email_delivery_skipped' &&
+    event.operation === 'contact_reply' && event.code === 'EMAIL_OPERATION_DEADLINE_EXCEEDED'));
 
   assert.deepStrictEqual(normalizedEmailFailure({ statusCode: 429 }), { code: 'EMAIL_RATE_LIMITED', retryable: true });
   assert.deepStrictEqual(normalizedEmailFailure({ statusCode: 400 }), { code: 'EMAIL_PROVIDER_REJECTED', retryable: false });
