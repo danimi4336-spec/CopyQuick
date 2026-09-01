@@ -181,7 +181,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
     if (!answer) {
       return validationError(req, res, 'Tell us what you are building to continue.', { answer: '' });
     }
-    if (answer.length > MAX_ANSWER_LENGTH) {
+    if (answer.length > MAX_ANSWER_LENGTH || answer.includes('\0')) {
       return validationError(req, res, `Keep your answer under ${MAX_ANSWER_LENGTH} characters.`, { answer });
     }
 
@@ -238,6 +238,9 @@ router.post('/discovery', requireAuth, async (req, res) => {
     const renderMultiError = function(message) {
       return validationError(req, res, message, { selectedChoices, additionalDetail });
     };
+    if (submitted.length > currentQuestion.options.length) {
+      return renderMultiError('Choose only the product directions shown below.');
+    }
     if (invalidSelection) return renderMultiError('Choose only the product directions shown below.');
     if (!selectedChoices.length) return renderMultiError('Choose at least one direction to continue.');
     if (selectedChoices.length > currentQuestion.maxSelections) {
@@ -246,7 +249,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
     if (selectedChoices.includes('unsure') && selectedChoices.length > 1) {
       return renderMultiError('Choose “I’m not sure yet” by itself, or select the directions you want to explore.');
     }
-    if (additionalDetail.length > MAX_ANSWER_LENGTH) {
+    if (additionalDetail.length > MAX_ANSWER_LENGTH || additionalDetail.includes('\0')) {
       return renderMultiError(`Keep your additional idea under ${MAX_ANSWER_LENGTH} characters.`);
     }
 
@@ -300,7 +303,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
     const rerender = message => validationError(req, res, message, { otherAnswer: freeTextAnswer });
     if (unsure && freeTextAnswer) return rerender('Choose “I’m not sure yet” or describe the product, but not both.');
     if (!unsure && !freeTextAnswer) return rerender('Describe what you know so far, or choose “I’m not sure yet.”');
-    if (freeTextAnswer.length > MAX_ANSWER_LENGTH) {
+    if (freeTextAnswer.length > MAX_ANSWER_LENGTH || freeTextAnswer.includes('\0')) {
       return rerender(`Keep your answer under ${MAX_ANSWER_LENGTH} characters.`);
     }
 
@@ -356,7 +359,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
   if (selectedOption.allowsText && !otherAnswer) {
     return validationError(req, res, 'Tell us a little more about your “Other” choice.', { selectedChoice });
   }
-  if (otherAnswer.length > MAX_ANSWER_LENGTH) {
+  if (otherAnswer.length > MAX_ANSWER_LENGTH || otherAnswer.includes('\0')) {
     return validationError(req, res, `Keep your answer under ${MAX_ANSWER_LENGTH} characters.`, {
       selectedChoice,
       otherAnswer

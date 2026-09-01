@@ -6,7 +6,7 @@ const session = require('express-session');
 const { createCsrfProtection } = require('../lib/csrf');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
-const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
+const { MAX_REFLECTION_EDIT_LENGTH, applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 const discoveryRoutes = require('../routes/discovery');
 
 function confirmed(value, label = value) {
@@ -150,6 +150,18 @@ async function run() {
   });
   assert.strictEqual(edit.existingUnderstanding.targetAudience.value, 'Independent wellness retailers');
   assert.strictEqual(edit.existingUnderstanding.targetAudience.source, 'user_confirmed');
+  assert.throws(() => applyReflectionEdit({
+    answers: { initial_description: 'Original product' },
+    understanding: requiredUnderstanding(),
+    field: 'targetAudience',
+    value: 'x'.repeat(MAX_REFLECTION_EDIT_LENGTH + 1)
+  }), /under 2000 characters/);
+  assert.throws(() => applyReflectionEdit({
+    answers: { initial_description: 'Original product' },
+    understanding: requiredUnderstanding(),
+    field: 'targetAudience',
+    value: 'Invalid\0audience'
+  }), /under 2000 characters/);
 
   const app = express();
   app.set('view engine', 'ejs');

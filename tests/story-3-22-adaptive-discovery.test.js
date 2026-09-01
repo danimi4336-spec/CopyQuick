@@ -299,6 +299,14 @@ async function run() {
     assert.match(tampered.body, /value="bloating_comfort" checked/);
     assert.match(tampered.body, /Herbal capsule idea/);
 
+    const oversizedChoiceList = await request(explorer, 'POST', '/discovery', {
+      _csrf: explorationToken,
+      questionId: 'supplement_digestive_product_exploration',
+      choices: Array(10).fill('digestive_balance')
+    });
+    assert.strictEqual(oversizedChoiceList.res.statusCode, 400);
+    assert.match(oversizedChoiceList.body, /Choose only the product directions shown below/);
+
     const conflicting = await request(explorer, 'POST', '/discovery', {
       _csrf: explorationToken,
       questionId: 'supplement_digestive_product_exploration',
