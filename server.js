@@ -41,6 +41,7 @@ const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
+const { closeHttpServer } = require('./lib/httpShutdown');
 
 // Apply browser protections before every endpoint, including health checks,
 // signed webhooks, static assets, redirects, and error responses.
@@ -188,16 +189,14 @@ async function shutdown(signal) {
     operationalHealthWatcher?.stop(),
     defaultEmailDeliveryTracker.drain()
   ]);
-  const finish = () => {
-    stopRuntimeLockHeartbeat();
-    const release = releaseDatabaseRuntimeLock();
-    if (!release.released || release.cleanupFailed) {
-      console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
-    }
-    process.exit(0);
-  };
-  if (server) server.close(finish);
-  else finish();
+  const httpShutdown = await closeHttpServer(server);
+  writeOperationalEvent({ event: 'http_shutdown_completed', drained: httpShutdown.drained, forced: httpShutdown.forced });
+  stopRuntimeLockHeartbeat();
+  const release = releaseDatabaseRuntimeLock();
+  if (!release.released || release.cleanupFailed) {
+    console.error(`Database runtime lock release failed: ${release.code || 'OWNERSHIP_LOST'}`);
+  }
+  process.exit(0);
 }
 process.once('SIGTERM', () => { shutdown('SIGTERM'); });
 process.once('SIGINT', () => { shutdown('SIGINT'); });
