@@ -110,6 +110,11 @@ The canonical timestamp in the newest verified snapshot filename is also
 checked against `DATABASE_BACKUP_MAX_AGE_HOURS` (36 hours by default, bounded
 to 30 days). A stale or implausibly future-dated local backup cannot report as
 healthy and produces a sanitized local-backup health warning.
+Health inspection runs SQLite verification against at most the newest 10
+recognized snapshots by default (configurable up to 100 with
+`DATABASE_BACKUP_HEALTH_VERIFY_LIMIT`). If none in that bounded recovery window
+validate, health reports the local backup set as invalid rather than scanning
+an unbounded archive.
 
 While CopyQuick is running, never manually delete or replace:
 

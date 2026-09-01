@@ -132,6 +132,20 @@ async function run() {
     });
     assert.strictEqual(staleHealth.backups.status, 'stale');
     assert.strictEqual(staleHealth.status, 'warning');
+    let boundedVerificationAttempts = 0;
+    const boundedVerification = inspectStorageHealth({
+      env: { ...env, DATABASE_BACKUP_HEALTH_VERIFY_LIMIT: '1' },
+      db: sourceDb,
+      now: () => new Date('2026-08-28T01:00:00.000Z'),
+      verifyBackup: () => {
+        boundedVerificationAttempts += 1;
+        throw new Error('invalid newest backup');
+      }
+    });
+    assert.strictEqual(boundedVerificationAttempts, 1);
+    assert.strictEqual(boundedVerification.backups.verificationAttemptCount, 1);
+    assert.strictEqual(boundedVerification.backups.verificationLimit, 1);
+    assert.strictEqual(boundedVerification.backups.status, 'invalid');
     assert(health.backups.latestVerifiedBackupAt);
     assert(!fs.existsSync(`${validRestoreSource}-wal`));
     assert(!fs.existsSync(`${validRestoreSource}-shm`));
