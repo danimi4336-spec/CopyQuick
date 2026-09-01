@@ -97,7 +97,8 @@ async function run() {
     assert.strictEqual(statusResponse.res.statusCode, 418);
     assert.deepStrictEqual(JSON.parse(statusResponse.body), { error: GENERIC_ERROR_MESSAGE });
 
-    assert(productionLogs.some((entry) => entry.includes('❌ SERVER ERROR:') && entry.some((item) => item instanceof Error && item.message === SECRET_MESSAGE)));
+    assert(productionLogs.some((entry) => entry.join(' ').includes('http_request_failed')));
+    assert(!productionLogs.flat().join(' ').includes(SECRET_MESSAGE), 'production logs should not expose err.message');
   } finally {
     productionServer.close();
   }
@@ -109,7 +110,8 @@ async function run() {
     assert.strictEqual(devResponse.res.statusCode, 500);
     assert(devResponse.body.includes(SECRET_MESSAGE));
     assert(devResponse.body.includes('forcedRoute'));
-    assert(developmentLogs.some((entry) => entry.includes('❌ SERVER ERROR:')));
+    assert(developmentLogs.some((entry) => entry.join(' ').includes('http_request_failed')));
+    assert(!developmentLogs.flat().join(' ').includes(SECRET_MESSAGE));
   } finally {
     developmentServer.close();
   }

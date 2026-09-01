@@ -33,6 +33,8 @@ const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
 const { requireCompatibleMigrationState } = require('./lib/migrationStartupGate');
 const { startApplicationAfterMigrationGate } = require('./lib/applicationStartup');
 const { createBillingReconciliationScheduler } = require('./lib/billingReconciliationScheduler');
+const { createRequestContextMiddleware } = require('./lib/requestContext');
+const { writeOperationalEvent } = require('./lib/operationalLogger');
 
 // Startup auth config check
 const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
@@ -65,6 +67,8 @@ console.log(`  mode:     ${databaseDiagnostics.mode}`);
 if (databaseDiagnostics.path) console.log(`  path:     ${databaseDiagnostics.path}`);
 console.log(`  writable: ${databaseDiagnostics.writable ? 'yes' : 'no'}`);
 
+// Correlation starts before every route, including raw-body Stripe webhooks.
+app.use(createRequestContextMiddleware({ logger: writeOperationalEvent }));
 // Stripe webhooks are intentionally mounted before body parsing, sessions, and
 // CSRF protection because Stripe authenticates them with a signed raw body.
 app.use('/', webhookRoutes);

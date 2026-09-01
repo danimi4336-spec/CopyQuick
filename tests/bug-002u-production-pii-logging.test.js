@@ -387,9 +387,10 @@ function runErrorHandlerLoggingTest() {
     };
     handler(new Error('Operational failure'), req, res, () => {});
     const output = capture.output();
-    assert.match(output, /SERVER ERROR/);
-    assert.match(output, /Status/);
-    assert.match(output, /GET \/safe-error-path/);
+    assert.match(output, /http_request_failed/);
+    assert.match(output, /"statusCode":500/);
+    assert.match(output, /"method":"GET"/);
+    assert.doesNotMatch(output, /safe-error-path/, 'raw request URLs are not logged');
     assertNoMarkers(output, 'Global error handler logging');
   } finally {
     capture.restore();
