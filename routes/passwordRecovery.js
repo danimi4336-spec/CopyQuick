@@ -23,6 +23,8 @@ function createPasswordRecoveryRouter(options = {}) {
   const sendResetEmail = options.sendPasswordResetEmail || sendPasswordResetEmail;
   const emailDeliveryTracker = options.emailDeliveryTracker || defaultEmailDeliveryTracker;
   const operationalLogger = options.operationalLogger || writeOperationalEvent;
+  const applyPasswordReset = options.resetPassword || resetPassword;
+  const destroySession = options.destroyAuthenticatedSession || destroyAuthenticatedSession;
   const responseDelayMs = Number.isFinite(options.responseDelayMs)
     ? Math.max(0, options.responseDelayMs)
     : DEFAULT_REQUEST_RESPONSE_DELAY_MS;
@@ -105,20 +107,33 @@ function createPasswordRecoveryRouter(options = {}) {
       });
     }
     try {
-      const result = await resetPassword(database(), token, password, {
+      const result = await applyPasswordReset(database(), token, password, {
         env: options.env || process.env, bcrypt: options.bcrypt
       });
-      if (!result.ok) throw new Error(result.code);
-      await destroyAuthenticatedSession(req, res, {
+      if (!result.ok) {
+        return res.status(400).render('reset-password', {
+          title: 'Choose New Password - CopyQuick', currentPage: 'login', token: '',
+          error: 'This password reset link is invalid or has expired.', success: false
+        });
+      }
+      await destroySession(req, res, {
         cookieOptions: getSessionCookieClearOptions(options.env || process.env)
       });
       return res.render('reset-password', {
         title: 'Password Updated - CopyQuick', currentPage: 'login', token: '', error: null, success: true
       });
     } catch (err) {
-      return res.status(400).render('reset-password', {
+      operationalLogger({
+        event: 'password_reset_failed',
+        requestId: req.requestId,
+        method: req.method,
+        route: req.route?.path || 'unmatched',
+        statusCode: 500,
+        code: 'PASSWORD_RESET_INTERNAL_FAILED'
+      });
+      return res.status(500).render('reset-password', {
         title: 'Choose New Password - CopyQuick', currentPage: 'login', token: '',
-        error: 'This password reset link is invalid or has expired.', success: false
+        error: 'Password reset could not be completed safely. Please sign in again or request a new link.', success: false
       });
     }
   });
