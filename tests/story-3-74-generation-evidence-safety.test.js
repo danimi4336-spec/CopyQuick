@@ -17,7 +17,14 @@ function run() {
     'Example is transforming the industry.',
     'Science says Example works.',
     'Businesses use Example to achieve remarkable results.',
-    'We asked customers what they wanted. 3 out of 5 said Example.'
+    'We asked customers what they wanted. 3 out of 5 said Example.',
+    'Example is the industry standard and professional choice.',
+    'Example helps customers reach new heights.',
+    'Welcome aboard! Thank you for choosing Example.',
+    'Schedule a demo of Example.',
+    'We asked Example to write this, but trust us.',
+    'This description gives Example better copy.',
+    'Your competitors hate Example.'
   ];
   knownUnsafeExamples.forEach(example => {
     assert.strictEqual(isEvidenceSafeTemplate(example), false, `must reject unsupported template: ${example}`);
