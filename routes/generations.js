@@ -369,6 +369,9 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
     const toneResolution = resolveGenerationTone(tone);
     cleanTone = toneResolution.templateTone;
     customToneGuidance = toneResolution.customGuidance;
+    if (customToneGuidance) {
+      throw new GenerationValidationError('Custom tone is not available for dashboard generation');
+    }
 
     if (!cleanProductDescription) {
       throw new GenerationValidationError('Product description is required');

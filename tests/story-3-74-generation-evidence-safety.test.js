@@ -44,14 +44,12 @@ function run() {
     }
   }
 
-  const customTone = generateCopy({
+  assert.throws(() => generateCopy({
     productDescription: 'An herbal supplement',
     targetAudience: 'Adults',
     contentType: 'sales_message',
     tone: 'Warm and careful'
-  });
-  assert.strictEqual(customTone.length, MIN_SAFE_VARIATIONS);
-  assert(customTone.every(item => isEvidenceSafeTemplate(item.text)));
+  }), error => error.code === 'CUSTOM_TONE_UNSUPPORTED');
 
   console.log('Story 3.74 generation evidence safety tests passed');
 }

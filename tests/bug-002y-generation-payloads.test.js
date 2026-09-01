@@ -192,6 +192,10 @@ async function run() {
   assert.strictEqual(normalizeTone('  pRoFeSsIoNaL  '), 'professional');
   assert.strictEqual(resolveTone('Warm, trustworthy, educational, and science-forward').templateTone, 'professional');
   assert.strictEqual(resolveTone('Warm, trustworthy, educational, and science-forward').customGuidance, 'Warm, trustworthy, educational, and science-forward');
+  assert.throws(() => generateCopy({
+    productDescription: 'Example', contentType: 'sales_message', tone: 'professional',
+    customToneGuidance: 'Warm, trustworthy, educational, and science-forward'
+  }), error => error.code === 'CUSTOM_TONE_UNSUPPORTED');
   assert.strictEqual(resolveTone('').templateTone, 'professional');
   assert.strictEqual(resolveTone('   ').templateTone, 'professional');
   assert.strictEqual(resolveTone({ voice: 'warm' }).templateTone, 'professional');
@@ -286,12 +290,9 @@ async function run() {
       tone: 'Warm, trustworthy, educational, and science-forward',
       contentType: 'Product Descriptions'
     }));
-    assert.strictEqual(response.res.statusCode, 200);
-    const body = parseJson(response);
-    assert.strictEqual(body.results.length, 5);
-    assert(body.results.every((result) => result.tone === 'professional'));
-    assertNoUndefinedValues(body.results);
-    assert.strictEqual(snapshot(db, customQuickUserId).usageEvents, 1);
+    assert.strictEqual(response.res.statusCode, 400);
+    assert.strictEqual(parseJson(response).error, 'Invalid generation request');
+    assert.strictEqual(snapshot(db, customQuickUserId).usageEvents, 0);
   });
 
   const customBundleUserId = createUser(db, { monthly_limit: 20 });
@@ -301,12 +302,8 @@ async function run() {
       ...bundleBody(productionSelection),
       tone: 'Warm, trustworthy, educational, and science-forward'
     });
-    assert.strictEqual(response.res.statusCode, 200);
-    const body = parseJson(response);
-    assert.strictEqual(body.results.length, 25);
-    assert(body.results.every((result) => result.tone === 'professional'));
-    assertNoUndefinedValues(body.results);
-    assert.strictEqual(snapshot(db, customBundleUserId).usageEvents, 1);
+    assert.strictEqual(response.res.statusCode, 400);
+    assert.strictEqual(snapshot(db, customBundleUserId).usageEvents, 0);
   });
 
   const customCampaignUserId = createUser(db, { monthly_limit: 20 });
