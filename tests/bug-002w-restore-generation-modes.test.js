@@ -206,7 +206,7 @@ async function run() {
     assert.match(dashboard.body, /Guided Objective/);
     assert.match(dashboard.body, /id="mode-quick-trigger"/);
     assert.match(dashboard.body, /id="mode-bundle-trigger"/);
-    assert.match(dashboard.body, /id="mode-campaign-trigger"/);
+    assert.match(dashboard.body, /id="guided-objective-trigger"/);
     assert.match(dashboard.body, /data-mode-trigger="quick"/);
     assert.match(dashboard.body, /data-mode-trigger="bundle"/);
     assert.doesNotMatch(dashboard.body, /data-mode-trigger="campaign"/);

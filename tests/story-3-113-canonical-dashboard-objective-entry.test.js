@@ -6,7 +6,7 @@ const dashboard = fs.readFileSync(path.join(__dirname, '..', 'views', 'dashboard
 
 assert.match(dashboard, /Start a Guided Objective/);
 assert.match(dashboard, /Build a validated strategy, plan, and production-ready set of deliverables/);
-assert.match(dashboard, /href="\/welcome" class="mode-launch-card" id="mode-campaign-trigger"/);
+assert.match(dashboard, /href="\/welcome" class="mode-launch-card" id="guided-objective-trigger"/);
 assert.match(dashboard, /href="\/brand-brain" class="btn btn-outline btn-lg"/);
 assert.doesNotMatch(dashboard, /needs to learn about your business/i);
 assert.doesNotMatch(dashboard, /Complete your Brand Brain profile/i);

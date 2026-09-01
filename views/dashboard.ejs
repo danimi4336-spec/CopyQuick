@@ -1,5 +1,5 @@
 <%
-    var requestKeys = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys : { quick: '', bundle: '', campaign: '' };
+    var requestKeys = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys : { quick: '', bundle: '' };
     var credits = typeof aiCredits !== 'undefined' && aiCredits ? aiCredits : {
         label: 'AI Credits',
         planName: user.plan_tier || 'Free',
@@ -132,7 +132,7 @@
                 <strong>Marketing Bundle</strong>
                 <span>Generate a coordinated bundle of related assets.</span>
             </a>
-            <a href="/welcome" class="mode-launch-card" id="mode-campaign-trigger">
+            <a href="/welcome" class="mode-launch-card" id="guided-objective-trigger">
                 <span class="mode-launch-icon">🚀</span>
                 <strong>Guided Objective</strong>
                 <span>Build a validated strategy, plan, and production-ready set of deliverables.</span>
@@ -275,34 +275,6 @@
             <div class="results-area-bundle"></div>
         </div>
 
-        <!-- ===== Campaign ===== -->
-        <div class="mode-panel" id="mode-campaign">
-            <div class="campaign-workspace">
-                <div class="campaign-form-col">
-                    <div class="card p-4">
-                        <div class="mode-panel-header">
-                            <h2>🚀 Complete Campaign</h2>
-                            <p class="mode-panel-desc">Build customer-ready campaign deliverables from a guided objective and validated production plan.</p>
-                        </div>
-                        <p>CopyQuick will first understand the objective, then build a production plan whose deliverables are validated before they are presented as complete.</p>
-                        <a href="/welcome" class="btn btn-primary btn-block btn-lg campaign-cta">Start a Guided Objective →</a>
-                    </div>
-                </div>
-                <div class="campaign-deliverables-col">
-                    <div class="card p-4 deliverables-card">
-                        <div class="deliverables-header">
-                            <h3>Quality before generation</h3>
-                        </div>
-                        <div class="deliverables-list">
-                            <div class="deliverable-item">• Grounded in confirmed business context</div>
-                            <div class="deliverable-item">• Sequenced through a reviewed plan</div>
-                            <div class="deliverable-item">• Checked for customer-facing quality</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="results-area-campaign"></div>
-        </div>
     </div><!-- /bc-tools -->
 </div><!-- /builder-center -->
 
@@ -350,50 +322,6 @@
 .copycredit-bank-note{border:1px dashed var(--border);border-radius:0.6rem;padding:0.8rem;margin-bottom:1rem;background:var(--light);}
 .copycredit-bank-note strong{font-size:0.85rem;color:var(--dark);}
 .copycredit-bank-note p{font-size:0.78rem;color:var(--secondary);line-height:1.45;margin:0.25rem 0 0;max-width:none;}
-
-/* ===== Business Journey Groups ===== */
-.bj-section{margin-bottom:2.5rem;}
-.bj-heading{font-size:1.1rem;font-weight:700;color:var(--dark);margin-bottom:1.25rem;}
-.bj-layout{display:grid;grid-template-columns:1fr 320px;gap:1.5rem;align-items:start;}
-.bj-left{min-width:0;}
-.bj-group{margin-bottom:1.25rem;}
-.bj-group-header{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--secondary);margin-bottom:0.5rem;}
-.bj-group-cards{display:flex;flex-direction:column;gap:0.35rem;}
-.bj-card{display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.75rem;border:1px solid var(--border);border-radius:0.65rem;cursor:pointer;transition:all 0.15s;background:var(--white);}
-.bj-card:hover{border-color:var(--primary);box-shadow:0 1px 4px rgba(79,70,229,0.08);}
-.bj-card.selected{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 2px rgba(79,70,229,0.15);}
-.bj-card-icon{font-size:1.1rem;flex-shrink:0;width:1.5rem;text-align:center;}
-.bj-card-body{flex:1;min-width:0;}
-.bj-card-title{font-size:0.82rem;font-weight:600;color:var(--dark);}
-.bj-card-desc{font-size:0.72rem;color:var(--secondary);max-width:none;line-height:1.3;margin-top:0.05rem;}
-.bj-card-check{font-size:0.75rem;color:var(--primary);font-weight:700;opacity:0;transition:opacity 0.15s;flex-shrink:0;}
-.bj-card.selected .bj-card-check{opacity:1;}
-.bj-right{position:sticky;top:5rem;}
-.bj-blueprint-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.75rem;padding:3rem 1.5rem;border:1px dashed var(--border);border-radius:1rem;background:var(--light);text-align:center;}
-.bj-placeholder-icon{font-size:2rem;}
-.bj-placeholder-text{font-size:0.85rem;color:var(--secondary);max-width:200px;line-height:1.4;}
-
-/* ===== Blueprint Content ===== */
-.bj-blueprint-content{padding:1.25rem 1.25rem 0;border:1px solid var(--border);border-radius:1rem;background:var(--white);}
-.bp-header{display:flex;align-items:flex-start;gap:0.75rem;margin-bottom:0.75rem;}
-.bp-icon{font-size:1.5rem;flex-shrink:0;margin-top:0.15rem;}
-.bp-title-group{flex:1;min-width:0;}
-.bp-title{font-size:1rem;font-weight:700;color:var(--dark);margin:0 0 0.1rem;}
-.bp-tagline{font-size:0.78rem;color:var(--secondary);margin:0;line-height:1.35;max-width:none;}
-.bp-platforms{display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:1rem;}
-.bp-platform-chip{display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.55rem;font-size:0.72rem;font-weight:500;border:1px solid var(--border);border-radius:0.4rem;background:var(--light);color:var(--secondary);white-space:nowrap;}
-.bp-platform-chip::before{content:"🛒";font-size:0.7rem;}
-.bp-groups{display:flex;flex-direction:column;gap:0.9rem;margin-bottom:1rem;}
-.bp-group-category{font-size:0.78rem;font-weight:700;color:var(--dark);margin-bottom:0.2rem;text-transform:uppercase;letter-spacing:0.03em;}
-.bp-group-items{display:flex;flex-wrap:wrap;gap:0.3rem;}
-.bp-item-chip{display:inline-flex;align-items:center;gap:0.25rem;padding:0.25rem 0.5rem;font-size:0.72rem;font-weight:500;border:1px solid var(--border);border-radius:0.4rem;background:var(--white);color:var(--dark);white-space:nowrap;cursor:default;}
-.bp-item-chip:hover{border-color:var(--primary);}
-.bp-footer{border-top:1px solid var(--border);padding:0.75rem 0;margin-top:0.25rem;}
-.bp-stats{display:flex;gap:1.25rem;margin-bottom:0.3rem;}
-.bp-stat{font-size:0.78rem;font-weight:600;color:var(--dark);}
-.bp-stat:first-child{color:var(--primary);}
-.bp-outcome{font-size:0.72rem;color:var(--secondary);margin:0;line-height:1.4;max-width:none;}
-.bj-cta-row{margin-top:1.25rem;}
 
 /* ===== Recommendation ===== */
 .bc-recommendation{margin-bottom:2.5rem;}
@@ -443,21 +371,6 @@
 .bundle-selection-toast.visible{opacity:1;transform:translateY(0);}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 
-.campaign-workspace{display:grid;grid-template-columns:1fr 280px;gap:1.25rem;align-items:start;}
-.campaign-sec-btn{display:inline-flex;align-items:center;gap:0.35rem;padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--white);font-size:0.78rem;font-weight:500;color:var(--secondary);cursor:pointer;transition:all 0.15s;font-family:inherit;}
-.campaign-sec-btn:hover{border-color:var(--primary);color:var(--dark);}
-.campaign-sec-btn.active{border-color:var(--primary);background:var(--primary-light);color:var(--primary);font-weight:600;}
-.campaign-section-btns{display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.35rem;margin-bottom:1.25rem;}
-.campaign-cta{margin-top:1rem;font-size:1rem;padding:0.8rem;}
-
-.deliverables-card{position:sticky;top:5rem;}
-.deliverables-header h3{font-size:1rem;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
-.deliverables-list{display:flex;flex-direction:column;gap:0.2rem;}
-.deliverable-item{font-size:0.82rem;color:var(--secondary);padding:0.25rem 0;}
-.deliverable-item:hover{color:var(--dark);}
-.deliverables-footer{border-top:1px solid var(--border);margin-top:0.75rem;padding-top:0.6rem;}
-.deliverables-count{font-size:0.75rem;font-weight:600;color:var(--primary);}
-
 .custom-select-wrap{display:flex;flex-direction:column;gap:0.5rem;}
 .custom-field-hidden{display:none;max-height:0;overflow:hidden;transition:all 0.3s ease;}
 .custom-field-visible{display:block;max-height:120px;}
@@ -480,12 +393,6 @@
 .loading-skeleton{display:none;}
 .skeleton .skeleton-line{height:0.8rem;background:var(--border);border-radius:4px;margin-bottom:0.5rem;}
 
-@media(max-width:992px){
-    .campaign-workspace{grid-template-columns:1fr;}
-    .deliverables-card{position:static;}
-    .bj-layout{grid-template-columns:1fr;}
-    .bj-right{position:static;}
-}
 @media(max-width:768px){
     .bc-welcome{flex-direction:column;align-items:flex-start;gap:1rem;}
     .bc-welcome-right{width:100%;}
@@ -561,26 +468,6 @@
     toggle();
   });
 
-  // ===== Campaign Section Buttons =====
-  var sections = <%- JSON.stringify(campaignSections).replace(/</g, '\\u003c') %>;
-  var secBtns=document.querySelectorAll('.campaign-sec-btn');
-  var titleEl=document.getElementById('deliverables-title');
-  var listEl=document.getElementById('deliverables-list');
-  var countEl=document.getElementById('deliverables-count');
-  secBtns.forEach(function(btn){
-    btn.addEventListener('click',function(){
-      secBtns.forEach(function(b){b.classList.remove('active');});
-      btn.classList.add('active');
-      var id=btn.getAttribute('data-section');
-      var sec=sections.find(function(s){return s.id===id;});
-      if(sec){
-        if(titleEl)titleEl.textContent=sec.icon+' '+sec.label+' Includes';
-        if(listEl){listEl.replaceChildren();sec.deliverables.forEach(function(d){var item=document.createElement('div');item.className='deliverable-item';item.textContent='• '+d;listEl.appendChild(item);});}
-        if(countEl)countEl.textContent=sec.deliverables.length+' assets';
-      }
-    });
-  });
-
   // ===== Bundle Asset Selection =====
   var bundleSelection = window.CopyQuickBundleSelection && window.CopyQuickBundleSelection.init({
     maxSelected: 5
@@ -593,8 +480,7 @@
 	  var backBtn=document.getElementById('bcBackBtn');
 	  var modeTitles={
 	    quick:'⚡ Quick Generate',
-	    bundle:'📦 Marketing Bundle',
-	    campaign:'🚀 Complete Campaign'
+	    bundle:'📦 Marketing Bundle'
 	  };
 	  function showMode(mode){
 	    if(!toolsSection||!modeTitles[mode])return;
@@ -637,7 +523,6 @@
 	  }
 	  if(location.hash==='#mode-quick'||location.hash==='#mode-quick-trigger')showMode('quick');
 	  if(location.hash==='#mode-bundle'||location.hash==='#mode-bundle-trigger')showMode('bundle');
-	  if(location.hash==='#mode-campaign'||location.hash==='#mode-campaign-trigger')showMode('campaign');
 
 	  // ===== Form Submission (AJAX) =====
   function newGenerationRequestKey(){
@@ -651,8 +536,7 @@
       var btn=form.querySelector('.gen-btn');
       var skel=mode==='quick'?form.closest('.mode-panel').querySelector('.loading-skeleton'):null;
       var resArea=mode==='quick'?form.closest('.mode-panel').querySelector('.results-area-quick'):
-                   mode==='bundle'?form.closest('.mode-panel').querySelector('.results-area-bundle'):
-                   form.closest('.mode-panel').querySelector('.results-area-campaign');
+                   form.closest('.mode-panel').querySelector('.results-area-bundle');
       btn.disabled=true;btn.textContent='⏳';
       if(skel)skel.style.display='block';
       if(resArea)resArea.innerHTML='';
@@ -675,17 +559,6 @@
         document.querySelectorAll('#mode-bundle input[name="assets"]:checked').forEach(function(cb){checked.push(cb.value);});
         d.append('assets',checked.join(','));
         d.append('generationType','bundle');
-      } else if(mode==='campaign'){
-        d.append('productDescription',document.getElementById('campaignProduct').value);
-        var aud=document.getElementById('campaignTargetAudience');
-        d.append('targetAudience',aud.value==='Custom'?document.querySelector('#campaign-audience-custom textarea').value:aud.value);
-        var tone=document.getElementById('campaignVoice');
-        d.append('tone',tone.value==='Custom'?document.querySelector('#campaign-voice-custom textarea').value:tone.value);
-        var goal=document.getElementById('campaignGoal');
-        d.append('goal',goal.value==='Custom'?document.querySelector('#campaign-goal-custom textarea').value:goal.value);
-        var activeSec=document.querySelector('.campaign-sec-btn.active');
-        d.append('campaignSections',activeSec?activeSec.getAttribute('data-section'):'email');
-        d.append('generationType','campaign');
       }
 
       fetch('/dashboard/generate',{
@@ -701,12 +574,12 @@
         return d;
       });})
       .then(function(d){
-        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
+        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':'📦 Generate Bundle';
         if(skel)skel.style.display='none';
         window.CopyQuickDashboardResults.renderGenerationResults(resArea,d.results);
         if(requestKeyInput)requestKeyInput.value=newGenerationRequestKey();
       }).catch(function(e){
-        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':mode==='bundle'?'📦 Generate Bundle':'🚀 Build My Campaign';
+        btn.disabled=false;btn.textContent=mode==='quick'?'Generate':'📦 Generate Bundle';
         if(skel)skel.style.display='none';
         window.CopyQuickDashboardResults.renderError(resArea,e.message);
       });

@@ -6,7 +6,7 @@ function run() {
   const dashboard = fs.readFileSync(path.join(__dirname, '..', 'views', 'dashboard.ejs'), 'utf8');
 
   assert.match(dashboard, /href="\/welcome"[^>]*>🚀 Start a Guided Objective →<\/a>/);
-  assert.match(dashboard, /href="\/welcome"[^>]*id="mode-campaign-trigger"/);
+  assert.match(dashboard, /href="\/welcome"[^>]*id="guided-objective-trigger"/);
   assert.match(dashboard, /Add Brand Context/);
   assert.match(dashboard, /Update Brand Context/);
   assert.doesNotMatch(dashboard, /Continue to Brand Brain/);

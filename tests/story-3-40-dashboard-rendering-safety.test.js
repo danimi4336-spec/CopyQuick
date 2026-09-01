@@ -15,7 +15,6 @@ assert.match(routes, /errorAction: \{ href: '\/pricing'/);
 assert(!view.includes('listEl.innerHTML=sec.deliverables'));
 assert(!view.includes('platformsEl.innerHTML = chips'));
 assert(!view.includes('groupsEl.innerHTML = h'));
-assert.match(view, /item\.textContent='• '\+d/);
 assert.doesNotMatch(view, /bjBlueprintPanel|renderBlueprint|bpGroups/);
-assert.match(view, /JSON\.stringify\(campaignSections\)\.replace/);
+assert.doesNotMatch(view, /campaignSections|campaign-sec-btn|mode-campaign/);
 console.log('Story 3.40 dashboard rendering safety tests passed');

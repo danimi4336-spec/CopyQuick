@@ -10,7 +10,7 @@ const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
-const { bundleAssets, campaignSections, brandVoices, goals, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
+const { bundleAssets, brandVoices, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
@@ -33,7 +33,6 @@ router.use((req, res, next) => {
   res.locals.generationRequestKeys = {
     quick: crypto.randomUUID(),
     bundle: crypto.randomUUID(),
-    campaign: crypto.randomUUID(),
     regenerate: crypto.randomUUID()
   };
   next();
@@ -153,10 +152,6 @@ router.get('/dashboard', requireAuth, (req, res) => {
 
     const safeVal = function(val, fallback) { return val !== null && val !== undefined ? val : fallback; };
 
-    // Validate critical data before rendering
-    const sections = campaignSections;
-    if (!sections || !sections.length) { console.log('⚠️ campaignSections is empty!'); }
-
     const totalGenerations = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0').get(userId)?.count, 0);
     const favorites = safeVal(db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(userId)?.count, 0);
     const thisMonth = safeVal(db.prepare("SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(userId)?.count, 0);
@@ -201,8 +196,8 @@ router.get('/dashboard', requireAuth, (req, res) => {
       totalGenerations: totalGenerations, favorites: favorites, thisMonth: thisMonth,
       quickCount: quickCount, bundleCount: bundleCount,
       recent: recent, typeBreakdown: typeBreakdown,
-      bundleAssets: bundleAssets, campaignSections: campaignSections,
-      brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
+      bundleAssets: bundleAssets,
+      brandVoices: brandVoices, audiencePresets: audiencePresets,
       brain: brain, brainPct: brainPct, brainFilled: brainFilled,
       aiCredits: aiCredits,
       currentPage: 'dashboard'
@@ -221,8 +216,8 @@ router.get('/dashboard', requireAuth, (req, res) => {
         totalGenerations: 0, favorites: 0, thisMonth: 0,
         quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
-        bundleAssets: bundleAssets, campaignSections: campaignSections,
-        brandVoices: brandVoices, goals: goals, audiencePresets: audiencePresets,
+        bundleAssets: bundleAssets,
+        brandVoices: brandVoices, audiencePresets: audiencePresets,
         brain: {}, brainPct: 0, brainFilled: 0,
         aiCredits: null,
         currentPage: 'dashboard'
@@ -240,7 +235,7 @@ router.get('/dashboard', requireAuth, (req, res) => {
 
 // ====== Generate Copy ======
 router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, generationActionRateLimit, (req, res) => {
-  const { productDescription, targetAudience, contentType, tone, generationType, assets, goal, campaignSections: requestedCampaignSections } = req.body;
+  const { productDescription, targetAudience, contentType, tone, generationType, assets } = req.body;
   const db = getDb();
   const user = res.locals.user;
   const isAjax = req.xhr || req.headers.accept?.includes('json');
@@ -318,7 +313,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         totalGenerations: 0, favorites: 0, thisMonth: 0,
         quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
-        bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+        bundleAssets, brandVoices, audiencePresets,
         brain: db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {},
         brainPct: 0, brainFilled: 0,
         aiCredits: getAiCredits(db, user),
@@ -347,7 +342,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       totalGenerations: 0, favorites: 0, thisMonth: 0,
       quickCount: 0, bundleCount: 0,
       recent: [], typeBreakdown: [],
-      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      bundleAssets, brandVoices, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       aiCredits: formatAiCredits(usageSnapshot, user),
       input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
@@ -366,9 +361,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         tone: cleanTone,
         customToneGuidance,
         generationType: genType,
-        assets: selectedBundleAssets.map(asset => asset.assetId),
-        goal: normalizeField(goal),
-        campaignSections: normalizeField(requestedCampaignSections)
+        assets: selectedBundleAssets.map(asset => asset.assetId)
       }
     });
     if (generationRequest.replay) {
@@ -432,7 +425,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
           INSERT INTO generations (user_id, title, input_text, content_type, tone, results, word_count, goal, generation_type)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
-        const result = stmt.run(user.id, title, cleanProductDescription, contentTypeVal, cleanTone || 'professional', resultsJson, wordCount, goal || '', genType);
+        const result = stmt.run(user.id, title, cleanProductDescription, contentTypeVal, cleanTone || 'professional', resultsJson, wordCount, '', genType);
         return result.lastInsertRowid;
       },
       finalizeGeneration: (txDb, resource) => {
@@ -477,7 +470,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       totalGenerations, favorites, thisMonth,
       quickCount, bundleCount,
       recent, typeBreakdown,
-      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      bundleAssets, brandVoices, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       aiCredits: formatAiCredits(updatedUsageSnapshot, updatedUser),
       input: { productDescription: cleanProductDescription, targetAudience: cleanTargetAudience, contentType: cleanContentType, tone: cleanTone },
@@ -527,7 +520,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
         totalGenerations: 0, favorites: 0, thisMonth: 0,
         quickCount: 0, bundleCount: 0,
         recent: [], typeBreakdown: [],
-        bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+        bundleAssets, brandVoices, audiencePresets,
         brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
         aiCredits: formatAiCredits(latestUsageSnapshot, latestUser),
         input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
@@ -549,7 +542,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       totalGenerations: 0, favorites: 0, thisMonth: 0,
       quickCount: 0, bundleCount: 0,
       recent: [], typeBreakdown: [],
-      bundleAssets, campaignSections, brandVoices, goals, audiencePresets,
+      bundleAssets, brandVoices, audiencePresets,
       brain: brainSafe, brainPct: brainPctSafe, brainFilled: brainFilledSafe,
       aiCredits: null
     });
