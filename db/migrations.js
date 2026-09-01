@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 2;
+const MAX_SUPPORTED_SCHEMA_VERSION = 3;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -85,7 +85,48 @@ const BILLING_RECONCILIATION_MIGRATION = Object.freeze({
   }
 });
 
-const MIGRATIONS = Object.freeze([BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION]);
+const GENERATION_IDEMPOTENCY_MIGRATION = Object.freeze({
+  version: 3,
+  name: 'generation_request_idempotency',
+  kind: 'migration',
+  policy: 'additive',
+  // Older application revisions reject the v3 ledger before normal startup.
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    `CREATE TABLE generation_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      operation TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      request_hash TEXT NOT NULL CHECK(length(request_hash) = 64),
+      status TEXT NOT NULL CHECK(status IN ('in_progress', 'completed', 'failed')),
+      generation_id INTEGER REFERENCES generations(id),
+      error_code TEXT,
+      started_at DATETIME NOT NULL,
+      completed_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, operation, idempotency_key)
+    )`,
+    'CREATE INDEX idx_generation_requests_user_created ON generation_requests(user_id, created_at DESC)',
+    'CREATE INDEX idx_generation_requests_status_started ON generation_requests(status, started_at)'
+  ]),
+  validate(db) {
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='generation_requests'").get()) {
+      throw new MigrationError('Generation idempotency migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+    const indexes = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='generation_requests'").all().map(row => row.name));
+    if (!indexes.has('idx_generation_requests_user_created') || !indexes.has('idx_generation_requests_status_started')) {
+      throw new MigrationError('Generation idempotency migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
+const MIGRATIONS = Object.freeze([
+  BASELINE_MIGRATION,
+  BILLING_RECONCILIATION_MIGRATION,
+  GENERATION_IDEMPOTENCY_MIGRATION
+]);
 
 function migrationChecksum(migration) {
   const material = JSON.stringify({
@@ -474,6 +515,7 @@ async function executeMigrationsWithProductionBackup(db, options = {}) {
 module.exports = {
   BASELINE_MIGRATION,
   BILLING_RECONCILIATION_MIGRATION,
+  GENERATION_IDEMPOTENCY_MIGRATION,
   LEDGER_SQL,
   LEDGER_TABLE,
   MAX_SUPPORTED_SCHEMA_VERSION,

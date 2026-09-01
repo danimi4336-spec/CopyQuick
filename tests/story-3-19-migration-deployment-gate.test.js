@@ -9,9 +9,8 @@ const Database = require('better-sqlite3');
 const express = require('express');
 const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const {
-  BASELINE_MIGRATION,
-  BILLING_RECONCILIATION_MIGRATION,
   LEDGER_TABLE,
+  MIGRATIONS,
   runMigrationEngine
 } = require('../db/migrations');
 const { requireCompatibleMigrationState } = require('../lib/migrationStartupGate');
@@ -33,9 +32,9 @@ function closeFixture(value) {
   fs.rmSync(value.directory, { recursive: true, force: true });
 }
 
-function additiveV3() {
+function additiveV4() {
   return {
-    version: 3,
+    version: 4,
     name: 'add_gate_probe',
     kind: 'migration',
     policy: 'additive',
@@ -50,9 +49,9 @@ function initializeCurrent(db) {
 
 function initializeNewer(db) {
   return runMigrationEngine(db, {
-    registry: [BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION, additiveV3()],
+    registry: [...MIGRATIONS, additiveV4()],
     minVersion: 1,
-    maxVersion: 3,
+    maxVersion: 4,
     logger: () => {}
   });
 }
@@ -89,19 +88,19 @@ async function run() {
       initializeCurrent(value.db);
       const logs = [];
       const status = gate(value.db, {}, entry => logs.push(entry));
-      assert.strictEqual(status.currentVersion, 2);
+      assert.strictEqual(status.currentVersion, 3);
       assert.strictEqual(status.pendingCount, 0);
       assert.deepStrictEqual(logs, [{
         event: 'migration_compatibility_ok',
-        currentVersion: 2,
+        currentVersion: 3,
         minSupportedVersion: 1,
-        maxSupportedVersion: 2,
+        maxSupportedVersion: 3,
         pendingCount: 0
       }]);
     } finally { closeFixture(value); }
   }
 
-  // Mandatory rollback scenario: Build A (v1) refuses a database migrated by Build B (v2).
+  // Mandatory rollback scenario: the current build refuses a database migrated by a future build.
   {
     const value = fixture();
     try {
@@ -120,13 +119,13 @@ async function run() {
   // A schema below this build's minimum is incompatible; a pending additive migration is required, never implicit.
   {
     const value = fixture();
-    const registry = [BASELINE_MIGRATION, BILLING_RECONCILIATION_MIGRATION, additiveV3()];
+    const registry = [...MIGRATIONS, additiveV4()];
     try {
       initializeCurrent(value.db);
-      expectBlocked(() => gate(value.db, { registry, minVersion: 3, maxVersion: 3 }), 'MIGRATION_INCOMPATIBLE');
-      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: 3 }), 'MIGRATION_REQUIRED');
+      expectBlocked(() => gate(value.db, { registry, minVersion: 4, maxVersion: 4 }), 'MIGRATION_INCOMPATIBLE');
+      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: 4 }), 'MIGRATION_REQUIRED');
       assert.strictEqual(value.db.prepare("SELECT 1 FROM sqlite_master WHERE name='gate_probe'").get(), undefined);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
     } finally { closeFixture(value); }
   }
 
@@ -228,7 +227,7 @@ async function run() {
       assert.match(result.stderr, /"condition":"MIGRATION_INCOMPATIBLE"/);
       assert.strictEqual(fileHash(unsafe.databasePath), beforeHash);
       unsafe.db = new Database(unsafe.databasePath);
-      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
+      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 4);
     } finally { closeFixture(unsafe); }
   }
 
@@ -256,7 +255,7 @@ async function run() {
       assert.doesNotMatch(result.stdout + result.stderr, new RegExp(value.directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       assert.strictEqual(fs.existsSync(`${value.databasePath}.runtime-lock`), false);
       value.db = new Database(value.databasePath);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 4);
     } finally { closeFixture(value); }
   }
 

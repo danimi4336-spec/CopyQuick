@@ -136,9 +136,9 @@ async function run() {
   {
     const value = fixture();
     try {
-      assert.strictEqual(MIGRATIONS.at(-1), BILLING_RECONCILIATION_MIGRATION);
+      assert.strictEqual(MIGRATIONS.find(migration => migration.version === 2), BILLING_RECONCILIATION_MIGRATION);
       assert.strictEqual(BILLING_RECONCILIATION_MIGRATION.rollbackCompatible, false);
-      assert.strictEqual(value.db.prepare(`SELECT MAX(version) version FROM ${LEDGER_TABLE}`).get().version, 2);
+      assert.strictEqual(value.db.prepare(`SELECT version FROM ${LEDGER_TABLE} WHERE version = 2`).get().version, 2);
       assert.ok(value.db.pragma('table_info(subscriptions)').some(column => column.name === 'past_due_since'));
       assert.strictEqual(value.db.prepare('SELECT COUNT(*) count FROM billing_reconciliation_runs').get().count, 0);
     } finally { closeFixture(value); }
@@ -155,7 +155,9 @@ async function run() {
       });
       const userId = Number(value.db.prepare("INSERT INTO users(email, name, plan_tier, monthly_limit) VALUES ('migration@example.com', 'Migration', 'pro', 200)").run().lastInsertRowid);
       const before = value.db.prepare('SELECT * FROM users WHERE id=?').get(userId);
-      runMigrationEngine(value.db, { env, logger: () => {} });
+      runMigrationEngine(value.db, {
+        registry: MIGRATIONS.slice(0, 2), minVersion: 1, maxVersion: 2, env, logger: () => {}
+      });
       assert.deepStrictEqual(value.db.prepare('SELECT * FROM users WHERE id=?').get(userId), before);
       assert.strictEqual(value.db.prepare(`SELECT MAX(version) version FROM ${LEDGER_TABLE}`).get().version, 2);
     } finally { closeFixture(value); }

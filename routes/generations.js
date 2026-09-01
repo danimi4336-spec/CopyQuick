@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
@@ -15,6 +16,23 @@ const {
   persistGenerationUsageTransaction,
   UsageLimitExceededError
 } = require('../lib/subscriptions');
+const {
+  GenerationRequestError,
+  beginGenerationRequest,
+  completeGenerationRequest,
+  failGenerationRequest,
+  loadReplayGeneration
+} = require('../lib/generationIdempotency');
+
+router.use((req, res, next) => {
+  res.locals.generationRequestKeys = {
+    quick: crypto.randomUUID(),
+    bundle: crypto.randomUUID(),
+    campaign: crypto.randomUUID(),
+    regenerate: crypto.randomUUID()
+  };
+  next();
+});
 
 const goalLabels = {
   launch_product: 'Launch a New Product',
@@ -283,6 +301,7 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   const user = res.locals.user;
   const isAjax = req.xhr || req.headers.accept?.includes('json');
   const genType = generationType || 'quick';
+  let generationRequest = { enabled: false };
   const getDashboardCounts = function(currentUserId) {
     return {
       favorites: db.prepare('SELECT COUNT(*) as count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(currentUserId)?.count || 0,
@@ -383,6 +402,46 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
   }
 
   try {
+    generationRequest = beginGenerationRequest(db, {
+      userId: user.id,
+      operation: 'dashboard_generation',
+      key: req.get('Idempotency-Key') || req.body.idempotencyKey,
+      request: {
+        productDescription: cleanProductDescription,
+        targetAudience: cleanTargetAudience,
+        contentType: cleanContentType,
+        tone: cleanTone,
+        customToneGuidance,
+        generationType: genType,
+        assets: selectedBundleAssets.map(asset => asset.assetId),
+        goal: normalizeField(goal),
+        campaignSections: normalizeField(requestedCampaignSections)
+      }
+    });
+    if (generationRequest.replay) {
+      const existing = loadReplayGeneration(db, { userId: user.id, generationId: generationRequest.generationId });
+      if (!isAjax) return res.redirect(`/generation/${existing.id}`);
+      const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+      return res.set('Idempotency-Replayed', 'true').json({
+        results: JSON.parse(existing.results),
+        genId: existing.id,
+        generationsUsed: updatedUser.generations_used,
+        monthlyLimit: updatedUser.monthly_limit,
+        totalGenerations: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0').get(user.id).count,
+        favorites: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND favorite = 1 AND is_deleted = 0').get(user.id).count,
+        thisMonth: db.prepare("SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')").get(user.id).count,
+        idempotentReplay: true
+      });
+    }
+  } catch (err) {
+    if (err instanceof GenerationRequestError) {
+      if (isAjax) return res.status(err.statusCode).json({ error: err.message, code: err.code });
+      return res.status(err.statusCode).send('This generation request could not be processed safely.');
+    }
+    throw err;
+  }
+
+  try {
     let results = [];
     let wordCount = 0;
     let title = cleanProductDescription.length > 60 ? cleanProductDescription.substring(0, 60) + '...' : cleanProductDescription;
@@ -438,6 +497,9 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
         `);
         const result = stmt.run(user.id, title, cleanProductDescription, contentTypeVal, cleanTone || 'professional', resultsJson, wordCount, goal || '', genType);
         return result.lastInsertRowid;
+      },
+      finalizeGeneration: (txDb, resource) => {
+        if (generationRequest.enabled) completeGenerationRequest(txDb, generationRequest.requestId, resource.generationId);
       }
     });
     const genId = persisted.generationId;
@@ -492,6 +554,9 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       genMode: genType
     });
   } catch (err) {
+    if (generationRequest.enabled && !generationRequest.replay) {
+      failGenerationRequest(db, generationRequest.requestId, err.code || 'GENERATION_FAILED');
+    }
     if (err instanceof GenerationValidationError) {
       console.warn('Dashboard generation validation failed.');
       if (isAjax) return res.status(err.statusCode).json({ error: 'Invalid generation request' });
@@ -508,7 +573,10 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
       console.error('Dashboard generation failed.');
     }
     if (err instanceof UsageLimitExceededError) {
-      if (isAjax) return res.status(403).json({ error: 'Monthly limit reached' });
+      if (isAjax) return res.status(403).json({
+        error: 'Monthly limit reached',
+        retryWithNewRequestKey: generationRequest.enabled
+      });
 
       const latestUser = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) || user;
       const latestUsageSnapshot = getCurrentUsageSnapshot(db, latestUser);
@@ -539,7 +607,10 @@ router.post('/dashboard/generate', requireAuth, (req, res) => {
         input: { productDescription: '', targetAudience: '', contentType: 'subject_line', tone: 'professional' }
       });
     }
-    if (isAjax) return res.status(500).json({ error: 'Generation failed' });
+    if (isAjax) return res.status(500).json({
+      error: 'Generation failed',
+      retryWithNewRequestKey: generationRequest.enabled
+    });
     const brainSafe = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(user.id) || {};
     const brainFields = ['business_name','industry','target_audience','brand_voice','unique_value','competitors','goals','key_messages'];
     const brainFilledSafe = brainFields.filter(f => brainSafe[f] && brainSafe[f].trim()).length;
@@ -752,6 +823,28 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Monthly limit reached' });
   }
 
+  let generationRequest = { enabled: false };
+  try {
+    generationRequest = beginGenerationRequest(db, {
+      userId,
+      operation: `regenerate:${genId}`,
+      key: req.get('Idempotency-Key') || req.body?.idempotencyKey,
+      request: { generationId: Number(genId), contentType: gen.content_type, tone: gen.tone }
+    });
+    if (generationRequest.replay) {
+      const existing = loadReplayGeneration(db, { userId, generationId: generationRequest.generationId });
+      return res.set('Idempotency-Replayed', 'true').json({
+        results: JSON.parse(existing.results),
+        idempotentReplay: true
+      });
+    }
+  } catch (err) {
+    if (err instanceof GenerationRequestError) {
+      return res.status(err.statusCode).json({ error: err.message, code: err.code });
+    }
+    throw err;
+  }
+
   try {
     const newResults = generateCopy({
       productDescription: gen.input_text,
@@ -781,19 +874,25 @@ router.post('/generation/:id/regenerate', requireAuth, (req, res) => {
           throw notFoundError;
         }
         return genId;
+      },
+      finalizeGeneration: (txDb, resource) => {
+        if (generationRequest.enabled) completeGenerationRequest(txDb, generationRequest.requestId, resource.generationId);
       }
     });
 
     res.json({ results: newResults });
   } catch (err) {
+    if (generationRequest.enabled && !generationRequest.replay) {
+      failGenerationRequest(db, generationRequest.requestId, err.code || 'GENERATION_FAILED');
+    }
     console.error('Generation regeneration failed.');
     if (err instanceof UsageLimitExceededError) {
-      return res.status(403).json({ error: 'Monthly limit reached' });
+      return res.status(403).json({ error: 'Monthly limit reached', retryWithNewRequestKey: generationRequest.enabled });
     }
     if (err.code === 'GENERATION_NOT_FOUND') {
       return res.status(404).json({ error: 'Not found' });
     }
-    res.status(500).json({ error: 'Generation failed' });
+    res.status(500).json({ error: 'Generation failed', retryWithNewRequestKey: generationRequest.enabled });
   }
 });
 

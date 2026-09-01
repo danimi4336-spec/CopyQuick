@@ -8,6 +8,7 @@ const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const {
   BASELINE_MIGRATION,
   LEDGER_TABLE,
+  MIGRATIONS,
   MigrationError,
   executeMigrationsWithProductionBackup,
   inspectMigrationStatus,
@@ -56,10 +57,30 @@ async function run() {
     const value = fixture();
     try {
       const result = runMigrationEngine(value.db, { logger: () => {} });
-      assert.strictEqual(result.currentVersion, 2);
+      assert.strictEqual(result.currentVersion, 3);
       assert.strictEqual(result.pendingCount, 0);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
       assert.strictEqual(verifyBaselineStructure(value.db), true);
+      assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='generation_requests'").get());
+    } finally { closeFixture(value); }
+  }
+
+  // Story 3.24 applies v3 additively without rewriting business data. A v2
+  // application rejects the new ledger before normal runtime initialization.
+  {
+    const value = fixture();
+    try {
+      const v2Registry = MIGRATIONS.slice(0, 2);
+      runMigrationEngine(value.db, { registry: v2Registry, minVersion: 1, maxVersion: 2, logger: () => {} });
+      const userId = value.db.prepare('INSERT INTO users(email, name) VALUES (?, ?)').run('v3-upgrade@example.com', 'Preserved').lastInsertRowid;
+      const before = value.db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+      const upgraded = runMigrationEngine(value.db, { logger: () => {} });
+      assert.strictEqual(upgraded.currentVersion, 3);
+      assert.deepStrictEqual(value.db.prepare('SELECT * FROM users WHERE id = ?').get(userId), before);
+      assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='generation_requests'").get());
+      assertCode(() => inspectMigrationStatus(value.db, {
+        registry: v2Registry, minVersion: 1, maxVersion: 2
+      }), 'SCHEMA_VERSION_TOO_NEW');
     } finally { closeFixture(value); }
   }
 
@@ -75,7 +96,7 @@ async function run() {
       assert.strictEqual(migrated.status, 0, migrated.stderr);
       assert.match(migrated.stdout, /"event":"database_migration_complete"/);
       const db = new Database(databasePath, { readonly: true, fileMustExist: true });
-      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 2);
+      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 3);
       db.close();
       assert.strictEqual(fs.existsSync(`${databasePath}.runtime-lock`), false);
     } finally {
@@ -96,7 +117,7 @@ async function run() {
       runMigrationEngine(value.db, { logger: () => {} });
       const after = value.db.prepare('SELECT * FROM users WHERE email = ?').get('baseline@example.com');
       assert.deepStrictEqual(after, before);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 2);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 3);
     } finally { closeFixture(value); }
   }
 
@@ -186,7 +207,8 @@ async function run() {
 
     const newer = fixture();
     try {
-      runMigrationEngine(newer.db, { registry, minVersion: 1, maxVersion: 3, logger: () => {} });
+      const future = additive(4, 'future_schema_probe', ['CREATE TABLE future_schema_probe(id INTEGER PRIMARY KEY)']);
+      runMigrationEngine(newer.db, { registry: [...MIGRATIONS, future], minVersion: 1, maxVersion: 4, logger: () => {} });
       assertCode(() => inspectMigrationStatus(newer.db), 'SCHEMA_VERSION_TOO_NEW');
     } finally { closeFixture(newer); }
   }

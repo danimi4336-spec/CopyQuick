@@ -1,3 +1,4 @@
+<% var regenerateRequestKey = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys.regenerate : ''; %>
 <div class="container workspace-page">
     <nav class="breadcrumb fade-in">
         <a href="/dashboard">Dashboard</a>
@@ -111,9 +112,19 @@ function deleteGen() {
         });
 }
 
+var regenerateRequestKey = '<%= regenerateRequestKey %>';
 function regenerate() {
-    fetch('/generation/' + genId + '/regenerate', { method: 'POST', headers: window.CopyQuickCsrf.headers({ 'Accept': 'application/json' }) })
+    fetch('/generation/' + genId + '/regenerate', {
+        method: 'POST',
+        headers: window.CopyQuickCsrf.headers({
+            'Accept': 'application/json',
+            'Idempotency-Key': regenerateRequestKey
+        })
+    })
         .then(r => r.json()).then(function(d) {
+            if (d.retryWithNewRequestKey && window.crypto && typeof window.crypto.randomUUID === 'function') {
+                regenerateRequestKey = window.crypto.randomUUID();
+            }
             if (d.error) { showToast('Error: ' + d.error); return; }
             showToast('Regenerated!');
             location.reload();

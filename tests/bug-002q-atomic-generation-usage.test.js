@@ -152,7 +152,8 @@ function generationBody(overrides = {}) {
     generationType: overrides.generationType || 'quick',
     assets: overrides.assets,
     campaignSections: overrides.campaignSections,
-    goal: overrides.goal || 'Increase Sales'
+    goal: overrides.goal || 'Increase Sales',
+    ...(overrides.idempotencyKey ? { idempotencyKey: overrides.idempotencyKey } : {})
   };
 }
 
@@ -160,8 +161,11 @@ async function postGenerate(server, body = generationBody()) {
   return request(server, 'POST', '/dashboard/generate', body, { Accept: 'application/json' });
 }
 
-async function postRegenerate(server, generationId) {
-  return request(server, 'POST', `/generation/${generationId}/regenerate`, null, { Accept: 'application/json' });
+async function postRegenerate(server, generationId, idempotencyKey) {
+  return request(server, 'POST', `/generation/${generationId}/regenerate`, null, {
+    Accept: 'application/json',
+    ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+  });
 }
 
 function resetGeneratorState() {
@@ -208,6 +212,29 @@ async function assertFailedGenerationRollsBack(db, triggerSql) {
 async function run() {
   initDb();
   const db = getDb();
+
+  resetGeneratorState();
+  const idempotentUserId = createUser(db, { monthly_limit: 10 });
+  await withServer(idempotentUserId, async (server) => {
+    const key = 'dashboard-request-00000001';
+    const first = await postGenerate(server, generationBody({ idempotencyKey: key }));
+    const afterFirst = snapshot(db, idempotentUserId);
+    const callsAfterFirst = generatorState.calls.length;
+    const replay = await postGenerate(server, generationBody({ idempotencyKey: key }));
+    assert.strictEqual(replay.res.statusCode, 200);
+    assert.strictEqual(parseJson(replay).idempotentReplay, true);
+    assert.strictEqual(replay.res.headers['idempotency-replayed'], 'true');
+    assert.strictEqual(parseJson(replay).genId, parseJson(first).genId);
+    assert.deepStrictEqual(snapshot(db, idempotentUserId), afterFirst);
+    assert.strictEqual(generatorState.calls.length, callsAfterFirst);
+    const conflict = await postGenerate(server, generationBody({
+      idempotencyKey: key,
+      productDescription: 'Different request body'
+    }));
+    assert.strictEqual(conflict.res.statusCode, 409);
+    assert.strictEqual(parseJson(conflict).code, 'IDEMPOTENCY_KEY_REUSED');
+    assert.deepStrictEqual(snapshot(db, idempotentUserId), afterFirst);
+  });
 
   resetGeneratorState();
   const quickUserId = createUser(db, { monthly_limit: 10 });
@@ -296,13 +323,20 @@ async function run() {
   const regenId = insertGeneration(db, regenUserId);
   const originalResults = db.prepare('SELECT results FROM generations WHERE id = ?').get(regenId).results;
   await withServer(regenUserId, async (server) => {
-    const response = await postRegenerate(server, regenId);
+    const key = 'regeneration-request-000001';
+    const response = await postRegenerate(server, regenId, key);
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(generatorState.calls.length, 1);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM usage_events WHERE user_id = ? AND event_type = ?').get(regenUserId, 'regeneration').count, 1);
     assert.strictEqual(snapshot(db, regenUserId).usageCount, 1);
     assert.strictEqual(snapshot(db, regenUserId).legacy, 1);
     assert.notStrictEqual(db.prepare('SELECT results FROM generations WHERE id = ?').get(regenId).results, originalResults);
+    const afterFirst = snapshot(db, regenUserId);
+    const replay = await postRegenerate(server, regenId, key);
+    assert.strictEqual(replay.res.statusCode, 200);
+    assert.strictEqual(parseJson(replay).idempotentReplay, true);
+    assert.strictEqual(generatorState.calls.length, 1);
+    assert.deepStrictEqual(snapshot(db, regenUserId), afterFirst);
   });
 
   resetGeneratorState();
