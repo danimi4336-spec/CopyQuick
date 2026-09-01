@@ -28,6 +28,13 @@ async function run() {
   db.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('passport', JSON.stringify({ passport: { user: 38 } }), '2026-09-01');
   db.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('other', JSON.stringify({ userId: 99 }), '2026-09-01');
   db.prepare('INSERT INTO sessions VALUES (?, ?, ?)').run('malformed', '{bad', '2026-09-01');
+  const insertUnrelatedSession = db.prepare('INSERT INTO sessions VALUES (?, ?, ?)');
+  const addUnrelatedSessions = db.transaction(() => {
+    for (let index = 0; index < 1000; index += 1) {
+      insertUnrelatedSession.run(`unrelated-${index}`, JSON.stringify({ userId: 1000 + index }), '2026-09-01');
+    }
+  });
+  addUnrelatedSessions();
 
   const user = db.prepare('SELECT * FROM users WHERE id = 38').get();
   const token = createPasswordResetToken(user, {
@@ -48,7 +55,9 @@ async function run() {
   assert.strictEqual(reset.ok, true);
   assert.strictEqual(reset.sessionsRevoked, 2);
   assert.strictEqual(db.prepare('SELECT password_hash FROM users WHERE id = 38').get().password_hash, 'new-hash:new-secure-password');
-  assert.deepStrictEqual(db.prepare('SELECT id FROM sessions ORDER BY id').all().map(row => row.id), ['malformed', 'other']);
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id IN ('direct', 'passport')").get().count, 0);
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id LIKE 'unrelated-%'").get().count, 1000);
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS count FROM sessions WHERE id IN ('malformed', 'other')").get().count, 2);
   assert.strictEqual(validatePasswordResetToken(db, token, { env, now }), null, 'successful reset must consume every old-credential token');
   assert.deepStrictEqual(await resetPassword(db, token, 'another-password', { env, now }), { ok: false, code: 'TOKEN_INVALID' });
 
