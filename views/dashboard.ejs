@@ -315,14 +315,11 @@
                         </div>
                         <div class="form-group custom-select-wrap">
                             <label for="bundleVoice">Brand Voice</label>
-                            <select id="bundleVoice" name="tone" data-custom="bundle-voice-custom">
+                            <select id="bundleVoice" name="tone">
                                 <% brandVoices.forEach(function(v){ %>
                                     <option value="<%= v %>"><%= v %></option>
                                 <% }); %>
                             </select>
-                            <div id="bundle-voice-custom" class="custom-field-hidden">
-                                <textarea name="toneCustom" rows="2" placeholder="Example: Warm, trustworthy, premium, and faith-friendly."></textarea>
-                            </div>
                         </div>
                     </div>
                     <div class="form-group">
@@ -744,7 +741,7 @@
         var aud=document.getElementById('bundleTargetAudience');
         d.append('targetAudience',aud.value==='Custom'?document.querySelector('#bundle-audience-custom textarea').value:aud.value);
         var tone=document.getElementById('bundleVoice');
-        d.append('tone',tone.value==='Custom'?document.querySelector('#bundle-voice-custom textarea').value:tone.value);
+        d.append('tone',tone.value);
         var checked=[];
         document.querySelectorAll('#mode-bundle input[name="assets"]:checked').forEach(function(cb){checked.push(cb.value);});
         d.append('assets',checked.join(','));

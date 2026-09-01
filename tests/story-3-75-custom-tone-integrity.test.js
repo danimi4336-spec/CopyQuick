@@ -3,8 +3,9 @@ const { generateCopy, resolveTone } = require('../lib/generator');
 const { brandVoices } = require('../lib/generatorModes');
 
 function run() {
-  assert.strictEqual(brandVoices.includes('Custom'), false,
-    'dashboard generation must not advertise unsupported custom tone guidance');
+  assert.deepStrictEqual(brandVoices, [
+    'Professional', 'Casual', 'Urgent', 'Humorous', 'Inspirational'
+  ], 'dashboard generation must advertise only distinct tones the engine supports');
 
   const resolution = resolveTone('Warm, trustworthy, educational, and science-forward');
   assert.strictEqual(resolution.templateTone, 'professional');

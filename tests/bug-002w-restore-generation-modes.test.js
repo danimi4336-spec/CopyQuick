@@ -213,6 +213,12 @@ async function run() {
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="quick"/);
     assert.match(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="bundle"/);
     assert.doesNotMatch(dashboard.body, /class="gen-form" action="\/dashboard\/generate" method="POST" data-mode="campaign"/);
+    const voiceSelect = dashboard.body.match(/<select id="bundleVoice"[\s\S]*?<\/select>/)?.[0] || '';
+    assert.deepStrictEqual(
+      [...voiceSelect.matchAll(/<option value="([^"]+)">/g)].map(match => match[1]),
+      ['Professional', 'Casual', 'Urgent', 'Humorous', 'Inspirational']
+    );
+    assert.doesNotMatch(voiceSelect, /Luxury|Scientific|Christian|Minimal|Custom/);
     assert.match(dashboard.body, /Start a Guided Objective/);
     assert.match(dashboard.body, /href="\/welcome"/);
     assert.match(dashboard.body, /Try Now/);
