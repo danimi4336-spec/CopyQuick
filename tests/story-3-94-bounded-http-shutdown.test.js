@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-const { DEFAULT_HTTP_SHUTDOWN_TIMEOUT_MS, closeHttpServer, shutdownTimeoutMs } = require('../lib/httpShutdown');
+const { DEFAULT_HTTP_SHUTDOWN_TIMEOUT_MS, closeHttpServer, drainShutdownOperations, shutdownTimeoutMs } = require('../lib/httpShutdown');
 
 async function run() {
   assert.strictEqual(shutdownTimeoutMs('1000'), 1000);
@@ -34,6 +34,18 @@ async function run() {
   assert.deepStrictEqual(await forcedClose, { drained: false, forced: true });
   assert.strictEqual(forced, 1);
   assert.deepStrictEqual(await closeHttpServer(null), { drained: true, forced: false });
+
+  const events = [];
+  const components = await drainShutdownOperations({
+    worker: Promise.resolve({ drained: true }),
+    scheduler: Promise.reject(new Error('private scheduler failure')),
+    watcher: undefined
+  }, event => events.push(event));
+  assert.deepStrictEqual(components, { drained: false, failedComponents: ['scheduler'] });
+  assert.deepStrictEqual(events, [{
+    event: 'shutdown_component_failed', component: 'scheduler', code: 'SHUTDOWN_DRAIN_FAILED'
+  }]);
+  assert.doesNotMatch(JSON.stringify(events), /private scheduler failure/);
 
   console.log('Story 3.94 Bounded HTTP Shutdown tests passed');
 }
