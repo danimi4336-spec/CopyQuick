@@ -458,7 +458,7 @@ router.post('/dashboard/generate', requireAuth, requireGenerationAvailable, gene
       error: 'Generation failed',
       retryWithNewRequestKey: generationRequest.enabled
     });
-    res.render('dashboard', {
+    res.status(failureStatus).render('dashboard', {
       title: 'Dashboard - CopyQuick',
       contentTypes: getContentTypes(), tones: getTones(),
       ...loadDashboardSnapshot(db, user, { aiCredits: null }),

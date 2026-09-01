@@ -410,6 +410,30 @@ async function run() {
       && line.includes('"code":"GENERATION_FAILED"')));
     assert(!logs.join('\n').includes('Turmeric Curcumin and Ginger'));
   });
+
+  const browserFailureUserId = createUser(db, { monthly_limit: 20 });
+  await withServer(browserFailureUserId, async (agent) => {
+    const token = await getToken(agent);
+    const before = snapshot(db, browserFailureUserId);
+    db.exec(`
+      CREATE TRIGGER fail_002y_browser_generation_insert
+      BEFORE INSERT ON generations
+      BEGIN
+        SELECT RAISE(FAIL, 'forced browser generation insert failure');
+      END;
+    `);
+    try {
+      const response = await request(agent, 'POST', '/dashboard/generate', {
+        headers: { Accept: 'text/html', 'X-CSRF-Token': token },
+        body: quickBody()
+      });
+      assert.strictEqual(response.res.statusCode, 500);
+      assert.match(response.body, /An error occurred/);
+    } finally {
+      db.exec('DROP TRIGGER IF EXISTS fail_002y_browser_generation_insert');
+    }
+    assert.deepStrictEqual(snapshot(db, browserFailureUserId), before);
+  });
 }
 
 run()
