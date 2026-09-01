@@ -111,10 +111,10 @@ router.post('/brand-brain', requireAuth, (req, res) => {
 });
 
 // ====== Campaign Studio ======
-router.get('/campaign-studio', requireAuth, (req, res) => {
-  const db = getDb();
-  const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(req.session.userId);
-  res.render('campaign-studio', { title: 'Campaign Studio - CopyQuick', brain, currentPage: 'campaign-studio' });
+router.get('/campaign-studio', requireAuth, (_req, res) => {
+  // Preserve old bookmarks while sending builders into the supported guided
+  // objective flow instead of the retired, disabled campaign placeholder.
+  res.redirect('/welcome?goal=launch_product');
 });
 
 module.exports = router;
