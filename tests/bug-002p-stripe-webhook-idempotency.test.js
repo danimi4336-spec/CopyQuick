@@ -381,15 +381,19 @@ async function run() {
     assert.strictEqual(getUser(db, 'cached-owner@example.com').plan_tier, 'free');
 
     response = await request(server, subscriptionEvent({
-      id: 'evt_multi_new_active', created: 360, customer: 'cus_multi',
-      subscription: 'sub_multi_new', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
-    }));
-    assert.strictEqual(response.res.statusCode, 200);
-    response = await request(server, subscriptionEvent({
-      id: 'evt_multi_old_active', created: 370, customer: 'cus_multi',
+      id: 'evt_multi_old_active', created: 360, customer: 'cus_multi',
       subscription: 'sub_multi_old', status: 'active'
     }));
     assert.strictEqual(response.res.statusCode, 200);
+    response = await request(server, subscriptionEvent({
+      id: 'evt_multi_new_active', created: 370, customer: 'cus_multi',
+      subscription: 'sub_multi_new', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
+    }));
+    assert.strictEqual(response.res.statusCode, 200);
+    const multiBeforeTerminal = getUser(db, 'multi@example.com');
+    const siblingUsageBeforeTerminal = db.prepare('SELECT * FROM usage_periods WHERE id = ?')
+      .get(multiBeforeTerminal.current_usage_period_id);
+    assert.strictEqual(siblingUsageBeforeTerminal.monthly_limit, 999999);
     subscriptionStates.set('sub_multi_new', makeStripeSubscription({
       id: 'sub_multi_new', customer: 'cus_multi', status: 'active', price: process.env.STRIPE_UNLIMITED_PRICE
     }));
@@ -400,6 +404,14 @@ async function run() {
     assert.strictEqual(response.res.statusCode, 200);
     assert.strictEqual(getUser(db, 'multi@example.com').plan_tier, 'unlimited',
       'a terminal event for an older subscription must preserve an authoritative active sibling');
+    const multiAfterTerminal = getUser(db, 'multi@example.com');
+    assert.strictEqual(multiAfterTerminal.current_usage_period_id, multiBeforeTerminal.current_usage_period_id,
+      'a protected sibling entitlement must preserve its current usage ledger');
+    assert.deepStrictEqual(
+      db.prepare('SELECT * FROM usage_periods WHERE id = ?').get(multiAfterTerminal.current_usage_period_id),
+      siblingUsageBeforeTerminal,
+      'terminal sibling history must not rewrite current usage accounting'
+    );
     assert.strictEqual(db.prepare("SELECT status FROM subscriptions WHERE stripe_subscription_id='sub_multi_old'").get().status, 'canceled');
 
     subscriptionStates.set('sub_multi_new', null);

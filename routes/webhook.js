@@ -214,7 +214,8 @@ function applyValidatedSubscription(db, event, user, subscription, entitlementOv
     canceledAt: decision.canceledAt,
     endedAt: decision.endedAt,
     monthlyLimit: decision.plan.monthlyLimit,
-    pastDueSince: decision.pastDueSince
+    pastDueSince: decision.pastDueSince,
+    syncUsagePeriod: !entitlementOverride?.entitled
   });
   const effectiveDecision = entitlementOverride?.entitled ? entitlementOverride : decision;
   if (entitlementOverride?.entitled && !decision.entitled) {
