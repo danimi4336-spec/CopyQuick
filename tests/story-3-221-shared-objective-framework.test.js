@@ -59,7 +59,7 @@ function acquisitionFixture() {
 (async function run() {
   assert.deepStrictEqual(
     objectiveUniverse.filter(item => item.available).map(item => item.id),
-    ['launch_product', 'get_more_customers', 'increase_conversion_rates', 'improve_search_rankings', 'build_brand']
+    ['launch_product', 'get_more_customers', 'increase_conversion_rates', 'improve_search_rankings', 'build_brand', 'promote_service']
   );
   for (const definition of OBJECTIVE_DEFINITIONS.filter(item => item.available)) {
     assert.strictEqual(hasCompleteJourney(definition), true);
@@ -67,7 +67,7 @@ function acquisitionFixture() {
       assert(definition.journey[capability]?.policy, `${definition.id} must declare ${capability}`);
     });
   }
-  assert.strictEqual(getAvailableObjective('promote_service'), null,
+  assert.strictEqual(getAvailableObjective('validate_idea'), null,
     'metadata alone cannot make an incomplete objective executable');
   assert.throws(() => createObjectiveRuntime('more_objectives'), error => error.code === 'OBJECTIVE_JOURNEY_UNAVAILABLE');
 

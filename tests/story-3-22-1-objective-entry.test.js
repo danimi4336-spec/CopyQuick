@@ -106,7 +106,7 @@ async function run() {
     assert.strictEqual(invalid.res.statusCode, 400);
     assert.match(invalid.body, /Choose an available business objective to continue/);
 
-    const unavailable = await request(agent, 'POST', '/welcome', { _csrf: token, goal: 'promote_service' });
+    const unavailable = await request(agent, 'POST', '/welcome', { _csrf: token, goal: 'validate_idea' });
     assert.strictEqual(unavailable.res.statusCode, 400);
     assert.match(unavailable.body, /Choose an available business objective to continue/);
     assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');

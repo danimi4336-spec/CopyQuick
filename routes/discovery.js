@@ -51,6 +51,11 @@ const BRAND_EXAMPLE_PROMPTS = [
   'A sustainable home-goods company that needs positioning, voice, and messaging pillars',
   'An established consultancy that wants to clarify its brand story without losing existing equity'
 ];
+const SERVICE_EXAMPLE_PROMPTS = [
+  'A fractional finance service for growing agencies that need reliable monthly reporting',
+  'A local home-organizing service that wants more consultation bookings',
+  'A leadership coach promoting a structured program to first-time executives'
+];
 
 function activeObjective(req) {
   const sessionObjective = req.session.discoverySession?.objective;
@@ -93,6 +98,7 @@ function renderDiscovery(req, res, options = {}) {
   const conversion = objective === 'increase_conversion_rates';
   const search = objective === 'improve_search_rankings';
   const brand = objective === 'build_brand';
+  const service = objective === 'promote_service';
   res.status(options.status || 200).render('discovery', {
     title: "Let's Build Something Amazing - CopyQuick",
     currentPage: 'discovery',
@@ -103,9 +109,9 @@ function renderDiscovery(req, res, options = {}) {
     additionalDetail: options.additionalDetail || '',
     error: options.error || null,
     objective,
-    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : conversion ? 'What conversion journey do you want to improve?' : search ? 'What should people find through search?' : brand ? 'What brand do you want to build or strengthen?' : 'What are you building?',
-    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : conversion ? 'Describe the offer, audience, page or funnel, traffic, and action you want visitors to take...' : search ? 'Describe the website, offer, audience, existing content, and search outcome you want...' : brand ? 'Describe the business, audience, existing brand, and what should become clearer...' : 'Describe the product you want to bring to market...',
-    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : search ? SEARCH_EXAMPLE_PROMPTS : brand ? BRAND_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
+    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : conversion ? 'What conversion journey do you want to improve?' : search ? 'What should people find through search?' : brand ? 'What brand do you want to build or strengthen?' : service ? 'What service do you want to promote?' : 'What are you building?',
+    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : conversion ? 'Describe the offer, audience, page or funnel, traffic, and action you want visitors to take...' : search ? 'Describe the website, offer, audience, existing content, and search outcome you want...' : brand ? 'Describe the business, audience, existing brand, and what should become clearer...' : service ? 'Describe the service, ideal client, proof, offer, and how clients find you...' : 'Describe the product you want to bring to market...',
+    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : search ? SEARCH_EXAMPLE_PROMPTS : brand ? BRAND_EXAMPLE_PROMPTS : service ? SERVICE_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
     discoverySession,
     editingInitialDescription: Boolean(discoverySession?.editingInitialDescription),
     understandingSummary: getUnderstandingSummary(discoverySession),
