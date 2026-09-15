@@ -41,6 +41,11 @@ const CONVERSION_EXAMPLE_PROMPTS = [
   'A local service landing page that should generate more booked consultations',
   'An ecommerce product page receiving paid traffic but producing few purchases'
 ];
+const SEARCH_EXAMPLE_PROMPTS = [
+  'A local accounting firm that wants qualified small-business owners to find its service pages',
+  'An ecommerce store that wants educational content to support product discovery',
+  'A SaaS website that wants to organize content around customer problems and search intent'
+];
 
 function activeObjective(req) {
   const sessionObjective = req.session.discoverySession?.objective;
@@ -81,6 +86,7 @@ function renderDiscovery(req, res, options = {}) {
   const objective = activeObjective(req);
   const acquisition = objective === 'get_more_customers';
   const conversion = objective === 'increase_conversion_rates';
+  const search = objective === 'improve_search_rankings';
   res.status(options.status || 200).render('discovery', {
     title: "Let's Build Something Amazing - CopyQuick",
     currentPage: 'discovery',
@@ -91,9 +97,9 @@ function renderDiscovery(req, res, options = {}) {
     additionalDetail: options.additionalDetail || '',
     error: options.error || null,
     objective,
-    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : conversion ? 'What conversion journey do you want to improve?' : 'What are you building?',
-    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : conversion ? 'Describe the offer, audience, page or funnel, traffic, and action you want visitors to take...' : 'Describe the product you want to bring to market...',
-    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
+    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : conversion ? 'What conversion journey do you want to improve?' : search ? 'What should people find through search?' : 'What are you building?',
+    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : conversion ? 'Describe the offer, audience, page or funnel, traffic, and action you want visitors to take...' : search ? 'Describe the website, offer, audience, existing content, and search outcome you want...' : 'Describe the product you want to bring to market...',
+    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : search ? SEARCH_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
     discoverySession,
     editingInitialDescription: Boolean(discoverySession?.editingInitialDescription),
     understandingSummary: getUnderstandingSummary(discoverySession),
