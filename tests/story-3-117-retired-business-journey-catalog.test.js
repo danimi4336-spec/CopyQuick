@@ -8,7 +8,7 @@ assert.deepStrictEqual(
   ['getAvailableObjective', 'getObjective', 'objectiveUniverse']
 );
 assert.strictEqual(journeys.getAvailableObjective('launch_product')?.id, 'launch_product');
-assert.strictEqual(journeys.getAvailableObjective('build_brand'), null);
+assert.strictEqual(journeys.getAvailableObjective('promote_service'), null);
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'lib', 'businessJourneys.js'), 'utf8');
 assert.doesNotMatch(source, /estimatedAssets|estimatedTime|journeyGroups|const journeys =|getGroupsWithJourneys|getPlatformsForJourney|getAssetCount/);

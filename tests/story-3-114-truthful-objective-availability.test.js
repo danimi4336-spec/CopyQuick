@@ -13,7 +13,7 @@ assert.strictEqual(getAvailableObjective('get_more_customers')?.id, 'get_more_cu
 assert.strictEqual(getAvailableObjective('../invalid'), null);
 assert.deepStrictEqual(
   objectiveUniverse.filter((objective) => objective.available).map((objective) => objective.id),
-  ['launch_product', 'get_more_customers', 'increase_conversion_rates', 'improve_search_rankings']
+  ['launch_product', 'get_more_customers', 'increase_conversion_rates', 'improve_search_rankings', 'build_brand']
 );
 
 const welcome = fs.readFileSync(path.join(__dirname, '..', 'views', 'welcome.ejs'), 'utf8');
