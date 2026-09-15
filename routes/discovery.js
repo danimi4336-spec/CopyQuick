@@ -36,6 +36,11 @@ const ACQUISITION_EXAMPLE_PROMPTS = [
   'A local dental practice that wants more booked appointments',
   'A SaaS company that needs a predictable pipeline of trial users'
 ];
+const CONVERSION_EXAMPLE_PROMPTS = [
+  'A SaaS pricing page that should turn more qualified visitors into trial users',
+  'A local service landing page that should generate more booked consultations',
+  'An ecommerce product page receiving paid traffic but producing few purchases'
+];
 
 function activeObjective(req) {
   const sessionObjective = req.session.discoverySession?.objective;
@@ -75,6 +80,7 @@ function renderDiscovery(req, res, options = {}) {
   const discoverySession = req.session.discoverySession || null;
   const objective = activeObjective(req);
   const acquisition = objective === 'get_more_customers';
+  const conversion = objective === 'increase_conversion_rates';
   res.status(options.status || 200).render('discovery', {
     title: "Let's Build Something Amazing - CopyQuick",
     currentPage: 'discovery',
@@ -85,9 +91,9 @@ function renderDiscovery(req, res, options = {}) {
     additionalDetail: options.additionalDetail || '',
     error: options.error || null,
     objective,
-    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : 'What are you building?',
-    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : 'Describe the product you want to bring to market...',
-    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
+    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : conversion ? 'What conversion journey do you want to improve?' : 'What are you building?',
+    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : conversion ? 'Describe the offer, audience, page or funnel, traffic, and action you want visitors to take...' : 'Describe the product you want to bring to market...',
+    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
     discoverySession,
     editingInitialDescription: Boolean(discoverySession?.editingInitialDescription),
     understandingSummary: getUnderstandingSummary(discoverySession),
