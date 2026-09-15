@@ -22,6 +22,7 @@
     "generation:control": "node scripts/generation-control.js",
     "production:recovery": "node scripts/production-recovery.js",
     "operations:status": "node scripts/operations-status.js",
+    "release:check": "node scripts/check-deployment-readiness.js",
     "ai:evaluate": "node scripts/evaluate-ai-production.js"
   },
   "keywords": [],

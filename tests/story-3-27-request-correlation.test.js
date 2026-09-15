@@ -55,6 +55,8 @@ async function run() {
   assert.deepStrictEqual(sanitized, { event: 'test_event', code: 'SAFE' });
   assert.deepStrictEqual(sanitizedOperationalEvent({ event: 'test_event', code: 'private@example.com' }), { event: 'test_event' });
   assert.strictEqual(skipCompletionEvent('/healthz'), true);
+  assert.strictEqual(skipCompletionEvent('/livez'), true);
+  assert.strictEqual(skipCompletionEvent('/readyz'), true);
   assert.strictEqual(skipCompletionEvent('/js/dashboardResults.js'), true);
   assert.strictEqual(skipCompletionEvent('/production/12'), false);
 
