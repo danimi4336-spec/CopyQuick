@@ -1,7 +1,9 @@
 const assert = require('assert');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
-const { buildBrandBrainProposal, applyApprovedBrandBrainProposal } = require('../lib/brandObjectiveIntegration');
+const { buildBrandBrainProposal, applyApprovedBrandBrainProposal, loadBrandObjectiveProposal } = require('../lib/brandObjectiveIntegration');
+const fs = require('fs');
+const path = require('path');
 
 function fact(value, label = value) { return { value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' }; }
 
@@ -43,5 +45,22 @@ function fact(value, label = value) { return { value, label, confidence: 1, sour
   const enriched = applyApprovedBrandBrainProposal({ existing, proposal, approvedFields: ['key_messages'] });
   assert.strictEqual(enriched.target_audience, 'Established audience', 'unapproved established facts remain authoritative');
   assert(enriched.key_messages);
+
+  const persisted = loadBrandObjectiveProposal({
+    prepare(sql) {
+      if (sql.includes('FROM production_runs')) return { get: (runId, userId) => runId === 42 && userId === 7 ? { id: 42 } : undefined };
+      return { all: () => [...completed].map(([deliverable_id, output]) => ({ deliverable_id, structured_result: JSON.stringify(output) })) };
+    }
+  }, { userId: 7, productionRunId: 42, existing });
+  assert.strictEqual(persisted.productionRunId, 42);
+  assert(persisted.proposal.key_messages);
+  assert.strictEqual(loadBrandObjectiveProposal({ prepare: () => ({ get: () => undefined }) }, { userId: 8, productionRunId: 42, existing }), null, 'another user cannot load the proposal');
+
+  const builderRoute = fs.readFileSync(path.join(__dirname, '..', 'routes', 'builder.js'), 'utf8');
+  const brainView = fs.readFileSync(path.join(__dirname, '..', 'views', 'brand-brain.ejs'), 'utf8');
+  const studioView = fs.readFileSync(path.join(__dirname, '..', 'views', 'production-studio.ejs'), 'utf8');
+  assert.match(builderRoute, /brand-brain\/enrich\/\:productionRunId/);
+  assert.match(brainView, /Existing Brand Brain details are never replaced without your selection/);
+  assert.match(studioView, /Review decisions for Brand Brain/);
   console.log('Story 3.224 Build My Brand tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

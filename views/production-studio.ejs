@@ -7,6 +7,7 @@
         </header>
 
         <% if (executionNotice) { %><div class="alert production-execution-notice" role="status"><%= executionNotice %></div><% } %>
+        <% if (production.objective === 'build_brand' && production.status === 'completed') { %><p><a class="btn btn-primary" href="/brand-brain?fromRun=<%= production.id %>">Review decisions for Brand Brain</a></p><% } %>
         <p id="production-live-status" class="production-live-status" role="status" aria-live="polite"></p>
 
         <section class="production-run-summary">

@@ -10,7 +10,26 @@
         </div>
     </div>
     <div class="brain-progress-bar fade-in"><div class="brain-progress-fill" style="width:<%= pct %>%"></div></div>
+    <% if (typeof saved !== 'undefined' && saved) { %><div class="alert alert-success" role="status">Approved brand decisions were added to Brand Brain.</div><% } %>
     <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
+    <% if (typeof enrichment !== 'undefined' && enrichment) { %>
+      <section class="card fade-in" aria-labelledby="brand-enrichment-title" style="margin-bottom:2rem;padding:1.5rem;">
+        <h2 id="brand-enrichment-title">Review brand decisions before saving</h2>
+        <p class="text-secondary">Choose only the recommendations you want to make reusable brand context. Existing Brand Brain details are never replaced without your selection.</p>
+        <form action="/brand-brain/enrich/<%= enrichment.productionRunId %>" method="POST">
+          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+          <% Object.values(enrichment.proposal).forEach(function(item) { %>
+            <label style="display:block;margin:1rem 0;padding:1rem;border:1px solid var(--border);border-radius:.75rem;">
+              <input type="checkbox" name="approvedFields" value="<%= item.field %>">
+              <strong><%= item.field.replace(/_/g, ' ') %></strong>
+              <span style="display:block;margin-top:.4rem;"><%= item.proposed %></span>
+              <% if (item.current && item.current !== item.proposed) { %><small class="text-secondary">Current value will remain unless you select this change: <%= item.current %></small><% } %>
+            </label>
+          <% }); %>
+          <button type="submit" class="btn btn-primary">Add selected decisions to Brand Brain</button>
+        </form>
+      </section>
+    <% } %>
     <form action="/brand-brain" method="POST" class="brain-form fade-in">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="brain-grid">
