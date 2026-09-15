@@ -379,7 +379,7 @@ async function run() {
     assert.match(page.body, /Build Your Foundation/);
     assert.match(page.body, /Prepare Your Sales Channel/);
     assert.match(page.body, /Amazon Listing/);
-    assert.match(page.body, /Strategic direction/);
+    assert.doesNotMatch(page.body, /Strategic direction|Builder-provided offer description|Treat this as unverified context/);
     assert.doesNotMatch(page.body, /estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);

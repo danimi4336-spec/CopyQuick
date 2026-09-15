@@ -45,7 +45,14 @@ async function run() {
       NODE_ENV: 'production',
       DATABASE_PATH: databasePath,
       PERSISTENT_DATA_DIR: persistentRoot,
-      DATABASE_BACKUP_RETENTION: '2'
+      DATABASE_BACKUP_RETENTION: '2',
+      // Keep backup-state assertions independent of the host filesystem's
+      // current utilization. Capacity thresholds are exercised explicitly
+      // through classifyStorageCapacity below.
+      DATABASE_STORAGE_WARNING_FREE_BYTES: '0',
+      DATABASE_STORAGE_CRITICAL_FREE_BYTES: '0',
+      DATABASE_STORAGE_WARNING_FREE_PERCENT: '0',
+      DATABASE_STORAGE_CRITICAL_FREE_PERCENT: '0'
     };
     const sourceDb = new Database(databasePath);
     assert.strictEqual(sourceDb.pragma('journal_mode = WAL', { simple: true }).toLowerCase(), 'wal');

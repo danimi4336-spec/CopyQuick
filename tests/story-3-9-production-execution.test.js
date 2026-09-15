@@ -239,11 +239,16 @@ async function run() {
   failedRoot = db.prepare('SELECT * FROM production_jobs WHERE id = ?').get(failureResult.jobId);
   assert.strictEqual(failedRoot.status, 'failed');
   assert.strictEqual(failedRoot.attempt_count, 3);
-  assert(failedRoot.reversal_usage_event_id);
+  assert.strictEqual(failedRoot.reversal_usage_event_id, null, 'a failed free planning prerequisite must not create a credit reversal');
   assert.doesNotMatch(failedRoot.error_message, /provider|secret|payload/);
   const skipped = db.prepare("SELECT * FROM production_jobs WHERE production_run_id = ? AND status = 'skipped'").all(failedRunId);
-  assert.strictEqual(skipped.length, prepaid - 1);
-  assert(skipped.every((job) => job.reversal_usage_event_id));
+  assert(skipped.length > prepaid - 1, 'free planning and paid downstream work are both safely skipped');
+  assert.strictEqual(
+    skipped.filter((job) => getProductionHandler(job.deliverable_id).billingUnits > 0 && job.reversal_usage_event_id).length,
+    prepaid,
+    'every prepaid ready-to-use asset must be reversed'
+  );
+  assert(skipped.filter((job) => getProductionHandler(job.deliverable_id).billingUnits === 0).every((job) => !job.reversal_usage_event_id));
   assert.strictEqual(db.prepare('SELECT status FROM production_runs WHERE id = ?').get(failedRunId).status, 'failed');
   assert.deepStrictEqual(usage(db, failedUser), { units: 0, events: prepaid + 1, period: 0, legacy: 0 });
   const reversalCount = db.prepare("SELECT COUNT(*) AS count FROM usage_events WHERE user_id = ? AND event_type = 'production_reversal'").get(failedUser).count;
@@ -260,7 +265,7 @@ async function run() {
     await executeNextProductionJob({ db, userId: partialUser, productionRunId: partialRunId, generatorApi: failingGenerator });
   }
   assert.strictEqual(db.prepare('SELECT status FROM production_runs WHERE id = ?').get(partialRunId).status, 'partially_completed');
-  assert.strictEqual(usage(db, partialUser).period, 1, 'only the successfully produced job should remain charged');
+  assert.strictEqual(usage(db, partialUser).period, 0, 'successfully produced planning foundation is free and failed ready-to-use assets are reversed');
 
   const routeUser = createUser(db);
   const routeRunId = startRun(db, routeUser);

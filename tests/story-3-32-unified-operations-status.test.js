@@ -86,7 +86,11 @@ function run() {
   const db = new Database(databasePath);
   initDb({ db, env: { NODE_ENV: 'test' }, logger: () => {} });
   db.close();
-  fs.copyFileSync(databasePath, path.join(backupDirectory, 'copyquick-2026-08-31T120000Z.db'));
+  const recentBackupTimestamp = new Date(Date.now() - (5 * 60 * 1000))
+    .toISOString()
+    .replace(/:/g, '')
+    .replace(/\.\d{3}Z$/, 'Z');
+  fs.copyFileSync(databasePath, path.join(backupDirectory, `copyquick-${recentBackupTimestamp}.db`));
   const script = path.join(__dirname, '..', 'scripts', 'operations-status.js');
   const env = {
     ...process.env,
@@ -100,7 +104,7 @@ function run() {
   assert.strictEqual(cli.status, 0, cli.stderr);
   const output = JSON.parse(cli.stdout);
   assert.strictEqual(output.status, 'healthy');
-  assert.strictEqual(output.migration.currentVersion, 4);
+  assert.strictEqual(output.migration.currentVersion, 7);
   assert.strictEqual(output.storage.quickCheck, 'ok');
   assert.strictEqual(output.generation.mode, 'running');
   assert(!cli.stdout.includes(databasePath));

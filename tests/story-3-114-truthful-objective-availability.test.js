@@ -9,11 +9,11 @@ const {
 
 assert(getObjective('launch_product'));
 assert(getAvailableObjective('launch_product'));
-assert.strictEqual(getAvailableObjective('get_more_customers'), null);
+assert.strictEqual(getAvailableObjective('get_more_customers')?.id, 'get_more_customers');
 assert.strictEqual(getAvailableObjective('../invalid'), null);
 assert.deepStrictEqual(
   objectiveUniverse.filter((objective) => objective.available).map((objective) => objective.id),
-  ['launch_product']
+  ['launch_product', 'get_more_customers']
 );
 
 const welcome = fs.readFileSync(path.join(__dirname, '..', 'views', 'welcome.ejs'), 'utf8');

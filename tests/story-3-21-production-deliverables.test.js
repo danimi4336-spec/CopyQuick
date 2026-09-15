@@ -90,9 +90,10 @@ async function run() {
   };
   const conceptOutput = conceptContract.generateOutput(conceptContext);
   assert.strictEqual(conceptContract.validateOutput(conceptOutput), true);
-  assert.deepStrictEqual(conceptOutput.directionsToExplore, [
+  assert.deepStrictEqual(conceptOutput.directionsToExplore.map(item => item.split(' — ')[0]), [
     'Gut microbiome support', 'Bloating & digestive comfort', 'Digestive enzyme support'
   ]);
+  assert(conceptOutput.directionsToExplore.every(item => /Investigate/.test(item)));
   assert.match(conceptOutput.conceptSummary, /working product concept/i);
   assert.match(JSON.stringify(conceptOutput), /not confirmed product characteristics/i);
   assert.doesNotMatch(JSON.stringify(conceptOutput), /contains digestive enzymes|clinically proven|search volume:\s*\d/i);
@@ -149,6 +150,42 @@ async function run() {
   assert(keywordOutput.content.length >= 6);
   assert.match(keywordOutput.summary, /not measured demand/i);
   assert.strictEqual(profileContract.validateOutput(customerProfile({ needs: ['To be confirmed'] })), false);
+
+  const outreachContract = getProductionContract('outreach_sequence');
+  const campaignBriefContract = getProductionContract('campaign_brief');
+  assert.strictEqual(campaignBriefContract.displayType, 'Campaign Brief');
+  assert.strictEqual(campaignBriefContract.artifactRole, 'planning_foundation');
+  assert.strictEqual(campaignBriefContract.billingUnits, 0);
+  assert.strictEqual(outreachContract.displayType, 'Email Campaign');
+  assert.strictEqual(outreachContract.artifactRole, 'ready_to_use_asset');
+  assert.strictEqual(outreachContract.billingUnits, 1);
+  const outreachOutput = outreachContract.generateOutput({
+    title: 'Customer Outreach Sequence',
+    strategicDirection: 'Builder-provided offer description: A bookkeeping service for growing small businesses. Treat this as unverified context.',
+    strategySnapshot: {
+      primaryCustomer: { value: 'Small-business owners', semanticRole: 'confirmed_fact' },
+      customerMotivation: { value: 'More qualified leads', semanticRole: 'confirmed_fact' }
+    },
+    dependencyOutputs: []
+  });
+  assert.strictEqual(outreachContract.version, 'outreach_sequence:v4');
+  assert.strictEqual(outreachContract.validateOutput(outreachOutput), true);
+  assert.strictEqual(validateCustomerReadyOutput(outreachOutput, outreachContract).valid, true);
+  assert.match(outreachContract.buildPrompt({
+    title: 'Customer Outreach Sequence',
+    strategicDirection: 'Create an outreach sequence.',
+    strategySnapshot: {},
+    dependencyOutputs: []
+  }), /three distinct, complete, copy-ready emails/i);
+  assert.match(outreachOutput.email1Body, /Hi \[First Name\]/);
+  assert.match(outreachOutput.email1Body, /Best,\n\[Sender Name\]/);
+  assert.match(outreachOutput.email2Body, /Would a short call be useful\?/);
+  assert.match(outreachOutput.email3Body, /last note/i);
+  assert(outreachOutput.sendPlan.length >= 3);
+  assert(outreachOutput.personalizationChecklist.length >= 2);
+  assert(outreachOutput.complianceChecklist.length >= 2);
+  assert.strictEqual(outreachContract.validateOutput({ ...outreachOutput, email2Body: 'Message 2 — share proof.' }), false);
+  assert.doesNotMatch(JSON.stringify(outreachOutput), /Message 1 — relevance|Message 2 — useful proof|To be confirmed/i);
 
   assert.strictEqual(validateCustomerReadyOutput(customerProfile(), profileContract).valid, true);
   assert.strictEqual(validateCustomerReadyOutput(customerProfile({ summary: 'Create the approved Customer Profile deliverable.' }), profileContract).code, 'PRODUCTION_QUALITY_INTERNAL_CONTEXT_LEAK');
@@ -263,13 +300,54 @@ async function run() {
 
   const productionHtml = await render('generation.ejs', {
     gen: { id: 7, title: 'Product Positioning', input_text: 'SECRET INTERNAL PROMPT', content_type: 'sales_message', tone: 'professional', favorite: 0, word_count: 20, created_at: new Date().toISOString() },
-    results: [], productionDeliverable: { runId: 1, customerReady: true, generationMethod: 'Structured Production Engine', sections: [{ label: 'Positioning Statement', value: 'A clear position for retailers.', isList: false }] }
+    results: [], productionDeliverable: { runId: 1, customerReady: true, canRegenerateWithAi: true, generationMethod: 'Structured Production Engine', source: { label: 'OpenAI production AI', model: 'gpt-test' }, sections: [{ label: 'Positioning Statement', value: 'A clear position for retailers.', isList: false }] }
   });
   assert.doesNotMatch(productionHtml, /SECRET INTERNAL PROMPT|<h3>Prompt<\/h3>/);
   assert.match(productionHtml, /Back to Production Plan|Production Plan/);
   assert.match(productionHtml, /Positioning Statement/);
   assert.match(productionHtml, /Generation Method|Structured Production Engine/);
+  assert.match(productionHtml, /Output Source|OpenAI production AI|gpt-test/);
+  assert.match(productionHtml, /Create Improved AI Version/);
+  assert.match(productionHtml, /uses 1 generation credit/);
   assert.doesNotMatch(productionHtml, /AI Model|CopyQuick AI/);
+
+  const legacyOutreachHtml = await render('generation.ejs', {
+    gen: { id: 9, title: 'Customer Outreach Sequence', input_text: 'INTERNAL', content_type: 'email_campaign', tone: 'professional', favorite: 0, word_count: 30, created_at: new Date().toISOString() },
+    results: [], productionDeliverable: {
+      runId: 1,
+      customerReady: false,
+      canRegenerateWithAi: true,
+      generationMethod: 'Structured Production Engine',
+      source: { label: 'Deterministic structured engine', model: 'CopyQuick Deterministic' },
+      sections: [{ label: 'Legacy Outreach Outline', value: ['Message 1 — relevance'], isList: true }]
+    }
+  });
+  assert.match(legacyOutreachHtml, /legacy planning outline, not a copy-ready deliverable/i);
+  assert.match(legacyOutreachHtml, /Legacy Outreach Outline/);
+  assert.match(legacyOutreachHtml, /Create Improved AI Version/);
+
+  const campaignBriefHtml = await render('generation.ejs', {
+    gen: { id: 10, title: 'Lead Generation Campaign Brief', input_text: 'INTERNAL', content_type: 'sales_message', tone: 'professional', favorite: 0, word_count: 80, created_at: new Date().toISOString() },
+    results: [], productionDeliverable: {
+      runId: 1,
+      customerReady: true,
+      canRegenerateWithAi: true,
+      generationMethod: 'Structured Production Engine',
+      source: { label: 'OpenAI production AI', model: 'gpt-test' },
+      displayType: 'Campaign Brief',
+      artifactRole: 'planning_foundation',
+      purposeNotice: 'This is the campaign plan that guides execution. It is not customer-facing sales copy.',
+      nextDeliverable: { id: 11, title: 'Customer Outreach Sequence' },
+      sections: [{ label: 'Campaign Brief', value: ['Define the audience and offer.'], isList: true }]
+    }
+  });
+  assert.match(campaignBriefHtml, /Planning deliverable:/);
+  assert.match(campaignBriefHtml, /not customer-facing sales copy/i);
+  assert.match(campaignBriefHtml, /href="\/generation\/11"/);
+  assert.match(campaignBriefHtml, /Open the ready-to-use email campaign/);
+  assert.match(campaignBriefHtml, /<span class="meta-value">Campaign Brief<\/span>/);
+  assert.match(campaignBriefHtml, /Regenerate Planning Foundation/);
+  assert.match(campaignBriefHtml, /It will not create customer-facing sales copy/);
 
   const ordinaryHtml = await render('generation.ejs', {
     gen: { id: 8, title: 'Quick Copy', input_text: 'Ordinary customer prompt', content_type: 'social_post', tone: 'friendly', favorite: 0, word_count: 4, created_at: new Date().toISOString() },

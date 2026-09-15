@@ -18,7 +18,7 @@
             ['primarySalesChannel', 'Primary Sales Channel'],
             ['communicationStyle', 'Communication Style'],
             ['marketingFocus', 'Marketing Focus'],
-            ['launchApproach', 'Launch Strategy'],
+            ['launchApproach', objective === 'get_more_customers' ? 'Acquisition Approach' : 'Launch Strategy'],
             ['risks', 'Strategic Risks']
         ]; %>
         <div class="strategy-grid">
@@ -68,7 +68,7 @@
         <% } %>
 
         <div class="strategy-actions">
-            <a href="/discovery/reflection" class="btn btn-outline">Edit Business Understanding</a>
+            <a href="/discovery/reflection" class="btn btn-outline">← Back</a>
             <% if (canBuildPlan) { %>
                 <a href="/discovery/build-plan" class="btn btn-primary">Continue to Build Plan</a>
             <% } else { %>

@@ -4,37 +4,35 @@
             <span class="production-ready-icon" aria-hidden="true">✓</span>
             <span class="build-plan-eyebrow">Production Handoff</span>
             <h1>Your production plan is ready.</h1>
-            <p>You approved <strong><%= productionSet.selectedDeliverables.length %> deliverables</strong> in dependency-aware production order. Nothing has been generated yet.</p>
+            <p>You approved <strong><%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong> with <strong><%= planningFoundation.length %> free planning prerequisite<%= planningFoundation.length === 1 ? '' : 's' %></strong> in this batch. Nothing has been generated yet.</p>
         </header>
 
-        <% if (dependencyCount) { %>
-            <div class="production-ready-note">
-                <strong><%= dependencyCount %> prerequisite<%= dependencyCount === 1 ? '' : 's' %> included</strong>
-                <p>These foundational deliverables keep downstream production consistent with your approved strategy.</p>
-            </div>
+        <section class="deliverable-display-section deliverable-output-section" aria-labelledby="handoff-output-title">
+            <header><div><span class="build-plan-eyebrow">Your outputs</span><h2 id="handoff-output-title">Ready-to-use output deliverables</h2></div><strong><%= readyToUseAssets.length %> output<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
+            <p>These are the deliverables you will copy, export, and use with customers.</p>
+            <ol class="deliverable-display-list">
+                <% readyToUseAssets.forEach(function(item, index) { %>
+                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready-to-use asset · 1 production credit</small><p><%= item.reason %></p></div></li>
+                <% }); %>
+            </ol>
+        </section>
+
+        <% if (planningFoundation.length) { %>
+            <details class="planning-foundation-disclosure">
+                <summary><span>Free planning foundation deliverables</span><small><%= planningFoundation.length %> internal prerequisite<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                <div class="planning-foundation-content">
+                    <p>CopyQuick uses these internal briefs and decisions to guide the ready-to-use outputs. They are planning documents, not customer-facing copy.</p>
+                    <ol class="deliverable-display-list">
+                        <% planningFoundation.forEach(function(item, index) { %>
+                            <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Free planning foundation · internal use</small><p><%= item.reason %></p></div></li>
+                        <% }); %>
+                    </ol>
+                </div>
+            </details>
         <% } %>
 
-        <div class="production-ready-phases">
-            <% phases.forEach(function(phase, phaseIndex) { %>
-                <section>
-                    <span>Phase <%= phaseIndex + 1 %></span>
-                    <div>
-                        <h2><%= phase.title %></h2>
-                        <ol>
-                            <% phase.deliverables.forEach(function(item) { %>
-                                <li>
-                                    <strong><%= item.title %></strong>
-                                    <p><%= item.strategicDirection %></p>
-                                </li>
-                            <% }); %>
-                        </ol>
-                    </div>
-                </section>
-            <% }); %>
-        </div>
-
         <div class="production-ready-actions">
-            <a href="/discovery/build-plan" class="btn btn-outline">Review Build Plan</a>
+            <a href="/discovery/build-plan" class="btn btn-outline">← Back</a>
             <a href="/production/review" class="btn btn-primary">Review Cost &amp; Start Production</a>
             <small>No usage is consumed until you review the final cost and explicitly start production.</small>
         </div>

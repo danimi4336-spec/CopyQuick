@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 4;
+const MAX_SUPPORTED_SCHEMA_VERSION = 7;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -158,11 +158,97 @@ const SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION = Object.freeze({
   }
 });
 
+const SAVED_BUILD_PLANS_MIGRATION = Object.freeze({
+  version: 5,
+  name: 'saved_build_plans',
+  kind: 'migration',
+  policy: 'additive',
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    `CREATE TABLE saved_build_plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      objective TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('saved', 'active', 'partially_completed', 'completed', 'invalidated')),
+      plan_fingerprint TEXT NOT NULL CHECK(length(plan_fingerprint) = 64),
+      state_version INTEGER NOT NULL CHECK(state_version > 0),
+      workflow_state TEXT NOT NULL,
+      saved_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT,
+      UNIQUE(user_id, objective)
+    )`,
+    'CREATE INDEX idx_saved_build_plans_user_status_updated ON saved_build_plans(user_id, status, updated_at DESC)',
+    'CREATE INDEX idx_saved_build_plans_fingerprint ON saved_build_plans(user_id, plan_fingerprint)'
+  ]),
+  validate(db) {
+    if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='saved_build_plans'").get()) {
+      throw new MigrationError('Saved build plan migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+    const indexes = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='saved_build_plans'").all().map(row => row.name));
+    if (!indexes.has('idx_saved_build_plans_user_status_updated') || !indexes.has('idx_saved_build_plans_fingerprint')) {
+      throw new MigrationError('Saved build plan migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
+const SAVED_BUILD_PLAN_FINGERPRINT_MIGRATION = Object.freeze({
+  version: 6,
+  name: 'saved_build_plan_fingerprint_length',
+  kind: 'migration',
+  policy: 'additive',
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    `CREATE TABLE saved_build_plan_states (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      objective TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('saved', 'active', 'partially_completed', 'completed', 'invalidated')),
+      plan_fingerprint TEXT NOT NULL CHECK(length(plan_fingerprint) = 20),
+      state_version INTEGER NOT NULL CHECK(state_version > 0),
+      workflow_state TEXT NOT NULL,
+      saved_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      completed_at TEXT,
+      UNIQUE(user_id, objective)
+    )`,
+    'CREATE INDEX idx_saved_build_plan_states_user_status_updated ON saved_build_plan_states(user_id, status, updated_at DESC)',
+    'CREATE INDEX idx_saved_build_plan_states_fingerprint ON saved_build_plan_states(user_id, plan_fingerprint)'
+  ]),
+  validate(db) {
+    const sql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='saved_build_plan_states'").get()?.sql || '';
+    if (!/length\(plan_fingerprint\) = 20/.test(sql)) {
+      throw new MigrationError('Saved build plan fingerprint migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
+const PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION = Object.freeze({
+  version: 7,
+  name: 'production_plan_progress_snapshot',
+  kind: 'migration',
+  policy: 'additive',
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    'ALTER TABLE production_runs ADD COLUMN production_plan_snapshot TEXT'
+  ]),
+  validate(db) {
+    if (!db.pragma('table_info(production_runs)').some(column => column.name === 'production_plan_snapshot')) {
+      throw new MigrationError('Production plan progress snapshot migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+    }
+  }
+});
+
 const MIGRATIONS = Object.freeze([
   BASELINE_MIGRATION,
   BILLING_RECONCILIATION_MIGRATION,
   GENERATION_IDEMPOTENCY_MIGRATION,
-  SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION
+  SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION,
+  SAVED_BUILD_PLANS_MIGRATION,
+  SAVED_BUILD_PLAN_FINGERPRINT_MIGRATION,
+  PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION
 ]);
 
 function migrationChecksum(migration) {
@@ -558,6 +644,8 @@ module.exports = {
   LEDGER_TABLE,
   MAX_SUPPORTED_SCHEMA_VERSION,
   MIGRATIONS,
+  SAVED_BUILD_PLAN_FINGERPRINT_MIGRATION,
+  SAVED_BUILD_PLANS_MIGRATION,
   MIN_SUPPORTED_SCHEMA_VERSION,
   MigrationError,
   executeMigrationsWithProductionBackup,

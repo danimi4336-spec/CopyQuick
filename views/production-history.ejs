@@ -1,0 +1,57 @@
+<div class="container production-studio-container">
+    <header class="production-studio-header">
+        <span class="build-plan-eyebrow">Production history</span>
+        <h1>Your Production Plans</h1>
+        <p>Return to active work or review completed deliverables. Opening a plan does not restart production or use credits.</p>
+    </header>
+
+    <nav class="production-history-filters" aria-label="Filter production plans">
+        <% [['all', 'All'], ['active', 'Active'], ['recoverable', 'Needs attention'], ['completed', 'Completed']].forEach(function(filter) { %>
+            <a href="/production?status=<%= filter[0] %>" class="btn <%= history.status === filter[0] ? 'btn-primary' : 'btn-outline' %>" <%= history.status === filter[0] ? 'aria-current="page"' : '' %>><%= filter[1] %></a>
+        <% }); %>
+    </nav>
+
+    <% if (!productionRuns.length) { %>
+        <section class="card p-4">
+            <h2>No production plans yet</h2>
+            <p>Start a guided objective to create and approve your first production plan.</p>
+            <a href="/welcome" class="btn btn-primary">Start an Objective →</a>
+        </section>
+    <% } else { %>
+        <div class="production-history-list">
+            <% productionRuns.forEach(function(run) { %>
+                <article class="card p-4 production-history-card">
+                    <div>
+                        <span class="build-plan-eyebrow"><%= run.statusLabel %></span>
+                        <h2><%= run.planName %></h2>
+                        <small><%= run.objectiveLabel %></small>
+                        <% if (run.progress) { %>
+                            <p><strong><%= run.progress.completedCount %> of <%= run.progress.totalCount %></strong> plan steps completed.</p>
+                        <% } else { %>
+                            <p><strong><%= run.batchCompletedCount %> of <%= run.batchTotalCount %></strong> current-batch jobs completed.</p>
+                        <% } %>
+                        <small>Created <%= run.createdAt %></small>
+                    </div>
+                    <a href="<%= run.href %>" class="btn btn-primary"><%= run.actionLabel %> →</a>
+                </article>
+            <% }); %>
+        </div>
+        <% if (history.totalPages > 1) { %>
+            <nav class="production-history-pagination" aria-label="Production history pages">
+                <% if (history.page > 1) { %><a class="btn btn-outline" href="/production?status=<%= history.status %>&page=<%= history.page - 1 %>">← Previous</a><% } %>
+                <span>Page <%= history.page %> of <%= history.totalPages %></span>
+                <% if (history.page < history.totalPages) { %><a class="btn btn-outline" href="/production?status=<%= history.status %>&page=<%= history.page + 1 %>">Next →</a><% } %>
+            </nav>
+        <% } %>
+    <% } %>
+</div>
+
+<style>
+.production-history-list{display:grid;gap:1rem;}
+.production-history-filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;}
+.production-history-pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin-top:1.5rem;}
+.production-history-card{display:flex;align-items:center;justify-content:space-between;gap:1rem;}
+.production-history-card h2{margin:.2rem 0;}
+.production-history-card p{margin:.35rem 0;}
+@media(max-width:640px){.production-history-card{align-items:flex-start;flex-direction:column;}}
+</style>

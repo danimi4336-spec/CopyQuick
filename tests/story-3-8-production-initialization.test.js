@@ -18,6 +18,7 @@ const { buildPlan } = require('../lib/buildPlanEngine');
 const { createApprovedProductionSet, createDefaultSelection, planFingerprint } = require('../lib/buildPlanApproval');
 const { calculateProductionCost } = require('../lib/productionCost');
 const { getProductionReview, initializeProduction } = require('../lib/productionInitialization');
+const { getProductionHandler } = require('../lib/productionHandlers');
 const productionRoutes = require('../routes/production');
 
 function confirmed(value, label = value) {
@@ -138,18 +139,21 @@ async function run() {
   const failureUserId = createUser(db, 50);
   const otherUserId = createUser(db, 50);
   const validateUserId = createUser(db, 50);
+  const phasedUserId = createUser(db, 4);
 
   const approved = createDiscoveryState().approvedProductionSet;
-  const units = approved.selectedDeliverables.length;
+  const deliverableCount = approved.selectedDeliverables.length;
   const cost = calculateProductionCost({
     approvedProductionSet: approved,
     usageSnapshot: { used: 3, monthlyLimit: 50, remaining: 47 }
   });
+  const units = cost.productionUnitCount;
   assert.strictEqual(cost.valid, true);
-  assert.strictEqual(cost.productionUnitCount, units);
+  assert(units > 0 && units < deliverableCount, 'planning foundation must be free while customer-ready assets remain billable');
+  assert.strictEqual(cost.planningFoundationCount + cost.readyToUseAssetCount, deliverableCount);
   assert.strictEqual(cost.currentUsage, 3);
   assert.strictEqual(cost.canAfford, true);
-  assert.strictEqual(cost.costingModel, 'existing_generation_unit');
+  assert.strictEqual(cost.costingModel, 'ready_to_use_asset_unit');
   const unknownCost = calculateProductionCost({
     approvedProductionSet: { selectedDeliverables: [{ id: 'unknown_free_asset' }] },
     usageSnapshot: { used: 0, monthlyLimit: 50, remaining: 50 }
@@ -230,9 +234,12 @@ async function run() {
     await request(sufficient, 'GET', `/test/authenticate/${sufficientUserId}/valid`);
     const review = await request(sufficient, 'GET', '/production/review');
     assert.strictEqual(review.res.statusCode, 200);
-    assert.match(review.body, new RegExp(`${units} generations`));
-    assert.match(review.body, /Starting this production plan will use/);
+    assert.match(review.body, new RegExp(`${units} production credit`));
+    assert.match(review.body, /Starting this run will use/);
     assert.match(review.body, /Start Production/);
+    assert.match(review.body, /Ready-to-use output deliverables/);
+    assert.match(review.body, /<details class="planning-foundation-disclosure">/);
+    assert(review.body.indexOf('Ready-to-use output deliverables') < review.body.indexOf('Free planning foundation deliverables'));
     assert.deepStrictEqual(usageState(db, sufficientUserId), reviewBefore);
     const token = review.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const csrfDenied = await request(sufficient, 'POST', '/production/start');
@@ -248,7 +255,7 @@ async function run() {
     assert.strictEqual(run.production_cost_units, units, 'client-posted cost must be ignored');
     assert.strictEqual(run.plan_fingerprint, approved.planFingerprint);
     assert.deepStrictEqual(JSON.parse(run.strategy_snapshot), approved.strategySnapshot);
-    assert.strictEqual(jobs.length, units);
+    assert.strictEqual(jobs.length, deliverableCount);
     assert.deepStrictEqual(jobs.map((job) => job.deliverable_id), approved.productionOrder);
     jobs.forEach(function(job, index) {
       assert.strictEqual(job.sequence_order, index);
@@ -268,12 +275,12 @@ async function run() {
     assert.strictEqual(duplicate.res.statusCode, 303);
     assert.strictEqual(duplicate.res.headers.location, runLocation);
     assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM production_runs WHERE user_id = ?').get(sufficientUserId).count, 1);
-    assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM production_jobs WHERE production_run_id = ?').get(runId).count, units);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM production_jobs WHERE production_run_id = ?').get(runId).count, deliverableCount);
     assert.deepStrictEqual(usageState(db, sufficientUserId), { events: 1, units, periodUsage: units, legacy: units });
 
     const studio = await request(sufficient, 'GET', runLocation);
     assert.strictEqual(studio.res.statusCode, 200);
-    assert.match(studio.body, new RegExp(`0 of ${units} completed`));
+    assert.match(studio.body, new RegExp(`0 of ${deliverableCount} completed`));
     assert.match(studio.body, /queued/);
     assert.match(studio.body, /waiting dependency/);
     assert.doesNotMatch(studio.body, /\d+%|almost done|AI is working/i);
@@ -332,6 +339,79 @@ async function run() {
       db.prepare('SELECT deliverable_id FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order').all(validateStart.productionRunId).map((job) => job.deliverable_id),
       validateState.approvedProductionSet.productionOrder
     );
+
+    const phasedState = createDiscoveryState();
+    phasedState.approvedProductionSet.batchMode = 'affordable';
+    const firstBatch = initializeProduction({
+      db,
+      user: db.prepare('SELECT * FROM users WHERE id = ?').get(phasedUserId),
+      discoverySession: phasedState
+    });
+    assert.strictEqual(firstBatch.valid, true);
+    assert(firstBatch.cost.productionUnitCount <= 4);
+    assert(firstBatch.batch.productionNow.length >= firstBatch.cost.productionUnitCount, 'free planning may accompany the paid assets in a batch');
+    const firstBatchJobCount = firstBatch.batch.productionNow.length;
+    const firstBatchUnits = firstBatch.cost.productionUnitCount;
+    const firstBatchJobs = db.prepare(`
+      SELECT * FROM production_jobs WHERE production_run_id = ? ORDER BY sequence_order
+    `).all(firstBatch.productionRunId);
+    const generatedByDeliverable = new Map();
+    firstBatchJobs.forEach(function(job) {
+      const handler = getProductionHandler(job.deliverable_id);
+      const dependencyOutputs = JSON.parse(job.dependencies || '[]').map(function(deliverableId) {
+        return generatedByDeliverable.get(deliverableId);
+      }).filter(Boolean);
+      const structuredResult = handler.generateOutput({
+        objective: phasedState.objective,
+        title: job.title,
+        strategicDirection: job.strategic_direction,
+        strategySnapshot: phasedState.approvedProductionSet.strategySnapshot,
+        dependencyOutputs
+      });
+      const generationId = Number(db.prepare(`
+        INSERT INTO generations (
+          user_id, title, input_text, content_type, ai_model, results,
+          production_job_id, deliverable_id, contract_version, structured_result
+        ) VALUES (?, ?, 'test', 'sales_message', 'CopyQuick Deterministic', '[]', ?, ?, ?, ?)
+      `).run(phasedUserId, job.title, job.id, job.deliverable_id, job.contract_version, JSON.stringify(structuredResult)).lastInsertRowid);
+      db.prepare(`
+        UPDATE production_jobs
+        SET status = 'completed', generation_id = ?, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(generationId, job.id);
+      generatedByDeliverable.set(job.deliverable_id, {
+        deliverableId: job.deliverable_id,
+        title: job.title,
+        contractVersion: job.contract_version,
+        output: structuredResult,
+        result: []
+      });
+    });
+    db.prepare("UPDATE production_runs SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(firstBatch.productionRunId);
+    db.prepare('UPDATE users SET monthly_limit = 50 WHERE id = ?').run(phasedUserId);
+
+    const secondBatch = initializeProduction({
+      db,
+      user: db.prepare('SELECT * FROM users WHERE id = ?').get(phasedUserId),
+      discoverySession: phasedState
+    });
+    assert.strictEqual(secondBatch.valid, true);
+    assert.notStrictEqual(secondBatch.productionRunId, firstBatch.productionRunId, 'a later batch must not reopen the completed earlier run');
+    assert.strictEqual(secondBatch.cost.productionUnitCount, units - firstBatchUnits);
+    assert.strictEqual(db.prepare('SELECT production_cost_units FROM production_runs WHERE id = ?').get(secondBatch.productionRunId).production_cost_units, units - firstBatchUnits);
+    assert.strictEqual(db.prepare(`
+      SELECT COUNT(*) AS count FROM production_jobs
+      WHERE production_run_id = ? AND generation_id IS NULL
+    `).get(secondBatch.productionRunId).count, deliverableCount - firstBatchJobCount);
+
+    const repeatedSecondBatch = initializeProduction({
+      db,
+      user: db.prepare('SELECT * FROM users WHERE id = ?').get(phasedUserId),
+      discoverySession: phasedState
+    });
+    assert.strictEqual(repeatedSecondBatch.duplicate, true);
+    assert.strictEqual(repeatedSecondBatch.productionRunId, secondBatch.productionRunId, 'repeated starts must remain idempotent within the active batch');
 
     console.log('Story 3.8 Production Initialization tests passed');
   } finally {

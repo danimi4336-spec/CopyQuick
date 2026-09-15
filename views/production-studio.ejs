@@ -2,7 +2,7 @@
     <div class="container production-studio-container">
         <header class="production-studio-header">
             <span class="build-plan-eyebrow">Production Studio</span>
-            <h1>Production Plan</h1>
+            <h1><%= typeof planName !== 'undefined' ? planName : 'Production Plan' %></h1>
             <p><strong id="production-progress"><%= completedCount %> of <%= production.jobs.length %> completed.</strong> Jobs below show their real persisted queue state.</p>
         </header>
 
@@ -11,24 +11,44 @@
 
         <section class="production-run-summary">
             <div><span>Run status</span><strong id="production-run-status"><%= production.status.replace(/_/g, ' ') %></strong></div>
-            <div><span>Production units</span><strong><%= production.production_cost_units %></strong></div>
+            <div><span><%= production.costingModel === 'ready_to_use_asset_unit' ? 'Paid production credits' : 'Historical production units' %></span><strong><%= production.production_cost_units %></strong></div>
             <div><span>Started</span><strong><%= production.started_at %></strong></div>
         </section>
 
-        <div class="production-studio-phases">
-            <% phases.forEach(function(phase, phaseIndex) { %>
+        <% if (typeof planProgress !== 'undefined' && planProgress) { %>
+            <section class="production-review-status" aria-label="Overall production plan progress">
+                <div><h2>Overall plan progress</h2><p id="plan-progress-overall"><strong><%= planProgress.completed.length %> of <%= planProgress.total %></strong> steps completed across production batches. The plan contains <%= planProgress.readyToUseAssetCount %> ready-to-use asset<%= planProgress.readyToUseAssetCount === 1 ? '' : 's' %> and <%= planProgress.planningFoundationCount %> free planning prerequisite<%= planProgress.planningFoundationCount === 1 ? '' : 's' %>.</p></div>
+                <div><h2>Current batch</h2><p id="plan-progress-current"><%= planProgress.batchNew.length %> new deliverable<%= planProgress.batchNew.length === 1 ? '' : 's' %> in this run; <%= planProgress.batchIncomplete.length %> remain incomplete. <%= planProgress.reused.length %> prerequisite<%= planProgress.reused.length === 1 ? '' : 's' %> reused.</p></div>
+                <div><h2>Saved for later</h2><p id="plan-progress-deferred"><%= planProgress.deferred.length %> deliverable<%= planProgress.deferred.length === 1 ? '' : 's' %> <%= planProgress.deferred.length === 1 ? 'remains' : 'remain' %> deferred (estimated <%= planProgress.remainingEstimatedCost %> generation<%= planProgress.remainingEstimatedCost === 1 ? '' : 's' %>).</p></div>
+            </section>
+        <% } %>
+
+        <% const readyToUsePhases = phases.map(function(phase) { return { ...phase, jobs: phase.jobs.filter(function(job) { return job.artifactPolicy?.role !== 'planning_foundation'; }) }; }).filter(function(phase) { return phase.jobs.length; }); %>
+        <% const planningFoundationJobs = phases.reduce(function(items, phase) { return items.concat(phase.jobs.filter(function(job) { return job.artifactPolicy?.role === 'planning_foundation'; })); }, []); %>
+
+        <section class="production-output-section" aria-labelledby="ready-assets-title">
+            <header class="production-output-section-header">
+                <div><span class="build-plan-eyebrow">Your outputs</span><h2 id="ready-assets-title">Ready-to-use assets</h2></div>
+                <strong><%= readyToUsePhases.reduce(function(total, phase) { return total + phase.jobs.length; }, 0) %> asset<%= readyToUsePhases.reduce(function(total, phase) { return total + phase.jobs.length; }, 0) === 1 ? '' : 's' %></strong>
+            </header>
+            <p class="production-output-intro">Open these deliverables to copy, export, or put them to work.</p>
+            <div class="production-studio-phases production-ready-asset-phases">
+            <% let readyAssetNumber = 0; %>
+            <% readyToUsePhases.forEach(function(phase) { %>
                 <section class="production-studio-phase">
                     <header>
-                        <span>Phase <%= phaseIndex + 1 %></span>
+                        <span>Ready-to-use</span>
                         <h2><%= phase.title %></h2>
                     </header>
                     <ol>
                         <% phase.jobs.forEach(function(job) { %>
+                            <% readyAssetNumber += 1; %>
                             <li data-production-sequence="<%= job.sequence_order %>">
-                                <span class="production-job-order"><%= job.sequence_order + 1 %></span>
+                                <span class="production-job-order"><%= readyAssetNumber %></span>
                                 <div>
                                     <h3><%= job.title %></h3>
-                                    <p><%= job.strategic_direction %></p>
+                                    <small>Ready-to-use asset · paid production output</small>
+                                    <p><%= job.display_description %></p>
                                     <% if (job.status === 'waiting_dependency' && job.dependencies.length) { %><small class="production-dependency-state">Waiting for <%= job.dependencies.length %> prerequisite<%= job.dependencies.length === 1 ? '' : 's' %>.</small><% } %>
                                     <% if (job.error_message) { %><small class="production-job-error"><%= job.error_message %></small><% } %>
                                     <% if (job.status === 'recovery_required') { %><small class="production-job-recovery">CopyQuick will not regenerate this item until its prior attempt can be verified safely.</small><% } %>
@@ -40,7 +60,51 @@
                     </ol>
                 </section>
             <% }); %>
-        </div>
+            </div>
+        </section>
+
+        <% if (planningFoundationJobs.length) { %>
+            <details class="production-foundation-disclosure">
+                <summary>
+                    <span>Free planning foundation deliverables</span>
+                    <small><%= planningFoundationJobs.length %> internal prerequisite<%= planningFoundationJobs.length === 1 ? '' : 's' %> · no production credits</small>
+                </summary>
+                <div class="production-foundation-content">
+                    <p>CopyQuick used these internal insights to guide the ready-to-use assets above. Open them only when you want to review the strategy or assumptions behind the work.</p>
+                    <ol>
+                        <% planningFoundationJobs.forEach(function(job, foundationIndex) { %>
+                            <li data-production-sequence="<%= job.sequence_order %>">
+                                <span class="production-job-order"><%= foundationIndex + 1 %></span>
+                                <div>
+                                    <h3><%= job.title %></h3>
+                                    <small>Free planning foundation · internal use</small>
+                                    <% if (job.error_message) { %><small class="production-job-error"><%= job.error_message %></small><% } %>
+                                    <% if (job.status === 'recovery_required') { %><small class="production-job-recovery">CopyQuick will not regenerate this item until its prior attempt can be verified safely.</small><% } %>
+                                    <span class="production-result-actions"><% if (job.status === 'completed' && job.generation_id) { %><a class="production-result-link" href="/generation/<%= job.generation_id %>">Review foundation →</a><% } %></span>
+                                </div>
+                                <span class="production-job-status status-<%= job.status %>"><%= job.status.replace(/_/g, ' ') %></span>
+                            </li>
+                        <% }); %>
+                    </ol>
+                </div>
+            </details>
+        <% } %>
+
+        <% if (typeof synthesis !== 'undefined' && synthesis) { %>
+            <section class="production-next-steps" aria-labelledby="production-next-steps-title">
+                <span class="build-plan-eyebrow">Decision summary</span>
+                <h2 id="production-next-steps-title">What to do next</h2>
+                <p><strong>Current stage:</strong> <%= synthesis.currentStage %></p>
+                <div class="production-next-steps-grid">
+                    <div><h3>Concept directions</h3><ul><% synthesis.conceptDirections.forEach(function(item) { %><li><%= item %></li><% }); %></ul></div>
+                    <div><h3>Largest open decisions</h3><ul><% synthesis.openDecisions.forEach(function(item) { %><li><%= item %></li><% }); %></ul></div>
+                    <div><h3>Immediate validation actions</h3><ul><% synthesis.immediateActions.forEach(function(item) { %><li><%= item %></li><% }); %></ul></div>
+                    <div><h3>Evidence needed</h3><ul><% synthesis.evidenceNeeded.forEach(function(item) { %><li><%= item %></li><% }); %></ul></div>
+                </div>
+                <h3><%= synthesis.unlockTitle || 'Before listing and launch assets unlock' %></h3>
+                <ul><% synthesis.unlockConditions.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
+            </section>
+        <% } %>
 
         <% if (hasExpiredLease) { %>
             <form action="/production/<%= production.id %>/run-next" method="POST" class="production-run-next">
@@ -74,6 +138,25 @@
         var element = document.getElementById('production-live-status');
         if (element) element.textContent = message || '';
     }
+    function countLabel(count, singular, plural) {
+        return count + ' ' + (count === 1 ? singular : plural);
+    }
+    function updatePlanProgress(progress) {
+        if (!progress) return;
+        var overall = document.getElementById('plan-progress-overall');
+        var current = document.getElementById('plan-progress-current');
+        var deferred = document.getElementById('plan-progress-deferred');
+        if (overall) overall.textContent = progress.completedCount + ' of ' + progress.totalCount
+            + ' steps completed across production batches. The plan contains '
+            + countLabel(progress.readyToUseAssetCount, 'ready-to-use asset', 'ready-to-use assets') + ' and '
+            + countLabel(progress.planningFoundationCount, 'free planning prerequisite', 'free planning prerequisites') + '.';
+        if (current) current.textContent = countLabel(progress.batchNewCount, 'new deliverable', 'new deliverables')
+            + ' in this run; ' + progress.batchIncompleteCount + ' remain incomplete. '
+            + countLabel(progress.reusedCount, 'prerequisite', 'prerequisites') + ' reused.';
+        if (deferred) deferred.textContent = countLabel(progress.deferredCount, 'deliverable', 'deliverables')
+            + (progress.deferredCount === 1 ? ' remains' : ' remain') + ' deferred (estimated '
+            + countLabel(progress.remainingEstimatedCost, 'generation', 'generations') + ').';
+    }
     function scheduleRefresh(delay) {
         if (pollingStopped || terminal.includes(latestRunStatus)) return;
         if (pollTimer) window.clearTimeout(pollTimer);
@@ -103,6 +186,7 @@
             liveStatus('');
             document.getElementById('production-progress').textContent = state.completedCount + ' of ' + state.totalCount + ' completed.';
             document.getElementById('production-run-status').textContent = label(state.runStatus);
+            updatePlanProgress(state.planProgress);
             state.jobs.forEach(function (job) {
                 var row = document.querySelector('[data-production-sequence="' + job.sequenceOrder + '"]');
                 if (!row) return;

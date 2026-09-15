@@ -14,6 +14,7 @@ const {
   validateSelection
 } = require('../lib/buildPlanApproval');
 const discoveryRoutes = require('../routes/discovery');
+const { getDb } = require('../db/database');
 
 function confirmed(value, label = value) {
   return { value, label, confidence: 1, source: 'user_confirmed' };
@@ -243,6 +244,8 @@ async function run() {
   assert.strictEqual(validateSelection(changedPlan, defaults).valid, false);
 
   const app = express();
+  getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
+    .run(37, 'story-3-7@example.com', 'Build Plan Tester');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.use(express.urlencoded({ extended: true }));
@@ -300,13 +303,26 @@ async function run() {
     assert.match(page.body, /Approve &amp; Prepare for Production/);
     assert.match(page.body, /Save Plan Choices/);
     assert.match(page.body, /Include in production|Included as a prerequisite/);
-    assert.match(page.body, /Essential:/);
-    assert.match(page.body, /Recommended:/);
-    assert.match(page.body, /Optional:/);
-    assert.match(page.body, /Strategic direction/);
+    assert.match(page.body, /Free planning foundation:/);
+    assert.match(page.body, /Production credits:/);
+    assert.match(page.body, /Total steps:/);
+    assert.match(page.body, /Ready-to-use output deliverables/);
+    assert.match(page.body, /<details class="planning-foundation-disclosure">/);
+    assert(page.body.indexOf('Ready-to-use output deliverables') < page.body.indexOf('Free planning foundation deliverables'));
+    assert.doesNotMatch(page.body, /Strategic direction|Builder-provided offer description|Treat this as unverified context/);
     assert.match(page.body, /Amazon is the confirmed sales channel/);
     assert.doesNotMatch(page.body, /priority|estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
     const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+
+    const savedForLater = await request(valid, 'POST', '/discovery/build-plan/save-later', { _csrf: token });
+    assert.strictEqual(savedForLater.res.statusCode, 303);
+    assert.strictEqual(savedForLater.res.headers.location, '/discovery/build-plan');
+    const savedForLaterPage = await request(valid, 'GET', '/discovery/build-plan');
+    assert.match(savedForLaterPage.body, /Plan saved\. Resume it anytime from Start an Objective/);
+    const afterSaveForLater = JSON.parse((await request(valid, 'GET', '/test/session')).body);
+    assert(afterSaveForLater.discoverySession.buildPlanSavedAt);
+    assert.strictEqual(afterSaveForLater.credits, 19);
+    assert.strictEqual(afterSaveForLater.usageCount, 8);
 
     const csrfDenied = await request(valid, 'POST', '/discovery/build-plan/selection', {
       selectedDeliverableIds: defaults.selectedDeliverableIds
@@ -341,6 +357,10 @@ async function run() {
     assert.match(handoff.body, /Nothing has been generated yet/);
     assert.match(handoff.body, /Review Cost &amp; Start Production/);
     assert.match(handoff.body, /No usage is consumed until/);
+    assert.match(handoff.body, /Ready-to-use output deliverables/);
+    assert.match(handoff.body, /<details class="planning-foundation-disclosure">/);
+    assert(handoff.body.indexOf('Ready-to-use output deliverables') < handoff.body.indexOf('Free planning foundation deliverables'));
+    assert.doesNotMatch(handoff.body, /Builder-provided offer description|Treat this as unverified context|Inferred primary customer/);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);
     assert(stored.discoverySession.buildPlanSelection.approvedAt);

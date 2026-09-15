@@ -1,4 +1,5 @@
 <% var regenerateRequestKey = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys.regenerate : ''; %>
+<% var productionRegenerateRequestKey = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys.productionRegenerate : ''; %>
 <div class="container workspace-page">
     <nav class="breadcrumb fade-in">
         <a href="/dashboard">Dashboard</a>
@@ -31,8 +32,17 @@
                 <h3><%= productionDeliverable ? 'Production Deliverable' : 'Generated Content' %></h3>
                 <div class="detail-results">
                     <% if (productionDeliverable && !productionDeliverable.customerReady) { %>
-                        <div class="alert" role="status">This historical deliverable needs a safe quality review before it can be shown.</div>
-                    <% } else if (productionDeliverable) { %>
+                        <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready deliverable. Create an improved AI version below to replace it with complete content.</div>
+                    <% } %>
+                    <% if (productionDeliverable && productionDeliverable.purposeNotice) { %>
+                        <div class="alert alert-info production-purpose-notice" role="status">
+                            <strong>Planning deliverable:</strong> <%= productionDeliverable.purposeNotice %>
+                            <% if (productionDeliverable.nextDeliverable) { %>
+                                <a href="/generation/<%= productionDeliverable.nextDeliverable.id %>">Open the ready-to-use email campaign →</a>
+                            <% } %>
+                        </div>
+                    <% } %>
+                    <% if (productionDeliverable && productionDeliverable.sections.length) { %>
                         <% productionDeliverable.sections.forEach(function(section, i) { %>
                             <section class="production-deliverable-section">
                                 <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
@@ -40,7 +50,7 @@
                                 <% } else { %><p class="result-text" id="deliverable-<%= i %>"><%= section.value %></p><% } %>
                             </section>
                         <% }); %>
-                    <% } else { %>
+                    <% } else if (!productionDeliverable) { %>
                     <% var resultsList = typeof results === 'string' ? JSON.parse(results) : results; %>
                     <% if (resultsList && resultsList.length) { %>
                         <% resultsList.forEach(function(r, i) { %>
@@ -60,6 +70,7 @@
             <!-- Actions -->
             <div class="detail-actions-card">
                 <% if (!productionDeliverable) { %><button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button><% } %>
+                <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { %><button class="btn btn-primary" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" onclick="regenerateProductionWithAi()"><%= productionDeliverable.artifactRole === 'planning_foundation' ? '✨ Regenerate Planning Foundation' : '✨ Create Improved AI Version' %></button><% } %>
                 <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>" class="btn btn-primary">← Back to Production Plan</a><% } %>
                 <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
                 <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
@@ -71,10 +82,16 @@
             <div class="sidebar-card">
                 <h3 class="h4">Metadata</h3>
                 <div class="meta-list">
-                    <div class="meta-row"><span class="meta-label">Type</span><span class="meta-value"><%= gen.content_type.replace(/_/g, ' ') %></span></div>
+                    <div class="meta-row"><span class="meta-label">Type</span><span class="meta-value"><%= productionDeliverable && productionDeliverable.displayType ? productionDeliverable.displayType : gen.content_type.replace(/_/g, ' ') %></span></div>
                     <div class="meta-row"><span class="meta-label">Tone</span><span class="meta-value"><%= gen.tone %></span></div>
                     <div class="meta-row"><span class="meta-label">Words</span><span class="meta-value"><%= gen.word_count || 0 %></span></div>
-                    <div class="meta-row"><span class="meta-label"><%= productionDeliverable ? 'Generation Method' : 'AI Model' %></span><span class="meta-value"><%= productionDeliverable ? productionDeliverable.generationMethod : (gen.ai_model || 'CopyQuick AI') %></span></div>
+                    <% if (productionDeliverable) { %>
+                    <div class="meta-row"><span class="meta-label">Output Source</span><span class="meta-value"><%= productionDeliverable.source.label %></span></div>
+                    <div class="meta-row"><span class="meta-label">Model</span><span class="meta-value"><%= productionDeliverable.source.model %></span></div>
+                    <div class="meta-row"><span class="meta-label">Generation Method</span><span class="meta-value"><%= productionDeliverable.generationMethod %></span></div>
+                    <% } else { %>
+                    <div class="meta-row"><span class="meta-label">AI Model</span><span class="meta-value"><%= gen.ai_model || 'CopyQuick AI' %></span></div>
+                    <% } %>
                     <div class="meta-row"><span class="meta-label">Created</span><span class="meta-value"><%= new Date(gen.created_at).toLocaleDateString() %></span></div>
                     <div class="meta-row"><span class="meta-label">Updated</span><span class="meta-value"><%= new Date(gen.updated_at || gen.created_at).toLocaleDateString() %></span></div>
                 </div>
@@ -113,6 +130,7 @@ function deleteGen() {
 }
 
 var regenerateRequestKey = '<%= regenerateRequestKey %>';
+var productionRegenerateRequestKey = '<%= productionRegenerateRequestKey %>';
 function regenerate() {
     fetch('/generation/' + genId + '/regenerate', {
         method: 'POST',
@@ -129,6 +147,37 @@ function regenerate() {
             showToast('Regenerated!');
             location.reload();
         });
+}
+
+function regenerateProductionWithAi() {
+    var button = document.getElementById('productionRegenerateBtn');
+    var planningDeliverable = button && button.dataset.artifactRole === 'planning_foundation';
+    var confirmation = planningDeliverable
+        ? 'Regenerate this planning foundation? This optional regeneration uses 1 generation credit and replaces the current planning document. It will not create customer-facing sales copy.'
+        : 'Create a new AI version of this deliverable? This uses 1 generation credit and replaces the content shown on this page.';
+    if (!confirm(confirmation)) return;
+    if (button) { button.disabled = true; button.textContent = 'Creating AI version…'; }
+    fetch('/generation/' + genId + '/regenerate-production', {
+        method: 'POST',
+        headers: window.CopyQuickCsrf.headers({
+            'Accept': 'application/json',
+            'Idempotency-Key': productionRegenerateRequestKey
+        })
+    }).then(function(response) {
+        return response.json().then(function(body) { return { ok: response.ok, body: body }; });
+    }).then(function(result) {
+        if (!result.ok || result.body.error) {
+            if (result.body.retryWithNewRequestKey && window.crypto && typeof window.crypto.randomUUID === 'function') {
+                productionRegenerateRequestKey = window.crypto.randomUUID();
+            }
+            throw new Error(result.body.error || 'The AI version could not be created.');
+        }
+        showToast('Improved AI version created.');
+        location.reload();
+    }).catch(function(error) {
+        showToast(error.message);
+        if (button) { button.disabled = false; button.textContent = planningDeliverable ? '✨ Regenerate Planning Foundation' : '✨ Create Improved AI Version'; }
+    });
 }
 
 function copyText(id, btn) {

@@ -96,6 +96,27 @@
         </div>
     </div>
 
+    <% if (typeof latestProduction !== 'undefined' && latestProduction) { %>
+        <section class="bc-production-resume fade-in" aria-labelledby="productionResumeTitle">
+            <div class="bc-rec-card">
+                <div class="bc-rec-icon" aria-hidden="true">📋</div>
+                <div class="bc-rec-body">
+                    <span class="bc-rec-label">Your Production Plan</span>
+                    <strong id="productionResumeTitle"><%= latestProduction.planName %></strong>
+                    <span class="bc-rec-text">
+                        <%= latestProduction.objectiveLabel %> · Status: <%= latestProduction.statusLabel %>.
+                        <% if (latestProduction.progress) { %>
+                            <%= latestProduction.progress.completedCount %> of <%= latestProduction.progress.totalCount %> plan steps completed.
+                        <% } else { %>
+                            <%= latestProduction.batchCompletedCount %> of <%= latestProduction.batchTotalCount %> current-batch jobs completed.
+                        <% } %>
+                    </span>
+                </div>
+                <a href="<%= latestProduction.href %>" class="btn btn-primary bc-rec-btn"><%= latestProduction.actionLabel %> →</a>
+            </div>
+        </section>
+    <% } %>
+
     <!-- ===== SECTION 2: Next Recommended Action ===== -->
     <section class="bc-recommendation fade-in">
         <div class="bc-rec-card">
@@ -329,6 +350,7 @@
 .copycredit-bank-note p{font-size:0.78rem;color:var(--secondary);line-height:1.45;margin:0.25rem 0 0;max-width:none;}
 
 /* ===== Recommendation ===== */
+.bc-production-resume{margin-bottom:1rem;}
 .bc-recommendation{margin-bottom:2.5rem;}
 .bc-rec-card{display:flex;align-items:center;gap:1rem;padding:0.9rem 1.25rem;background:var(--primary-light);border:1px solid rgba(79,70,229,0.15);border-radius:0.9rem;transition:all 0.2s;}
 .bc-rec-icon{font-size:1.5rem;flex-shrink:0;}

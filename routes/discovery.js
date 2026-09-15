@@ -5,7 +5,14 @@ const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { DISCOVERY_POLICY_VERSION, isMeaningfullyReady } = require('../lib/discoveryRequirements');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
 const { STRATEGY_POLICY_VERSION, buildStrategy } = require('../lib/strategyEngine');
+const { buildStrategyWithAI } = require('../lib/aiStrategySynthesis');
 const { buildPlan } = require('../lib/buildPlanEngine');
+const { getDb } = require('../db/database');
+const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
+const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
+const { getSavedPlan, saveBuildPlan } = require('../lib/savedBuildPlans');
+const { getAvailableObjective } = require('../lib/businessJourneys');
+const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
 const {
   buildApprovalView,
   createApprovedProductionSet,
@@ -23,6 +30,21 @@ const EXAMPLE_PROMPTS = [
   'A premium meal-planning service for busy families',
   'A sustainable home goods brand for modern apartments'
 ];
+const ACQUISITION_EXAMPLE_PROMPTS = [
+  'A bookkeeping service that wants more qualified small-business leads',
+  'An online store that wants more repeat customers through email',
+  'A local dental practice that wants more booked appointments',
+  'A SaaS company that needs a predictable pipeline of trial users'
+];
+
+function activeObjective(req) {
+  const sessionObjective = req.session.discoverySession?.objective;
+  if (getAvailableObjective(sessionObjective)) return sessionObjective;
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const goal = db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId)?.builder_goal;
+  return getAvailableObjective(goal)?.id || 'launch_product';
+}
 
 function getInitialAnswer(req) {
   return req.session.discoverySession?.answers?.initial_description
@@ -36,8 +58,23 @@ function getUnderstandingSummary(session) {
   });
 }
 
+function captureDiscoveryStep(discoverySession) {
+  const snapshot = { ...discoverySession };
+  delete snapshot.stepHistory;
+  delete snapshot.editingInitialDescription;
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
+function appendDiscoveryStepHistory(discoverySession) {
+  return (Array.isArray(discoverySession.stepHistory) ? discoverySession.stepHistory : [])
+    .concat(captureDiscoveryStep(discoverySession))
+    .slice(-30);
+}
+
 function renderDiscovery(req, res, options = {}) {
   const discoverySession = req.session.discoverySession || null;
+  const objective = activeObjective(req);
+  const acquisition = objective === 'get_more_customers';
   res.status(options.status || 200).render('discovery', {
     title: "Let's Build Something Amazing - CopyQuick",
     currentPage: 'discovery',
@@ -47,8 +84,12 @@ function renderDiscovery(req, res, options = {}) {
     otherAnswer: options.otherAnswer || '',
     additionalDetail: options.additionalDetail || '',
     error: options.error || null,
-    examplePrompts: EXAMPLE_PROMPTS,
+    objective,
+    initialPrompt: acquisition ? 'Tell us about the business you want to grow.' : 'What are you building?',
+    initialPlaceholder: acquisition ? 'Describe your offer, ideal customer, and how customers find you today...' : 'Describe the product you want to bring to market...',
+    examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
     discoverySession,
+    editingInitialDescription: Boolean(discoverySession?.editingInitialDescription),
     understandingSummary: getUnderstandingSummary(discoverySession),
     nextQuestion: discoverySession?.nextQuestion || null
   });
@@ -132,16 +173,28 @@ function hasCurrentBuildPlanState(discoverySession) {
 function renderBuildPlan(req, res, options = {}) {
   const discoverySession = req.session.discoverySession;
   const productionNotice = discoverySession.productionNotice || null;
+  const buildPlanNotice = discoverySession.buildPlanNotice || null;
   discoverySession.productionNotice = null;
+  discoverySession.buildPlanNotice = null;
   discoverySession.buildPlanSelection = initializeSelection(
     discoverySession.buildPlan,
     discoverySession.buildPlanSelection
   );
+  const db = getDb();
+  const userId = req.session?.userId || req.session?.passport?.user;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  const usageSnapshot = user ? getCurrentUsageSnapshotReadOnly(db, user) : { used: 0, monthlyLimit: 0, remaining: 0 };
+  const affordability = buildProductionBatchStatus({
+    db, userId, plan: discoverySession.buildPlan,
+    selection: discoverySession.buildPlanSelection, usageSnapshot, mode: 'full'
+  });
   return res.status(options.status || 200).render('build-plan', {
     title: 'Your Personalized Build Plan - CopyQuick',
     currentPage: 'discovery',
     plan: discoverySession.buildPlan,
     approval: buildApprovalView(discoverySession.buildPlan, discoverySession.buildPlanSelection),
+    affordability,
+    notice: buildPlanNotice,
     error: options.error || productionNotice
   });
 }
@@ -151,6 +204,7 @@ function renderReflection(req, res, options = {}) {
   const productionNotice = discoverySession.productionNotice || null;
   discoverySession.productionNotice = null;
   const reflection = buildBusinessReflection({
+    objective: discoverySession.objective,
     answers: discoverySession.answers,
     understanding: discoverySession.understanding,
     planningReadiness: discoverySession.planningReadiness
@@ -159,6 +213,7 @@ function renderReflection(req, res, options = {}) {
     title: 'Business Reflection - CopyQuick',
     currentPage: 'discovery',
     reflection,
+    objective: discoverySession.objective,
     planningReadiness: discoverySession.planningReadiness,
     error: options.error || productionNotice,
     confirmed: Boolean(discoverySession.planningConfirmedAt)
@@ -186,19 +241,21 @@ router.post('/discovery', requireAuth, async (req, res) => {
     }
 
     const now = new Date().toISOString();
-    const understandingResult = await understandBusiness({ objective: 'launch_product', answer });
+    const objective = activeObjective(req);
+    const understandingResult = await understandBusiness({ objective, answer });
     const answers = { initial_description: answer };
     const intelligenceResult = analyzeDiscovery({
-      objective: 'launch_product',
+      objective,
       understanding: understandingResult.understanding,
       unknowns: understandingResult.unknowns,
       answers
     });
     req.session.discoverySession = {
-      objective: 'launch_product',
+      objective,
       answers,
       understanding: understandingResult.understanding,
       unknowns: understandingResult.unknowns,
+      interpretation: understandingResult.interpretation,
       completedQuestions: ['initial_description'],
       completion: intelligenceResult.completion,
       knowledgeDomains: intelligenceResult.knowledgeDomains,
@@ -208,6 +265,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       planningReadiness: intelligenceResult.planningReadiness,
       discoveryCompleteForNow: intelligenceResult.discoveryCompleteForNow,
       discoveryPolicyVersion: DISCOVERY_POLICY_VERSION,
+      stepHistory: [],
       startedAt: req.session.discoverySession?.startedAt || now,
       updatedAt: now
     };
@@ -282,12 +340,15 @@ router.post('/discovery', requireAuth, async (req, res) => {
       unknowns: understandingResult.unknowns,
       answers: updatedAnswers
     });
+    const stepHistory = appendDiscoveryStepHistory(discoverySession);
     discoverySession.answers = updatedAnswers;
     discoverySession.understanding = understandingResult.understanding;
     discoverySession.unknowns = understandingResult.unknowns;
+    discoverySession.interpretation = understandingResult.interpretation;
     discoverySession.completedQuestions = Array.from(new Set(
       discoverySession.completedQuestions.concat(currentQuestion.id)
     ));
+    discoverySession.stepHistory = stepHistory;
     applyIntelligenceResult(discoverySession, intelligenceResult);
     discoverySession.updatedAt = new Date().toISOString();
     if (intelligenceResult.discoveryCompleteForNow) {
@@ -332,12 +393,15 @@ router.post('/discovery', requireAuth, async (req, res) => {
       unknowns: understandingResult.unknowns,
       answers: updatedAnswers
     });
+    const stepHistory = appendDiscoveryStepHistory(discoverySession);
     discoverySession.answers = updatedAnswers;
     discoverySession.understanding = understandingResult.understanding;
     discoverySession.unknowns = understandingResult.unknowns;
+    discoverySession.interpretation = understandingResult.interpretation;
     discoverySession.completedQuestions = Array.from(new Set(
       discoverySession.completedQuestions.concat(currentQuestion.id)
     ));
+    discoverySession.stepHistory = stepHistory;
     applyIntelligenceResult(discoverySession, intelligenceResult);
     discoverySession.updatedAt = new Date().toISOString();
     if (intelligenceResult.discoveryCompleteForNow) {
@@ -393,18 +457,40 @@ router.post('/discovery', requireAuth, async (req, res) => {
     answers: updatedAnswers
   });
 
+  const stepHistory = appendDiscoveryStepHistory(discoverySession);
   discoverySession.answers = updatedAnswers;
   discoverySession.understanding = understandingResult.understanding;
   discoverySession.unknowns = understandingResult.unknowns;
+  discoverySession.interpretation = understandingResult.interpretation;
   discoverySession.completedQuestions = Array.from(new Set(
     discoverySession.completedQuestions.concat(currentQuestion.id)
   ));
+  discoverySession.stepHistory = stepHistory;
   applyIntelligenceResult(discoverySession, intelligenceResult);
   discoverySession.updatedAt = new Date().toISOString();
 
   if (intelligenceResult.discoveryCompleteForNow) {
     discoverySession.reflectionStartedAt = new Date().toISOString();
     return res.redirect(303, '/discovery/reflection');
+  }
+  return res.redirect(303, '/discovery');
+});
+
+router.post('/discovery/back', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!discoverySession?.answers?.initial_description) return res.redirect(303, '/welcome');
+
+  const history = Array.isArray(discoverySession.stepHistory) ? discoverySession.stepHistory : [];
+  if (history.length) {
+    const remainingHistory = history.slice(0, -1);
+    req.session.discoverySession = {
+      ...history[history.length - 1],
+      stepHistory: remainingHistory,
+      updatedAt: new Date().toISOString()
+    };
+  } else {
+    discoverySession.editingInitialDescription = true;
+    discoverySession.updatedAt = new Date().toISOString();
   }
   return res.redirect(303, '/discovery');
 });
@@ -451,6 +537,7 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   discoverySession.answers = edit.answers;
   discoverySession.understanding = understandingResult.understanding;
   discoverySession.unknowns = understandingResult.unknowns;
+  discoverySession.interpretation = understandingResult.interpretation;
   applyIntelligenceResult(discoverySession, intelligenceResult);
   discoverySession.updatedAt = new Date().toISOString();
   discoverySession.planningConfirmedAt = null;
@@ -467,7 +554,7 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
   return res.redirect(303, '/discovery/reflection');
 });
 
-router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
+router.post('/discovery/reflection/plan', requireAuth, async (req, res) => {
   const discoverySession = req.session.discoverySession;
   refreshDiscoveryPolicy(discoverySession);
   if (!canViewReflection(discoverySession)) {
@@ -481,7 +568,7 @@ router.post('/discovery/reflection/plan', requireAuth, (req, res) => {
   }
 
   discoverySession.confirmedUnderstanding = { ...discoverySession.understanding };
-  discoverySession.strategyResult = buildStrategy({
+  discoverySession.strategyResult = await buildStrategyWithAI({
     objective: discoverySession.objective,
     understanding: discoverySession.understanding,
     answers: discoverySession.answers,
@@ -512,6 +599,7 @@ router.get('/discovery/strategy', requireAuth, (req, res) => {
     title: 'Recommended Business Strategy - CopyQuick',
     currentPage: 'discovery',
     strategyResult,
+    objective: discoverySession.objective,
     canBuildPlan: hasCurrentStrategyState(discoverySession),
     error: productionNotice
   });
@@ -566,6 +654,31 @@ router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
   }
   discoverySession.buildPlanSelection = result.selection;
   discoverySession.approvedProductionSet = null;
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session?.userId || req.session?.passport?.user;
+  if (getSavedPlan(db, { userId, objective: discoverySession.objective })) saveBuildPlan(db, { userId, discoverySession });
+  return res.redirect(303, '/discovery/build-plan');
+});
+
+router.post('/discovery/build-plan/save-later', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  refreshDiscoveryPolicy(discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
+    return res.redirect(303, '/discovery/build-plan');
+  }
+
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session?.userId || req.session?.passport?.user;
+  try {
+    const saved = saveBuildPlan(db, { userId, discoverySession });
+    discoverySession.buildPlanSavedAt = saved.savedAt;
+    discoverySession.buildPlanNotice = 'Plan saved. Resume it anytime from Start an Objective → Saved Plan.';
+  } catch (_) {
+    return renderBuildPlan(req, res, {
+      status: 409,
+      error: 'This plan could not be saved safely. Review it and try again.'
+    });
+  }
   return res.redirect(303, '/discovery/build-plan');
 });
 
@@ -578,7 +691,8 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
   const result = createApprovedProductionSet({
     plan: discoverySession.buildPlan,
     selection: discoverySession.buildPlanSelection,
-    strategyResult: discoverySession.strategyResult
+    strategyResult: discoverySession.strategyResult,
+    batchMode: req.body.batchMode
   });
   if (!result.valid) {
     return renderBuildPlan(req, res, { status: 409, error: result.error });
@@ -602,21 +716,35 @@ router.get('/discovery/production-ready', requireAuth, (req, res) => {
   }
 
   const productionSet = discoverySession.approvedProductionSet;
+  const db = getDb();
+  const userId = req.session?.userId || req.session?.passport?.user;
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  const usageSnapshot = user ? getCurrentUsageSnapshotReadOnly(db, user) : { used: 0, monthlyLimit: 0, remaining: 0 };
+  const batch = buildProductionBatchStatus({
+    db, userId, plan: discoverySession.buildPlan,
+    selection: discoverySession.buildPlanSelection, usageSnapshot,
+    mode: productionSet.batchMode || 'full'
+  });
+  if (!batch.valid || !batch.productionNow.length) return res.redirect('/discovery/build-plan');
   const phases = discoverySession.buildPlan.phases.map(function(phase) {
     return {
       id: phase.id,
       title: phase.title,
-      deliverables: productionSet.selectedDeliverables.filter(function(item) {
+      deliverables: batch.productionNow.filter(function(item) {
         return item.phase === phase.id;
       })
     };
   }).filter(function(phase) { return phase.deliverables.length; });
+  const planningFoundation = batch.productionNow.filter(isPlanningFoundation);
+  const readyToUseAssets = batch.productionNow.filter(isReadyToUseAsset);
   return res.render('production-ready', {
     title: 'Your Production Plan Is Ready - CopyQuick',
     currentPage: 'discovery',
     productionSet,
+    batch,
     phases,
-    dependencyCount: discoverySession.buildPlanSelection.requiredDependencyIds.length
+    planningFoundation,
+    readyToUseAssets
   });
 });
 

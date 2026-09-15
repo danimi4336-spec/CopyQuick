@@ -268,7 +268,7 @@ async function run() {
     assert.match(page.body, /Strategy Ready — Open Decisions/);
     assert.match(page.body, /Evidence-Based and Reassuring/);
     assert.match(page.body, /Areas that may improve your strategy/);
-    assert.match(page.body, /Edit Business Understanding/);
+    assert.match(page.body, /href="\/discovery\/reflection"[^>]*>← Back<\/a>/);
     assert.match(page.body, /Continue to Build Plan/);
     assert.doesNotMatch(page.body, /\d+%/);
 

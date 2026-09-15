@@ -9,12 +9,21 @@ const generator = require('../lib/generator');
 const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
+const { generateDeliverable } = require('../lib/generationService');
+const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const { parseJob, parseStrategySnapshot } = require('../lib/productionState');
 const { bundleAssets, brandVoices, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
+const { getLatestProductionResume } = require('../lib/productionResume');
+const {
+  configuredProductionProvider,
+  productionProviderStatus,
+  storedProductionSource
+} = require('../lib/openaiProductionProvider');
 const { consumeBillingReturnNotice } = require('../lib/billingCheckoutReturn');
 const {
   getCurrentUsageSnapshot,
@@ -34,7 +43,8 @@ router.use((req, res, next) => {
   res.locals.generationRequestKeys = {
     quick: crypto.randomUUID(),
     bundle: crypto.randomUUID(),
-    regenerate: crypto.randomUUID()
+    regenerate: crypto.randomUUID(),
+    productionRegenerate: crypto.randomUUID()
   };
   next();
 });
@@ -169,6 +179,7 @@ function loadDashboardSnapshot(db, user, options = {}) {
     bundleCount: db.prepare("SELECT COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 AND generation_type = 'bundle'").get(userId).count,
     recent: db.prepare('SELECT id, title, input_text, content_type, tone, created_at, favorite, word_count, generation_type FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 10').all(userId),
     typeBreakdown: db.prepare('SELECT content_type, COUNT(*) AS count FROM generations WHERE user_id = ? AND is_deleted = 0 GROUP BY content_type ORDER BY count DESC').all(userId),
+    latestProduction: getLatestProductionResume(db, userId),
     bundleAssets,
     brandVoices,
     audiencePresets,
@@ -581,20 +592,60 @@ router.get('/generation/:id', requireAuth, (req, res) => {
   let productionDeliverable = null;
   if (gen.generation_type === 'production' && gen.production_job_id) {
     const production = db.prepare(`
-      SELECT production_runs.id AS run_id, production_jobs.title AS job_title
+      SELECT production_runs.id AS run_id, production_jobs.title AS job_title,
+             production_jobs.production_run_id, usage_events.metadata AS usage_metadata
       FROM production_jobs JOIN production_runs ON production_runs.id = production_jobs.production_run_id
+      LEFT JOIN usage_events ON usage_events.id = production_runs.usage_event_id
       WHERE production_jobs.id = ? AND production_jobs.generation_id = ? AND production_runs.user_id = ?
     `).get(gen.production_job_id, gen.id, userId);
     const contract = getProductionContract(gen.deliverable_id);
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
     const quality = validateCustomerReadyOutput(output, contract);
+    const legacySections = gen.deliverable_id === 'outreach_sequence'
+      && output && typeof output.summary === 'string' && Array.isArray(output.content)
+      ? [
+          { key: 'summary', label: 'Legacy Overview', value: output.summary, isList: false },
+          { key: 'content', label: 'Legacy Outreach Outline', value: output.content, isList: true }
+        ]
+      : [];
+    const providerStatus = productionProviderStatus();
+    let readyAssetBilling = false;
+    try {
+      readyAssetBilling = JSON.parse(production?.usage_metadata || '{}').costingModel === 'ready_to_use_asset_unit';
+    } catch (_) { readyAssetBilling = false; }
+    const nextDeliverable = gen.deliverable_id === 'campaign_brief' && production?.production_run_id
+      ? db.prepare(`
+          SELECT generations.id, production_jobs.title
+          FROM production_jobs
+          JOIN generations ON generations.id = production_jobs.generation_id
+          WHERE production_jobs.production_run_id = ?
+            AND production_jobs.deliverable_id = 'outreach_sequence'
+            AND production_jobs.status = 'completed'
+            AND generations.user_id = ?
+            AND generations.is_deleted = 0
+          LIMIT 1
+        `).get(production.production_run_id, userId)
+      : null;
     productionDeliverable = {
       runId: production?.run_id || null,
       title: production?.job_title || gen.title,
       customerReady: quality.valid,
+      source: storedProductionSource(gen.ai_model),
       generationMethod: 'Structured Production Engine',
-      sections: quality.valid ? contract.presentationSections(output) : []
+      canRegenerateWithAi: providerStatus.live,
+      providerStatus,
+      displayType: contract?.displayType || gen.content_type.replace(/_/g, ' '),
+      artifactRole: contract?.artifactRole || 'ready_to_use_asset',
+      purposeNotice: contract?.artifactRole === 'planning_foundation'
+        ? readyAssetBilling
+          ? 'This is internal foundation work that guides later execution. It is not customer-facing or publishable copy, and it did not consume a production credit.'
+          : 'This is internal foundation work, not customer-facing or publishable copy. This historical run used the earlier per-step billing model; future runs include planning foundation at no credit cost.'
+        : null,
+      nextDeliverable: nextDeliverable
+        ? { id: nextDeliverable.id, title: nextDeliverable.title }
+        : null,
+      sections: quality.valid ? contract.presentationSections(output) : legacySections
     };
   }
 
@@ -606,6 +657,131 @@ router.get('/generation/:id', requireAuth, (req, res) => {
     currentPage: 'history',
     productionDeliverable
   });
+});
+
+// ====== Regenerate Production Deliverable with configured AI ======
+router.post('/generation/:id/regenerate-production', requireAuth, requireGenerationAvailable, generationActionRateLimit, async (req, res) => {
+  const db = getDb();
+  const userId = res.locals.user.id;
+  const genId = req.generationResourceId;
+  const gen = db.prepare(`
+    SELECT * FROM generations
+    WHERE id = ? AND user_id = ? AND is_deleted = 0 AND generation_type = 'production'
+  `).get(genId, userId);
+  if (!gen?.production_job_id) return res.status(404).json({ error: 'Production deliverable not found.' });
+
+  const sourceStatus = productionProviderStatus();
+  if (!sourceStatus.live) {
+    return res.status(409).json({
+      error: 'OpenAI production AI is not configured. Add the server API settings and restart CopyQuick.'
+    });
+  }
+
+  const usageSnapshot = getCurrentUsageSnapshot(db, res.locals.user);
+  if (usageSnapshot.isOverLimit) return res.status(403).json({ error: 'Monthly limit reached' });
+
+  let generationRequest = { enabled: false };
+  try {
+    generationRequest = beginGenerationRequest(db, {
+      userId,
+      operation: `production-regenerate:${genId}`,
+      key: req.get('Idempotency-Key') || req.body?.idempotencyKey,
+      request: { generationId: Number(genId), deliverableId: gen.deliverable_id, model: sourceStatus.model }
+    });
+    if (generationRequest.replay) {
+      return res.set('Idempotency-Replayed', 'true').json({ success: true, idempotentReplay: true });
+    }
+  } catch (error) {
+    if (error instanceof GenerationRequestError) {
+      return res.status(error.statusCode).json({ error: error.message, code: error.code });
+    }
+    throw error;
+  }
+
+  try {
+    const rawJob = db.prepare('SELECT * FROM production_jobs WHERE id = ? AND generation_id = ?').get(gen.production_job_id, genId);
+    if (!rawJob) {
+      const error = new Error('Production job not found');
+      error.code = 'GENERATION_NOT_FOUND';
+      throw error;
+    }
+    const job = parseJob(rawJob);
+    if (job.stateError) throw job.stateError;
+    const rawRun = db.prepare('SELECT * FROM production_runs WHERE id = ? AND user_id = ?').get(job.production_run_id, userId);
+    if (!rawRun) {
+      const error = new Error('Production run not found');
+      error.code = 'GENERATION_NOT_FOUND';
+      throw error;
+    }
+    const brand = db.prepare(`
+      SELECT business_name, brand_voice, brand_voice_custom, unique_value, key_messages
+      FROM brand_brain WHERE user_id = ?
+    `).get(userId);
+    const brandContext = brand ? {
+      businessName: String(brand.business_name || '').slice(0, 200),
+      voice: String(brand.brand_voice === 'custom' ? brand.brand_voice_custom : brand.brand_voice || '').slice(0, 300),
+      uniqueValue: String(brand.unique_value || '').slice(0, 1000),
+      keyMessages: String(brand.key_messages || '').slice(0, 1000)
+    } : null;
+    const handler = getProductionContract(job.deliverable_id);
+    const generated = await generateDeliverable({
+      job,
+      productionRun: {
+        ...rawRun,
+        strategySnapshot: parseStrategySnapshot(rawRun.strategy_snapshot, 'run_strategy_snapshot'),
+        brandContext
+      },
+      dependencyOutputs: loadDependencyOutputs(db, job),
+      handler,
+      generatorApi: configuredProductionProvider()
+    });
+
+    persistGenerationUsageTransaction(db, {
+      userId,
+      usagePeriodId: usageSnapshot.usagePeriod.id,
+      eventType: 'production_regeneration',
+      sourceRoute: 'POST /generation/:id/regenerate-production',
+      metadata: { deliverableId: gen.deliverable_id, provider: generated.provider, model: generated.aiModel },
+      persistGeneration: (txDb) => {
+        const updated = txDb.prepare(`
+          UPDATE generations
+          SET input_text = ?, content_type = ?, tone = ?, ai_model = ?, results = ?, word_count = ?,
+              contract_version = ?, structured_result = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND user_id = ? AND production_job_id = ? AND is_deleted = 0
+        `).run(
+          generated.inputText, generated.contentType, generated.tone, generated.aiModel,
+          JSON.stringify(generated.results), generated.wordCount, generated.contractVersion,
+          JSON.stringify(generated.structuredOutput), genId, userId, job.id
+        );
+        if (updated.changes !== 1) {
+          const error = new Error('Generation not found during production regeneration');
+          error.code = 'GENERATION_NOT_FOUND';
+          throw error;
+        }
+        txDb.prepare('UPDATE production_jobs SET contract_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+          .run(generated.contractVersion, job.id);
+        return genId;
+      },
+      finalizeGeneration: (txDb, resource) => {
+        if (generationRequest.enabled) completeGenerationRequest(txDb, generationRequest.requestId, resource.generationId);
+      }
+    });
+    return res.json({ success: true, generationId: genId, model: generated.aiModel });
+  } catch (error) {
+    if (generationRequest.enabled && !generationRequest.replay) {
+      failGenerationRequest(db, generationRequest.requestId, error.code || 'PRODUCTION_REGENERATION_FAILED');
+    }
+    const status = error instanceof UsageLimitExceededError ? 403
+      : error.code === 'GENERATION_NOT_FOUND' ? 404
+        : error.code === 'OPENAI_API_KEY_REQUIRED' ? 409 : 502;
+    logGenerationFailure(req, 'production_generation_regeneration_failed', error.code || 'PRODUCTION_REGENERATION_FAILED', status);
+    return res.status(status).json({
+      error: status === 403 ? 'Monthly limit reached'
+        : status === 404 ? 'Production deliverable not found.'
+          : 'The AI version could not be created. No CopyQuick generation credit was used.',
+      retryWithNewRequestKey: generationRequest.enabled
+    });
+  }
 });
 
 // ====== Toggle Favorite ======

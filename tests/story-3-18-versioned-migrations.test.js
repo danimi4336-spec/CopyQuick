@@ -57,12 +57,13 @@ async function run() {
     const value = fixture();
     try {
       const result = runMigrationEngine(value.db, { logger: () => {} });
-      assert.strictEqual(result.currentVersion, 4);
+      assert.strictEqual(result.currentVersion, 7);
       assert.strictEqual(result.pendingCount, 0);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 4);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 7);
       assert.strictEqual(verifyBaselineStructure(value.db), true);
       assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='generation_requests'").get());
       assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='subscription_checkout_intents'").get());
+      assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='saved_build_plans'").get());
     } finally { closeFixture(value); }
   }
 
@@ -76,7 +77,7 @@ async function run() {
       const userId = value.db.prepare('INSERT INTO users(email, name) VALUES (?, ?)').run('v3-upgrade@example.com', 'Preserved').lastInsertRowid;
       const before = value.db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
       const upgraded = runMigrationEngine(value.db, { logger: () => {} });
-      assert.strictEqual(upgraded.currentVersion, 4);
+      assert.strictEqual(upgraded.currentVersion, 7);
       assert.deepStrictEqual(value.db.prepare('SELECT * FROM users WHERE id = ?').get(userId), before);
       assert.ok(value.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='generation_requests'").get());
       assertCode(() => inspectMigrationStatus(value.db, {
@@ -97,7 +98,7 @@ async function run() {
       assert.strictEqual(migrated.status, 0, migrated.stderr);
       assert.match(migrated.stdout, /"event":"database_migration_complete"/);
       const db = new Database(databasePath, { readonly: true, fileMustExist: true });
-      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 4);
+      assert.strictEqual(inspectMigrationStatus(db).currentVersion, 7);
       db.close();
       assert.strictEqual(fs.existsSync(`${databasePath}.runtime-lock`), false);
     } finally {
@@ -118,7 +119,7 @@ async function run() {
       runMigrationEngine(value.db, { logger: () => {} });
       const after = value.db.prepare('SELECT * FROM users WHERE email = ?').get('baseline@example.com');
       assert.deepStrictEqual(after, before);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 4);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 7);
     } finally { closeFixture(value); }
   }
 
@@ -208,8 +209,8 @@ async function run() {
 
     const newer = fixture();
     try {
-      const future = additive(5, 'future_schema_probe', ['CREATE TABLE future_schema_probe(id INTEGER PRIMARY KEY)']);
-      runMigrationEngine(newer.db, { registry: [...MIGRATIONS, future], minVersion: 1, maxVersion: 5, logger: () => {} });
+      const future = additive(8, 'future_schema_probe', ['CREATE TABLE future_schema_probe(id INTEGER PRIMARY KEY)']);
+      runMigrationEngine(newer.db, { registry: [...MIGRATIONS, future], minVersion: 1, maxVersion: 8, logger: () => {} });
       assertCode(() => inspectMigrationStatus(newer.db), 'SCHEMA_VERSION_TOO_NEW');
     } finally { closeFixture(newer); }
   }

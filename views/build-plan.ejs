@@ -11,6 +11,7 @@
             <p><%= plan.summary.whyThisPlan %></p>
         </section>
 
+        <% if (notice) { %><div class="alert alert-success build-plan-alert" role="status"><%= notice %></div><% } %>
         <% if (error) { %><div class="alert alert-error build-plan-alert" role="alert"><%= error %></div><% } %>
         <% if (approval.messages.length) { %>
             <div class="build-plan-adjustments" role="status">
@@ -19,52 +20,104 @@
         <% } %>
 
         <section class="build-plan-selection-summary" aria-label="Selected plan summary">
-            <strong><span data-plan-count="total"><%= approval.counts.total %></span> deliverables selected</strong>
+            <strong><span data-plan-count="readyToUseAssets"><%= approval.counts.readyToUseAssets || 0 %></span> ready-to-use asset<%= approval.counts.readyToUseAssets === 1 ? '' : 's' %> selected</strong>
             <div>
-                <span>Essential: <b data-plan-count="essential"><%= approval.counts.essential %></b></span>
-                <span>Recommended: <b data-plan-count="recommended"><%= approval.counts.recommended %></b></span>
-                <span>Optional: <b data-plan-count="optional"><%= approval.counts.optional %></b></span>
+                <span>Free planning foundation: <b data-plan-count="planningFoundation"><%= approval.counts.planningFoundation || 0 %></b></span>
+                <span>Production credits: <b data-plan-count="productionUnits"><%= approval.counts.productionUnits || 0 %></b></span>
+                <span>Total steps: <b data-plan-count="total"><%= approval.counts.total %></b></span>
             </div>
         </section>
 
+        <% if (affordability && affordability.valid) { %>
+            <section class="build-plan-affordability <%= affordability.cost.canAfford ? 'affordable' : 'blocked' %>" aria-labelledby="plan-affordability-title">
+                <div>
+                    <span class="build-plan-eyebrow">Production estimate</span>
+                    <h2 id="plan-affordability-title"><%= affordability.cost.productionUnitCount %> production credit<%= affordability.cost.productionUnitCount === 1 ? '' : 's' %> remaining in this plan</h2>
+                    <p><%= affordability.cost.readyToUseAssetCount %> ready-to-use asset<%= affordability.cost.readyToUseAssetCount === 1 ? '' : 's' %> · <%= affordability.cost.planningFoundationCount %> planning prerequisite<%= affordability.cost.planningFoundationCount === 1 ? '' : 's' %> included free · <%= affordability.completed.length %> already completed</p>
+                </div>
+                <dl>
+                    <div><dt>Available now</dt><dd data-available-balance="<%= affordability.cost.remainingAllowance %>"><%= affordability.cost.remainingAllowance %></dd></div>
+                    <div><dt>Selected cost</dt><dd data-selected-cost data-completed-count="<%= affordability.completed.length %>"><%= affordability.cost.productionUnitCount %></dd></div>
+                    <div><dt>After production</dt><dd data-projected-balance><%= Math.max(affordability.cost.remainingAllowance - affordability.cost.productionUnitCount, 0) %></dd></div>
+                </dl>
+            </section>
+            <% if (!affordability.cost.canAfford) { %>
+                <div class="build-plan-affordability-warning" role="alert">
+                    <strong>The full plan is not affordable right now.</strong>
+                    <p><%= affordability.cost.blockingReason %> Your choices remain saved.</p>
+                    <div class="build-plan-affordability-message">
+                        <% if (affordability.affordableRecommendation.length) { %>
+                            <span>A dependency-safe batch of <strong><%= affordability.affordableRecommendation.length %></strong> step<%= affordability.affordableRecommendation.length === 1 ? '' : 's' %> can be prepared now, including free planning prerequisites.</span>
+                        <% } else { %>
+                            <span>No valid production batch fits the current balance.</span>
+                        <% } %>
+                    </div>
+                    <div class="build-plan-affordability-actions">
+                        <a href="#optional-deliverables" class="btn btn-outline" data-review-optional>Review Optional Deliverables</a>
+                        <form action="/discovery/build-plan/save-later" method="POST">
+                            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                            <button type="submit" class="btn btn-outline">Save Plan for Later</button>
+                        </form>
+                        <a href="/pricing?returnTo=%2Fdiscovery%2Fbuild-plan" class="btn btn-primary">Compare Plans</a>
+                    </div>
+                </div>
+            <% } %>
+        <% } %>
+
         <form action="/discovery/build-plan/selection" method="POST" id="build-plan-selection-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <div class="build-plan-phases">
-            <% approval.phases.forEach(function(phase, phaseIndex) { %>
-                <section class="build-plan-phase" aria-labelledby="phase-<%= phase.id %>">
-                    <header class="build-plan-phase-header">
-                        <span>Phase <%= phaseIndex + 1 %></span>
-                        <div>
-                            <h2 id="phase-<%= phase.id %>"><%= phase.title %></h2>
-                            <p><%= phase.reason %></p>
-                        </div>
-                    </header>
-                    <div class="build-plan-deliverables">
-                        <% phase.deliverables.forEach(function(item) { %>
-                            <article class="build-plan-deliverable <%= item.selected ? 'selected' : '' %>">
-                                <div class="build-plan-deliverable-heading">
-                                    <label class="build-plan-select-control">
-                                        <% if (item.locked) { %><input type="hidden" name="selectedDeliverableIds" value="<%= item.id %>"><% } %>
-                                        <input type="checkbox" name="selectedDeliverableIds" value="<%= item.id %>" data-level="<%= item.recommendationLevel %>" <%= item.selected ? 'checked' : '' %> <%= item.locked ? 'disabled' : '' %>>
-                                        <span><%= item.locked ? 'Included as a prerequisite' : 'Include in production' %></span>
-                                    </label>
-                                    <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>"><%= item.recommendationLevel %></span>
-                                </div>
-                                <h3><%= item.title %></h3>
-                                <p><%= item.reason %></p>
-                                <% if (item.strategicDirection) { %>
-                                    <div class="build-plan-direction">
-                                        <strong>Strategic direction</strong>
-                                        <p><%= item.strategicDirection %></p>
+            <% const allPlanItems = approval.phases.reduce(function(items, phase) { return items.concat(phase.deliverables.map(function(item) { return { ...item, phaseTitle: phase.title }; })); }, []); %>
+            <% const outputPlanItems = allPlanItems.filter(function(item) { return item.artifactRole !== 'planning_foundation'; }); %>
+            <% const foundationPlanItems = allPlanItems.filter(function(item) { return item.artifactRole === 'planning_foundation'; }); %>
+            <% const hasOptionalOutput = outputPlanItems.some(function(item) { return item.recommendationLevel === 'optional'; }); %>
+
+            <section class="deliverable-display-section deliverable-output-section" <% if (hasOptionalOutput) { %>id="optional-deliverables"<% } %> aria-labelledby="build-plan-output-title">
+                <header><div><span class="build-plan-eyebrow">Your outputs</span><h2 id="build-plan-output-title">Ready-to-use output deliverables</h2></div><strong><%= outputPlanItems.length %> available output<%= outputPlanItems.length === 1 ? '' : 's' %></strong></header>
+                <p>Select the customer-ready deliverables you want CopyQuick to produce, copy, export, and put to work.</p>
+                <div class="build-plan-deliverables">
+                    <% outputPlanItems.forEach(function(item, index) { %>
+                        <article class="build-plan-deliverable <%= item.selected ? 'selected' : '' %>">
+                            <div class="build-plan-deliverable-heading">
+                                <label class="build-plan-select-control">
+                                    <% if (item.locked) { %><input type="hidden" name="selectedDeliverableIds" value="<%= item.id %>"><% } %>
+                                    <input type="checkbox" name="selectedDeliverableIds" value="<%= item.id %>" data-level="<%= item.recommendationLevel %>" data-artifact-role="<%= item.artifactRole || 'ready_to_use_asset' %>" data-billing-units="<%= item.billingUnits == null ? 1 : item.billingUnits %>" data-completed="<%= affordability && affordability.completed && affordability.completed.some(function(done) { return done.id === item.id; }) ? 'true' : 'false' %>" <%= item.selected ? 'checked' : '' %> <%= item.locked ? 'disabled' : '' %>>
+                                    <span><%= item.locked ? 'Included as a prerequisite ready-to-use output' : 'Include ready-to-use output' %></span>
+                                </label>
+                                <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>"><%= item.recommendationLevel %></span>
+                            </div>
+                            <span class="deliverable-sequence-label">Output <%= index + 1 %> · <%= item.phaseTitle %></span>
+                            <h3><%= item.title %></h3><p><%= item.reason %></p>
+                            <% if (item.dependencyNote) { %><p class="build-plan-dependency-note"><%= item.dependencyNote %></p><% } %>
+                        </article>
+                    <% }); %>
+                </div>
+            </section>
+
+            <% if (foundationPlanItems.length) { %>
+                <details class="planning-foundation-disclosure">
+                    <summary><span>Free planning foundation deliverables</span><small><%= foundationPlanItems.length %> internal prerequisite<%= foundationPlanItems.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                    <div class="planning-foundation-content">
+                        <p>CopyQuick uses these internal planning documents to guide the ready-to-use outputs. They are included automatically and are not customer-facing copy.</p>
+                        <div class="build-plan-deliverables">
+                            <% foundationPlanItems.forEach(function(item, index) { %>
+                                <article class="build-plan-deliverable <%= item.selected ? 'selected' : '' %>">
+                                    <div class="build-plan-deliverable-heading">
+                                        <label class="build-plan-select-control">
+                                            <% if (item.locked) { %><input type="hidden" name="selectedDeliverableIds" value="<%= item.id %>"><% } %>
+                                            <input type="checkbox" name="selectedDeliverableIds" value="<%= item.id %>" data-level="<%= item.recommendationLevel %>" data-artifact-role="planning_foundation" data-billing-units="<%= item.billingUnits == null ? 0 : item.billingUnits %>" data-completed="<%= affordability && affordability.completed && affordability.completed.some(function(done) { return done.id === item.id; }) ? 'true' : 'false' %>" <%= item.selected ? 'checked' : '' %> <%= item.locked ? 'disabled' : '' %>>
+                                            <span><%= item.locked ? 'Included as a free planning prerequisite' : 'Include free planning foundation' %></span>
+                                        </label>
+                                        <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>">Free planning</span>
                                     </div>
-                                <% } %>
-                                <% if (item.dependencyNote) { %><p class="build-plan-dependency-note"><%= item.dependencyNote %></p><% } %>
-                            </article>
-                        <% }); %>
+                                    <span class="deliverable-sequence-label">Foundation <%= index + 1 %> · <%= item.phaseTitle %></span>
+                                    <h3><%= item.title %></h3><p><%= item.reason %></p>
+                                    <% if (item.dependencyNote) { %><p class="build-plan-dependency-note"><%= item.dependencyNote %></p><% } %>
+                                </article>
+                            <% }); %>
+                        </div>
                     </div>
-                </section>
-            <% }); %>
-            </div>
+                </details>
+            <% } %>
 
             <div class="build-plan-save-actions">
                 <button type="submit" class="btn btn-outline">Save Plan Choices</button>
@@ -72,11 +125,21 @@
         </form>
 
         <div class="build-plan-actions">
-            <a href="/discovery/strategy" class="btn btn-outline">Review Strategy</a>
+            <a href="/discovery/strategy" class="btn btn-outline">← Back</a>
+            <div class="build-plan-approval-actions">
+            <% if (affordability && affordability.valid && !affordability.cost.canAfford && affordability.affordableRecommendation.length) { %>
             <form action="/discovery/build-plan/approve" method="POST">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="btn btn-primary">Approve &amp; Prepare for Production</button>
+                <input type="hidden" name="batchMode" value="affordable">
+                <button type="submit" class="btn btn-primary">Produce Affordable Batch Now</button>
             </form>
+            <% } %>
+            <form action="/discovery/build-plan/approve" method="POST">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="batchMode" value="full">
+                <button type="submit" class="btn <%= affordability && affordability.valid && affordability.cost.canAfford ? 'btn-primary' : 'btn-outline' %>">Approve &amp; Prepare for Production</button>
+            </form>
+            </div>
         </div>
     </div>
 </div>
@@ -87,19 +150,39 @@
     if (!form) return;
     const controls = Array.from(form.querySelectorAll('input[type="checkbox"][data-level]'));
     function updateSummary() {
-        const counts = { total: 0, essential: 0, recommended: 0, optional: 0 };
+        const counts = { total: 0, essential: 0, recommended: 0, optional: 0, planningFoundation: 0, readyToUseAssets: 0, productionUnits: 0 };
         controls.forEach(function(control) {
             control.closest('.build-plan-deliverable').classList.toggle('selected', control.checked);
             if (control.checked) {
                 counts.total += 1;
                 counts[control.dataset.level] += 1;
+                if (control.dataset.artifactRole === 'planning_foundation') counts.planningFoundation += 1;
+                if (control.dataset.artifactRole === 'ready_to_use_asset') counts.readyToUseAssets += 1;
+                if (control.dataset.completed !== 'true') counts.productionUnits += Number(control.dataset.billingUnits || 0);
             }
         });
         Object.keys(counts).forEach(function(key) {
             const target = document.querySelector('[data-plan-count="' + key + '"]');
             if (target) target.textContent = counts[key];
         });
+        const available = Number(document.querySelector('[data-available-balance]')?.dataset.availableBalance || 0);
+        const selectedCost = document.querySelector('[data-selected-cost]');
+        const projected = document.querySelector('[data-projected-balance]');
+        const estimatedCost = counts.productionUnits;
+        if (selectedCost) selectedCost.textContent = estimatedCost;
+        if (projected) projected.textContent = Math.max(available - estimatedCost, 0);
     }
     controls.forEach(function(control) { control.addEventListener('change', updateSummary); });
+    const optionalReview = document.querySelector('[data-review-optional]');
+    optionalReview?.addEventListener('click', function(event) {
+        const target = document.getElementById('optional-deliverables');
+        if (!target) return;
+        event.preventDefault();
+        target.setAttribute('tabindex', '-1');
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.focus({ preventScroll: true });
+        target.classList.remove('build-plan-phase-highlight');
+        window.requestAnimationFrame(function() { target.classList.add('build-plan-phase-highlight'); });
+    });
 })();
 </script>

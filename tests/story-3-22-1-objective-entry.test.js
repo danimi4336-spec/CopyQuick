@@ -86,7 +86,8 @@ async function run() {
     assert.strictEqual(welcome.res.statusCode, 200, 'a returning user with builder_goal must still see /welcome');
     assert.match(welcome.body, /type="radio" name="goal"[^>]+value="launch_product"/);
     assert.match(welcome.body, /Start This Objective/);
-    assert.match(welcome.body, /value="get_more_customers"[^>]+disabled/);
+    assert.match(welcome.body, /value="get_more_customers"/);
+    assert.doesNotMatch(welcome.body, /value="get_more_customers"[^>]+disabled/);
     assert.match(welcome.body, /Get More Customers[\s\S]*?Planned/);
 
     const preselected = await request(agent, 'GET', '/welcome?goal=launch_product');
@@ -105,7 +106,7 @@ async function run() {
     assert.strictEqual(invalid.res.statusCode, 400);
     assert.match(invalid.body, /Choose an available business objective to continue/);
 
-    const unavailable = await request(agent, 'POST', '/welcome', { _csrf: token, goal: 'get_more_customers' });
+    const unavailable = await request(agent, 'POST', '/welcome', { _csrf: token, goal: 'increase_conversion_rates' });
     assert.strictEqual(unavailable.res.statusCode, 400);
     assert.match(unavailable.body, /Choose an available business objective to continue/);
     assert.strictEqual(db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId).builder_goal, 'launch_product');

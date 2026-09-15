@@ -7,6 +7,20 @@ const { generationActionRateLimit } = require('../lib/generationProtection');
 const { requireGenerationAvailable } = require('../lib/generationControls');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
+const { buildProductionSynthesis } = require('../lib/productionSynthesis');
+const { productionProviderStatus } = require('../lib/openaiProductionProvider');
+const {
+  buildProductionPlanProgress,
+  resolveProductionProgressSet,
+  serializeProductionPlanProgress
+} = require('../lib/productionPlanProgress');
+const { productionPlanName } = require('../lib/productionPlanIdentity');
+const { listProductionHistoryPage } = require('../lib/productionResume');
+const {
+  getProductionArtifactPolicy,
+  isPlanningFoundation,
+  isReadyToUseAsset
+} = require('../lib/productionArtifactPolicy');
 
 const router = express.Router();
 
@@ -28,21 +42,82 @@ function groupApprovedPhases(approvedProductionSet) {
   return phases;
 }
 
+const PRODUCTION_JOB_DESCRIPTIONS = Object.freeze({
+  customer_profile: 'Clarifies the current customer hypothesis, needs, objections, and evidence to validate.',
+  product_concept_brief: 'Defines the working concept, open decisions, evidence boundaries, and next definition steps.',
+  product_specification_brief: 'Organizes unresolved product requirements and the tests needed before supplier or prototype decisions.',
+  product_positioning: 'Frames a provisional position to validate without claiming unsupported differentiation.',
+  value_proposition: 'Defines a customer-value hypothesis and the evidence required to support it.',
+  validation_plan: 'Turns the largest assumptions into practical evidence-gathering actions and decision criteria.',
+  prototype_sample_validation_plan: 'Defines consistent prototype and sample tests before inventory commitment.',
+  sourcing_manufacturer_brief: 'Provides supplier evaluation and RFQ criteria without inventing vendors or commercial terms.',
+  compliance_evidence_checklist: 'Scopes questions, documents, and claims that require qualified review.',
+  unit_economics_pricing_model: 'Provides the input model needed to evaluate price, landed cost, and contribution margin.',
+  packaging_shipping_requirements: 'Defines packaging, labeling, protection, measurement, and shipping decisions.',
+  inventory_fulfillment_plan: 'Plans receiving, storage, replenishment, fulfillment, returns, and operational readiness.',
+  amazon_keyword_guidance: 'Provides unmeasured marketplace search hypotheses to investigate before keyword decisions.'
+});
+
+function productionJobDescription(job) {
+  return PRODUCTION_JOB_DESCRIPTIONS[job.deliverable_id]
+    || `Review the completed ${String(job.title || 'deliverable').toLowerCase()} and its supporting evidence before using it downstream.`;
+}
+
 function redirectInvalid(req, res, result) {
   if (req.session?.discoverySession) req.session.discoverySession.productionNotice = result.reason;
   return res.redirect(result.redirect || '/discovery/build-plan');
 }
 
 function renderReview(res, review, options = {}) {
+  const productionNowSet = { selectedDeliverables: review.batch.productionNow };
   return res.status(options.status || 200).render('production-review', {
     title: 'Review Production - CopyQuick',
     currentPage: 'production',
     productionSet: review.approvedProductionSet,
-    phases: groupApprovedPhases(review.approvedProductionSet),
+    phases: groupApprovedPhases(productionNowSet),
     cost: review.cost,
+    batch: review.batch,
+    planningFoundation: review.batch.productionNow.filter(isPlanningFoundation),
+    readyToUseAssets: review.batch.productionNow.filter(isReadyToUseAsset),
+    productionSource: productionProviderStatus(process.env),
     error: options.error || null
   });
 }
+
+function getProductionSynthesis(db, userId, productionRunId) {
+  const rows = db.prepare(`
+    SELECT generations.deliverable_id, generations.structured_result
+    FROM generations
+    JOIN production_jobs ON production_jobs.generation_id = generations.id
+    JOIN production_runs ON production_runs.id = production_jobs.production_run_id
+    WHERE production_runs.id = ? AND production_runs.user_id = ?
+      AND production_jobs.status = 'completed' AND generations.is_deleted = 0
+  `).all(productionRunId, userId);
+  const outputs = rows.map(function(row) {
+    try {
+      return { deliverableId: row.deliverable_id, output: JSON.parse(row.structured_result || 'null') };
+    } catch (_) {
+      return null;
+    }
+  }).filter(item => item?.output);
+  return buildProductionSynthesis(outputs);
+}
+
+router.get('/production', requireAuth, (req, res) => {
+  const db = getDb();
+  const user = getUser(req, db);
+  if (!user) return res.redirect('/login');
+  const history = listProductionHistoryPage(db, user.id, {
+    page: req.query.page,
+    status: req.query.status
+  });
+  return res.render('production-history', {
+    title: 'Production Plans - CopyQuick',
+    currentPage: 'production',
+    productionRuns: history.items,
+    history
+  });
+});
 
 router.get('/production/review', requireAuth, (req, res) => {
   const db = getDb();
@@ -122,6 +197,8 @@ router.get('/production/:id', requireAuth, (req, res) => {
 
   const phases = [];
   production.jobs.forEach(function(job) {
+    job.display_description = productionJobDescription(job);
+    job.artifactPolicy = getProductionArtifactPolicy(job.deliverable_id);
     let phase = phases.find(function(existing) { return existing.id === job.phase; });
     if (!phase) {
       phase = { id: job.phase, title: job.phase_title || job.phase, jobs: [] };
@@ -136,12 +213,22 @@ router.get('/production/:id', requireAuth, (req, res) => {
     return job.status === 'running' && job.lease_expires_at
       && Date.parse(job.lease_expires_at) <= Date.now();
   });
+  const approved = req.session?.discoverySession?.approvedProductionSet;
+  const progressSet = resolveProductionProgressSet({
+    db, userId: user.id, production, approvedProductionSet: approved
+  });
+  const planProgress = buildProductionPlanProgress({
+    db, userId: user.id, production, approvedProductionSet: progressSet
+  });
   return res.render('production-studio', {
     title: 'Production Studio - CopyQuick',
     currentPage: 'production',
     production,
     phases,
     completedCount,
+    planName: productionPlanName(production, progressSet),
+    planProgress,
+    synthesis: getProductionSynthesis(db, user.id, production.id),
     executionNotice,
     hasExpiredLease
   });
@@ -155,10 +242,17 @@ router.get('/production/:id/status', requireAuth, (req, res) => {
   const production = runId ? getProductionRun(db, user.id, runId) : null;
   if (!production) return res.status(404).json({ error: 'Production run not found.' });
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
+  const planProgress = buildProductionPlanProgress({
+    db,
+    userId: user.id,
+    production,
+    approvedProductionSet: req.session?.discoverySession?.approvedProductionSet
+  });
   return res.json({
     runStatus: production.status,
     completedCount,
     totalCount: production.jobs.length,
+    planProgress: serializeProductionPlanProgress(planProgress),
     jobs: production.jobs.map(function(job) {
       return {
         sequenceOrder: job.sequence_order,

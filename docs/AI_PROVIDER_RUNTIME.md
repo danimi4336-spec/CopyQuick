@@ -1,5 +1,80 @@
 # AI Provider Runtime Safety
 
+## Safe localhost and browser acceptance
+
+Start acceptance work with an explicit isolated execution mode:
+
+```sh
+COPYQUICK_EXECUTION_MODE=acceptance npm start
+```
+
+Acceptance mode forces production generation through CopyQuick's deterministic
+engine even when `.env` or the parent shell configures `AI_PROVIDER=openai` and
+a live key. Provider status and the startup event identify the execution mode as
+`acceptance` and isolation as active. Unsupported execution-mode values fail
+startup instead of silently selecting a provider.
+
+This mode is for local automated and browser acceptance with fabricated data.
+It does not change standard deployment behavior and it does not authorize use
+of production data. Deliberate live-provider evaluation remains separately
+guarded by `AI_EVALUATION_ENABLED=true` and must not use acceptance mode.
+
+## Isolated contract evaluation
+
+AI output can be previewed against one production contract without creating a
+production run, writing generations, or consuming customer allowance:
+
+```sh
+AI_EVALUATION_ENABLED=true npm run ai:evaluate -- customer_profile
+```
+
+For local editorial review, append `--show-output`. This returns only the
+contract's customer-facing presentation sections; it still excludes prompts,
+strategy snapshots, dependency payloads, credentials, and raw provider data:
+
+```sh
+AI_EVALUATION_ENABLED=true npm run ai:evaluate -- customer_profile --show-output
+```
+
+The command uses the deterministic provider unless `AI_PROVIDER=openai` is
+explicitly configured. Evaluation is refused when `NODE_ENV=production`. Its
+JSON result contains only contract/provider/model identifiers, validation and
+quality status, counts, timing, and sanitized failure codes. It never returns
+the raw prompt, fixture context, dependency content, or provider response. The
+optional preview is intended only for non-production evaluation and remains
+behind the same explicit evaluation guard.
+
+## AI-assisted Discovery
+
+Set `AI_DISCOVERY_ENABLED=true` together with the provider configuration to
+allow structured interpretation of the founder's free-text description.
+Recognized AI classifications are merged conservatively: user-confirmed values
+always win, deterministic high-confidence matches are retained, unsupported
+controlled values are discarded, and provider errors fall back to the existing
+deterministic discovery path. Session provenance records only provider/model,
+mode, sanitized failure code, uncertainty notes, and suggested questions.
+
+## AI-assisted Strategy
+
+Set `AI_STRATEGY_ENABLED=true` with the provider configuration to augment the
+deterministic strategy. The deterministic engine remains authoritative for
+confirmed facts, readiness, status, and core sections. AI output is limited to
+bounded recommendations, reasons, assumptions, rationale, and additional risks;
+unsupported claims and measured-result language are rejected. Provider failures
+return the complete deterministic strategy with a sanitized fallback reason.
+
+Production generation receives a bounded Brand Brain snapshot (brand name,
+voice, builder-provided value context, and key messages) when one exists. The
+stored generation and job-completion audit event record provider/model and
+contract version; prompts, credentials, and raw responses are excluded from
+operational event metadata.
+
+When `AI_SAFETY_IDENTIFIER_SECRET` is configured, production requests include
+a stable HMAC-derived `safety_identifier`; raw user IDs are never sent. Failed
+contract or customer-quality validation receives one bounded replacement attempt
+by default (`AI_PROVIDER_MAX_REVISIONS=0..2`). Revision attempts do not create
+extra generation records or consume additional customer generation units.
+
 CopyQuick routes external production-generation adapters through one bounded runtime. The runtime does not select or enable a provider; provider credentials, model selection, and live activation remain explicit deployment decisions.
 
 ## Safety bounds
@@ -26,7 +101,18 @@ Provider failures are normalized to safe codes. Raw provider messages and payloa
 - Request rejection and oversized input/output are permanent failures.
 - Timeouts, network interruptions, upstream 5xx responses, caller cancellation, and otherwise ambiguous failures require production-job recovery review. They are not automatically charged again because the provider may have completed work before the local result was lost.
 
-The built-in deterministic generator remains available for local development and tests and does not pass through this external-provider boundary.
+The built-in deterministic generator remains the default for local development and tests and does not pass through this external-provider boundary.
+
+## OpenAI production adapter
+
+CopyQuick includes an opt-in OpenAI Responses API adapter for structured production deliverables. It uses strict JSON Schema output and then passes the result through the existing production-contract and customer-readiness validation gates.
+
+- `AI_PROVIDER=openai` explicitly enables the adapter.
+- `OPENAI_API_KEY` must be supplied by the protected deployment environment.
+- `OPENAI_MODEL` selects the model and defaults to `gpt-5.4-mini`.
+- With `AI_PROVIDER` unset or set to `deterministic`, no external model request is made.
+
+Startup fails closed when OpenAI is explicitly selected without a key or when an unsupported provider is named. Prompts and model responses are not written to operational logs. The adapter sends `store: false` on Responses API requests.
 
 ## Activation checklist
 

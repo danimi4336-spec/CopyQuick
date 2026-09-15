@@ -16,11 +16,13 @@
     "migrations:status": "node scripts/migration-status.js",
     "migrations:check": "node scripts/migration-check.js",
     "migrate:database": "node scripts/migrate-database.js",
+    "rehearse:migration-v7": "node scripts/rehearse-migration-v7.js",
     "billing:status": "node scripts/billing-status.js",
     "billing:reconcile": "node scripts/reconcile-billing.js",
     "generation:control": "node scripts/generation-control.js",
     "production:recovery": "node scripts/production-recovery.js",
-    "operations:status": "node scripts/operations-status.js"
+    "operations:status": "node scripts/operations-status.js",
+    "ai:evaluate": "node scripts/evaluate-ai-production.js"
   },
   "keywords": [],
   "author": "",

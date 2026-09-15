@@ -3,16 +3,28 @@
         <header class="production-review-header">
             <span class="build-plan-eyebrow">Final Production Review</span>
             <h1>Review before starting production</h1>
-            <p>Confirm exactly what CopyQuick will queue, the approved strategic direction, and the authoritative usage cost before production begins.</p>
+            <p>Confirm what CopyQuick will produce and the exact usage cost before production begins.</p>
         </header>
 
         <% if (error) { %><div class="alert alert-error production-review-alert" role="alert"><%= error %></div><% } %>
 
+        <section class="production-source-card production-source-<%= productionSource.mode %>" aria-labelledby="production-source-title">
+            <div>
+                <span>Output source for this batch</span>
+                <h2 id="production-source-title"><%= productionSource.label %></h2>
+                <p><%= productionSource.description %></p>
+            </div>
+            <dl>
+                <div><dt>Provider</dt><dd><%= productionSource.provider %></dd></div>
+                <div><dt>Model</dt><dd><%= productionSource.model %></dd></div>
+            </dl>
+        </section>
+
         <section class="production-cost-card" aria-labelledby="production-cost-title">
             <div>
                 <span>Authoritative production cost</span>
-                <h2 id="production-cost-title"><%= cost.productionUnitCount %> generation<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
-                <p>One approved deliverable uses one existing CopyQuick generation unit when production is initialized.</p>
+                <h2 id="production-cost-title"><%= cost.productionUnitCount %> production credit<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
+                <p>Only ready-to-use assets use credits. <%= cost.planningFoundationCount %> planning prerequisite<%= cost.planningFoundationCount === 1 ? '' : 's' %> will be prepared at no charge.</p>
             </div>
             <dl>
                 <div><dt>Current usage</dt><dd><%= cost.currentUsage %></dd></div>
@@ -22,39 +34,49 @@
             </dl>
         </section>
 
-        <section class="production-review-plan" aria-labelledby="production-review-plan-title">
-            <h2 id="production-review-plan-title">What will be produced</h2>
-            <p><%= productionSet.selectedDeliverables.length %> approved deliverables, preserved in dependency-aware order.</p>
-            <% phases.forEach(function(phase, phaseIndex) { %>
-                <div class="production-review-phase">
-                    <span>Phase <%= phaseIndex + 1 %></span>
-                    <div>
-                        <h3><%= phase.title %></h3>
-                        <ol>
-                            <% phase.deliverables.forEach(function(item) { %>
-                                <li>
-                                    <strong><%= item.title %></strong>
-                                    <p><%= item.strategicDirection %></p>
-                                </li>
-                            <% }); %>
-                        </ol>
-                    </div>
-                </div>
-            <% }); %>
+        <section class="deliverable-display-section deliverable-output-section" aria-labelledby="production-review-plan-title">
+            <header><div><span class="build-plan-eyebrow">Your outputs</span><h2 id="production-review-plan-title">Ready-to-use output deliverables</h2></div><strong><%= readyToUseAssets.length %> output<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
+            <p>These are the customer-ready deliverables CopyQuick will produce in this run. <%= batch.completed.length %> completed step<%= batch.completed.length === 1 ? '' : 's' %> will not be repeated.</p>
+            <ol class="deliverable-display-list">
+                <% readyToUseAssets.forEach(function(item, index) { %>
+                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready-to-use asset · 1 production credit</small><p><%= item.reason %></p></div></li>
+                <% }); %>
+            </ol>
         </section>
+
+        <% if (planningFoundation.length) { %>
+            <details class="planning-foundation-disclosure">
+                <summary><span>Free planning foundation deliverables</span><small><%= planningFoundation.length %> internal prerequisite<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                <div class="planning-foundation-content">
+                    <p>CopyQuick prepares these internal planning documents first so the ready-to-use outputs stay aligned. They are not customer-facing copy.</p>
+                    <ol class="deliverable-display-list">
+                        <% planningFoundation.forEach(function(item, index) { %>
+                            <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Free planning foundation · internal use</small><p><%= item.reason %></p></div></li>
+                        <% }); %>
+                    </ol>
+                </div>
+            </details>
+        <% } %>
+
+        <% if (batch.completed.length || batch.deferred.length) { %>
+            <section class="production-review-status" aria-label="Plan progress and deferred work">
+                <% if (batch.completed.length) { %><div><h2>Already completed</h2><ul><% batch.completed.forEach(function(item) { %><li><%= item.title %></li><% }); %></ul><p>These are reused without another generation charge.</p></div><% } %>
+                <% if (batch.deferred.length) { %><div><h2>Saved for later</h2><ul><% batch.deferred.forEach(function(item) { %><li><%= item.title %></li><% }); %></ul><p>Return to this plan after the current batch is complete.</p></div><% } %>
+            </section>
+        <% } %>
 
         <% if (cost.canAfford) { %>
             <div class="production-confirmation">
-                <p>Starting this production plan will use <strong><%= cost.productionUnitCount %></strong> of your available generations. Usage begins only when you select Start Production.</p>
-                <form action="/production/start" method="POST">
-                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                    <button type="submit" class="btn btn-primary">Start Production</button>
-                </form>
+                <p>Starting this run will use <strong><%= cost.productionUnitCount %></strong> production credit<%= cost.productionUnitCount === 1 ? '' : 's' %> for <%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %>. The planning foundation is included free. Usage begins only when you select Start Production.</p>
+                <div class="production-confirmation-actions">
+                    <a href="/discovery/production-ready" class="btn btn-outline">← Back</a>
+                    <form action="/production/start" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn-primary">Start Production</button></form>
+                </div>
             </div>
         <% } else { %>
             <div class="production-confirmation blocked">
                 <p><%= cost.blockingReason %></p>
-                <a href="/pricing" class="btn btn-primary">View Plans</a>
+                <div><a href="/discovery/production-ready" class="btn btn-outline">← Back</a> <a href="/discovery/build-plan" class="btn btn-outline">Choose an Affordable Batch</a> <a href="/pricing?returnTo=%2Fproduction%2Freview" class="btn btn-primary">View Plans</a></div>
             </div>
         <% } %>
     </div>

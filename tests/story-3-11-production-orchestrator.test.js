@@ -19,7 +19,7 @@ const { createApprovedProductionSet, createDefaultSelection, planFingerprint } =
 const { initializeProduction } = require('../lib/productionInitialization');
 const {
   DEFAULT_LEASE_SECONDS, DEFAULT_RETRY_BASE_SECONDS, MAX_LEASE_SECONDS, MAX_RETRY_BASE_SECONDS,
-  claimNextRunnableJob, leaseSeconds, renewJobLease, retryBaseSeconds
+  claimNextRunnableJob, leaseSeconds, renewJobLease, retryBaseSeconds, updateProductionRunStatus
 } = require('../lib/productionExecution');
 const { MAX_CYCLE_WORK, eligibleRuns, maxConcurrency, recoverActiveRuns, runOrchestratorCycle } = require('../lib/productionOrchestrator');
 const {
@@ -186,6 +186,11 @@ async function run() {
   assert.strictEqual(renewJobLease(db, claim.id, 'stale-claim', { leaseSeconds: 30 }).renewed, false);
   db.prepare("UPDATE production_jobs SET status = 'completed', claim_token = NULL WHERE id = ?").run(claim.id);
   assert.strictEqual(renewJobLease(db, claim.id, 'current-claim', { leaseSeconds: 30 }).renewed, false);
+  // This fixture tests lease ownership, not restart recovery. Close its remaining
+  // jobs so Story 3.218's dependency reconciliation cannot legitimately revive
+  // it and compete with the retry fixture below.
+  db.prepare("UPDATE production_jobs SET status = 'skipped' WHERE production_run_id = ? AND status = 'waiting_dependency'").run(leaseRun);
+  updateProductionRunStatus(db, leaseRun);
 
   const retryOwner = createUser(db);
   const retryRun = startProduction(db, retryOwner);

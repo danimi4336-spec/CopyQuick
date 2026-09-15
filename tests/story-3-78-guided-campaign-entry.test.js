@@ -74,7 +74,7 @@ async function run() {
     assert.deepStrictEqual(state.unrelatedState, { preserve: true });
 
     const layout = fs.readFileSync(path.join(__dirname, '..', 'views', 'layout.ejs'), 'utf8');
-    assert.match(layout, /href="\/welcome\?goal=launch_product"/);
+    assert.match(layout, /href="\/welcome"/);
     assert.match(layout, />\s*Start an Objective\s*</);
     assert.doesNotMatch(layout, /href="\/campaign-studio"/);
 

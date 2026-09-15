@@ -1,4 +1,9 @@
 <div class="container pricing">
+    <% if (typeof returnLink !== 'undefined' && returnLink) { %>
+        <nav class="pricing-return" aria-label="Return to production planning">
+            <a href="<%= returnLink.path %>" class="btn btn-outline">← <%= returnLink.label %></a>
+        </nav>
+    <% } %>
     <div class="section-title">
         <h1>Choose Your Plan</h1>
         <p class="tagline">Choose the monthly generation allowance that fits your work.</p>

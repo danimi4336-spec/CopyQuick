@@ -26,6 +26,7 @@ const {
 } = require('../lib/billingCheckoutReturn');
 const { resolveOwnedPortalCustomerId } = require('../lib/billingPortalAccess');
 const { billingActionRateLimit } = require('../lib/billingRateLimit');
+const { pricingReturn } = require('../lib/pricingReturn');
 
 function logBillingFailure(req, event, code, statusCode) {
   writeOperationalEvent({
@@ -48,8 +49,10 @@ router.get('/pricing', (req, res) => {
   const checkoutKeys = req.session ? issueCheckoutKeys(req.session) : {};
   res.render('pricing', { 
     title: 'Pricing - CopyQuick',
+    currentPage: 'pricing',
     user: res.locals.user,
-    checkoutKeys
+    checkoutKeys,
+    returnLink: pricingReturn(req.query.returnTo)
   });
 });
 

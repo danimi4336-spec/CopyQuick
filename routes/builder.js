@@ -4,6 +4,7 @@ const { getDb } = require('../db/database');
 const { requireAuth } = require('./auth');
 const { objectiveUniverse, getAvailableObjective } = require('../lib/businessJourneys');
 const { normalizeStoredBrandBrain, validateBrandBrain } = require('../lib/brandBrainValidation');
+const { getSavedPlan, resumeSavedPlan, syncSavedPlanLifecycle } = require('../lib/savedBuildPlans');
 
 function emptyBrandBrain(userId) {
   return {
@@ -24,18 +25,48 @@ function emptyBrandBrain(userId) {
 
 // ====== Welcome / Builder Journey ======
 router.get('/welcome', requireAuth, (req, res) => {
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
   const requestedGoal = typeof req.query.goal === 'string' ? req.query.goal.trim() : '';
+  const storedGoal = db.prepare('SELECT builder_goal FROM users WHERE id = ?').get(userId)?.builder_goal;
+  const savedObjective = getAvailableObjective(requestedGoal)?.id || getAvailableObjective(storedGoal)?.id || 'launch_product';
+  const existing = getSavedPlan(db, { userId, objective: savedObjective });
+  const lifecycle = existing
+    ? syncSavedPlanLifecycle(db, { userId, planFingerprint: existing.planFingerprint })
+    : null;
+  const savedPlan = lifecycle?.status === 'completed' ? null : getSavedPlan(db, { userId, objective: savedObjective });
   res.render('welcome', {
     title: 'Choose Your Business Objective - CopyQuick',
     currentPage: 'welcome',
     objectives: objectiveUniverse,
     selectedGoal: getAvailableObjective(requestedGoal) ? requestedGoal : '',
+    savedPlan,
     error: null
   });
 });
 
+router.post('/saved-plan/resume', requireAuth, (req, res) => {
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const objective = getAvailableObjective(req.body.objective)?.id || 'launch_product';
+  const result = resumeSavedPlan(db, { userId, objective });
+  if (!result.valid) {
+    const requestedGoal = typeof req.query.goal === 'string' ? req.query.goal.trim() : '';
+    return res.status(409).render('welcome', {
+      title: 'Choose Your Business Objective - CopyQuick', currentPage: 'welcome',
+      objectives: objectiveUniverse,
+      selectedGoal: getAvailableObjective(requestedGoal) ? requestedGoal : '',
+      savedPlan: null,
+      error: result.reason
+    });
+  }
+  req.session.discoverySession = result.discoverySession;
+  req.session.discoverySession.buildPlanNotice = 'Saved plan restored. Your selections and completed work are preserved.';
+  return res.redirect(303, '/discovery/build-plan');
+});
+
 router.post('/welcome', requireAuth, (req, res) => {
-  const db = getDb();
+  const db = req.app.locals.copyquickDb || getDb();
   const goal = typeof req.body.goal === 'string' ? req.body.goal.trim() : '';
   if (!getAvailableObjective(goal)) {
     return res.status(400).render('welcome', {
@@ -43,15 +74,13 @@ router.post('/welcome', requireAuth, (req, res) => {
       currentPage: 'welcome',
       objectives: objectiveUniverse,
       selectedGoal: '',
+      savedPlan: getSavedPlan(db, { userId: req.session.userId || req.session.passport?.user }),
       error: 'Choose an available business objective to continue.'
     });
   }
   db.prepare('UPDATE users SET builder_goal = ? WHERE id = ?').run(goal, req.session.userId);
-  if (goal === 'launch_product') {
-    delete req.session.discoverySession;
-    return res.redirect('/discovery');
-  }
-  return res.redirect('/dashboard');
+  delete req.session.discoverySession;
+  return res.redirect('/discovery');
 });
 
 // ====== Brand Brain ======

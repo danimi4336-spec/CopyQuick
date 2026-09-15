@@ -8,6 +8,26 @@
 
         <% if (error) { %><div class="alert alert-error objective-universe-error" role="alert"><%= error %></div><% } %>
 
+        <% if (savedPlan) { %>
+            <section class="saved-plan-resume fade-in" aria-labelledby="saved-plan-title">
+                <div>
+                    <span class="objective-eyebrow">Saved Plan</span>
+                    <h2 id="saved-plan-title">Continue where you left off</h2>
+                    <p><%= savedPlan.description %></p>
+                    <div class="saved-plan-meta">
+                        <span><%= objectives.find(function(item) { return item.id === savedPlan.objective; })?.title || 'Guided objective' %></span>
+                        <span>Status: <%= savedPlan.status === 'partially_completed' ? 'Partially completed' : 'Saved' %></span>
+                        <span>Updated <time datetime="<%= savedPlan.updatedAt %>"><%= new Date(savedPlan.updatedAt).toLocaleDateString() %></time></span>
+                    </div>
+                </div>
+                <form action="/saved-plan/resume" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="objective" value="<%= savedPlan.objective %>">
+                    <button type="submit" class="btn btn-primary btn-lg">Resume Saved Plan <span aria-hidden="true">→</span></button>
+                </form>
+            </section>
+        <% } %>
+
         <form action="/welcome" method="POST" class="objective-universe-form fade-in">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <div class="objective-grid" aria-label="Business objectives">
@@ -27,7 +47,7 @@
                 <% }); %>
             </div>
             <div class="objective-universe-actions">
-                <button type="submit" class="btn btn-primary btn-lg">Start This Objective <span aria-hidden="true">→</span></button>
+                <button type="submit" class="btn btn-primary btn-lg"><%= savedPlan ? 'Start a New Objective' : 'Start This Objective' %> <span aria-hidden="true">→</span></button>
             </div>
             <p class="objective-assurance">You can change direction and explore other objectives from your Builder at any time.</p>
         </form>

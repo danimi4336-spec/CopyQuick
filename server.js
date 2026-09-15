@@ -28,6 +28,11 @@ const { createCsrfProtection } = require('./lib/csrf');
 const { createSessionConfig } = require('./lib/sessionConfig');
 const { createContactHandler, createContactRateLimiter } = require('./lib/contactProtection');
 const { createProductionWorker } = require('./lib/productionWorker');
+const {
+  configuredProductionProvider,
+  productionExecutionMode,
+  productionProviderStatus
+} = require('./lib/openaiProductionProvider');
 const { DEFAULT_LEASE_MS, acquireRuntimeLock, startRuntimeLockHeartbeat } = require('./lib/databaseRuntimeLock');
 const { createOffsiteBackupScheduler } = require('./lib/offsiteBackupScheduler');
 const { createBackupHealthWatcher } = require('./lib/backupHealthWatcher');
@@ -235,6 +240,17 @@ process.once('SIGTERM', () => { shutdown('SIGTERM'); });
 process.once('SIGINT', () => { shutdown('SIGINT'); });
 
 async function startApplication() {
+  const executionMode = productionExecutionMode(process.env);
+  const productionGeneratorApi = configuredProductionProvider(process.env);
+  const providerStatus = productionProviderStatus(process.env);
+  writeOperationalEvent({
+    event: 'production_generation_provider_configured',
+    operation: providerStatus.provider,
+    outcome: providerStatus.isolated ? 'isolated' : (productionGeneratorApi ? 'enabled' : 'disabled'),
+    executionMode,
+    isolated: Boolean(providerStatus.isolated),
+    model: providerStatus.model
+  });
   const started = await startApplicationAfterMigrationGate({
     databaseExists: databaseStorage.existedBeforeStartup,
     getDatabase: getDb,
@@ -250,7 +266,7 @@ async function startApplication() {
       return listeningServer;
     },
     startProductionWorker: db => {
-      const worker = createProductionWorker({ db });
+      const worker = createProductionWorker({ db, generatorApi: productionGeneratorApi });
       worker.start();
       return worker;
     },

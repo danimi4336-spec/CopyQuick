@@ -394,7 +394,7 @@ async function run() {
 
     token = await getToken(agent);
     valid = await request(agent, 'POST', '/welcome', {
-      body: { goal: 'get_more_customers', _csrf: token }
+      body: { goal: 'increase_conversion_rates', _csrf: token }
     });
     assert.strictEqual(valid.res.statusCode, 400);
     assert.match(valid.body, /Choose an available business objective to continue/);

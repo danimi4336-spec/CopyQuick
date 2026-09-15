@@ -214,6 +214,7 @@ async function run() {
     assert.strictEqual(state.understanding.intendedOutcome, undefined, 'suggested directions must not become facts before selection');
 
     const intendedOutcomePage = await request(blocked, 'GET', '/discovery');
+    assert.match(intendedOutcomePage.body, /formaction="\/discovery\/back"/);
     assert.match(intendedOutcomePage.body, /What is the primary wellness goal this supplement is intended to support\?/);
     assert.match(intendedOutcomePage.body, /Choose the closest direction for now\. You can refine it later\./);
     for (const value of ['everyday_wellness', 'energy_focus', 'digestive_wellness', 'sleep_stress_support', 'mobility_active_lifestyle', 'immune_health', 'healthy_aging']) {
@@ -267,6 +268,26 @@ async function run() {
     assert.strictEqual((await request(blocked, 'GET', '/discovery/strategy')).res.headers.location, '/discovery/reflection');
     assert.strictEqual((await request(blocked, 'GET', '/discovery/build-plan')).res.headers.location, '/discovery/reflection');
     assert.strictEqual(validateApprovedProductionSession(state).valid, false);
+
+    const backNavigation = { server, cookie: '' };
+    await begin(backNavigation);
+    await answerCurrent(backNavigation, 'digestive_wellness');
+    let backPage = await request(backNavigation, 'GET', '/discovery');
+    let backToken = backPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const backedToQuestion = await request(backNavigation, 'POST', '/discovery/back', { _csrf: backToken });
+    assert.strictEqual(backedToQuestion.res.headers.location, '/discovery');
+    state = await sessionState(backNavigation);
+    assert.strictEqual(state.nextQuestion.id, 'supplement_intended_outcome');
+    assert.strictEqual(state.answers.supplement_intended_outcome, undefined);
+    assert(!state.completedQuestions.includes('supplement_intended_outcome'));
+    backPage = await request(backNavigation, 'GET', '/discovery');
+    backToken = backPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    await request(backNavigation, 'POST', '/discovery/back', { _csrf: backToken });
+    state = await sessionState(backNavigation);
+    assert.strictEqual(state.editingInitialDescription, true);
+    const initialEditPage = await request(backNavigation, 'GET', '/discovery');
+    assert.match(initialEditPage.body, /<textarea[^>]*name="whatBuilding"[^>]*>an herbal supplement<\/textarea>/);
+    assert.match(initialEditPage.body, /href="\/welcome"[^>]*>← Back<\/a>/);
 
     const explorer = { server, cookie: '' };
     await begin(explorer, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');

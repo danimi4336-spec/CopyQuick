@@ -72,7 +72,7 @@
             <% if (planningReadiness.ready) { %>
                 <div>
                     <h2>We know enough to build a useful strategy.</h2>
-                    <p>The essential product decisions are established. Optional unknowns will remain clearly marked rather than guessed.</p>
+                    <p><%= objective === 'get_more_customers' ? 'The essential customer-acquisition decisions are established. Any future unknowns will remain clearly marked rather than guessed.' : 'The essential product decisions are established. Optional unknowns will remain clearly marked rather than guessed.' %></p>
                 </div>
             <% } else { %>
                 <div>
@@ -86,10 +86,10 @@
                     <% } %>
                 </div>
             <% } %>
-            <form action="/discovery/reflection/plan" method="POST">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <button type="submit" class="btn btn-primary btn-lg" <%- planningReadiness.ready ? '' : 'disabled aria-disabled="true"' %>>Build My Personalized Plan</button>
-            </form>
+            <div class="reflection-navigation-actions">
+                <form action="/discovery/back" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn-outline btn-lg">← Back</button></form>
+                <form action="/discovery/reflection/plan" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn-primary btn-lg" <%- planningReadiness.ready ? '' : 'disabled aria-disabled="true"' %>>Build My Personalized Plan</button></form>
+            </div>
         </section>
     </div>
 </div>
