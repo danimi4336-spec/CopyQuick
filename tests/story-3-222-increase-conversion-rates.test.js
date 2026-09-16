@@ -2,6 +2,7 @@ const assert = require('assert');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
 const { buildBusinessReflection } = require('../lib/businessReflection');
+const { createApprovedProductionSet, createDefaultSelection } = require('../lib/buildPlanApproval');
 
 function fact(value, label = value) {
   return { value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' };
@@ -50,6 +51,19 @@ function fact(value, label = value) {
     'acquisition_experiment_backlog'
   ]);
 
+  const approval = createApprovedProductionSet({
+    plan,
+    selection: createDefaultSelection(plan),
+    strategyResult: strategy,
+    confirmedUnderstanding: understanding
+  });
+  assert.strictEqual(approval.valid, true);
+  const productionStrategy = approval.productionSet.strategySnapshot;
+  assert.strictEqual(productionStrategy.confirmedOffer.value, understanding.currentOffer.value);
+  assert.strictEqual(productionStrategy.confirmedPrimaryCta.value, 'Start free trial');
+  assert.strictEqual(productionStrategy.builderDescribedPageExperience.value, understanding.pageExperience.value);
+  assert.strictEqual(productionStrategy.observedConversionFriction.value, understanding.conversionFriction.value);
+
   const completed = new Map();
   for (const item of items) {
     const contract = runtime.production.contract(item.id);
@@ -58,8 +72,8 @@ function fact(value, label = value) {
       contractVersion: runtime.production.contract(id).version, output: completed.get(id)
     }));
     const generated = await runtime.generation.generate({
-      job: { deliverable_id: item.id, title: item.title, strategic_direction: item.strategicDirection, strategySnapshot: strategy.strategy },
-      productionRun: { objective, strategySnapshot: strategy.strategy }, dependencyOutputs: dependencies, handler: contract
+      job: { deliverable_id: item.id, title: item.title, strategic_direction: item.strategicDirection, strategySnapshot: productionStrategy },
+      productionRun: { objective, strategySnapshot: productionStrategy }, dependencyOutputs: dependencies, handler: contract
     });
     assert.strictEqual(runtime.validation.validate(generated.structuredOutput, contract).valid, true, item.id);
     const visible = JSON.stringify(generated.structuredOutput);
@@ -69,6 +83,19 @@ function fact(value, label = value) {
   }
   const landing = completed.get('lead_capture_page');
   assert(landing.headline && landing.primaryCallToAction && landing.faq.length);
+  assert.strictEqual(landing.primaryCallToAction, 'Start free trial');
+  const landingContract = runtime.production.contract('lead_capture_page');
+  const landingPrompt = landingContract.buildPrompt({
+    objective, title: 'Lead Capture Page', strategicDirection: 'Improve the page',
+    strategySnapshot: productionStrategy, dependencyOutputs: []
+  });
+  assert.match(landingPrompt, /primaryCallToAction must be exactly "Start free trial"/);
+  assert.match(landingPrompt, /supplied context, not proof of customer behavior/i);
+  assert.match(landingPrompt, /public landing-page copy/i);
+  const sections = landingContract.presentationSections(landing);
+  assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').internal, true);
+  assert.strictEqual(sections.find(section => section.key === 'pageGoal').internal, true);
+  assert.strictEqual(sections.find(section => section.key === 'headline').internal, false);
 
   console.log('Story 3.222 Increase Conversion Rates tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

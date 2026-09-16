@@ -722,6 +722,7 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
     plan: discoverySession.buildPlan,
     selection: discoverySession.buildPlanSelection,
     strategyResult: discoverySession.strategyResult,
+    confirmedUnderstanding: discoverySession.confirmedUnderstanding,
     batchMode: req.body.batchMode
   });
   if (!result.valid) {

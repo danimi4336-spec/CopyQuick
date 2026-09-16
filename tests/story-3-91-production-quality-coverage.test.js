@@ -55,5 +55,25 @@ assert.deepStrictEqual(validateCustomerReadyOutput(invalidLandingPage, landingPa
   valid: false,
   code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
 });
+const editorialLandingPage = {
+  ...validLandingPage,
+  proofSection: 'This offer is presented as a service description. Testimonials should only be added after they have been verified.'
+};
+assert.deepStrictEqual(validateCustomerReadyOutput(editorialLandingPage, landingPage), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
+});
+
+const ctaContext = {
+  ...acquisitionContext,
+  strategySnapshot: {
+    ...acquisitionContext.strategySnapshot,
+    confirmedPrimaryCta: { value: 'Book a free consultation', semanticRole: 'confirmed_fact' }
+  }
+};
+const exactCtaLandingPage = landingPage.generateOutput(ctaContext);
+assert.strictEqual(exactCtaLandingPage.primaryCallToAction, 'Book a free consultation');
+assert.strictEqual(landingPage.validateOutput(exactCtaLandingPage, ctaContext), true);
+assert.strictEqual(landingPage.validateOutput({ ...exactCtaLandingPage, primaryCallToAction: 'Book a call' }, ctaContext), false);
 
 console.log('Story 3.91 Production Quality Coverage tests passed');

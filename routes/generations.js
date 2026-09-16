@@ -952,7 +952,7 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
     if (!validateCustomerReadyOutput(output, contract).valid) return res.status(409).send('This deliverable needs review before export.');
-    const sections = contract.presentationSections(output);
+    const sections = contract.presentationSections(output).filter(section => !section.internal);
     if (format === 'txt') content = sections.map(section => `${section.label}\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
     else if (format === 'md') content = `# ${gen.title}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
     else return res.status(400).send('Unsupported format');
