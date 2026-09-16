@@ -3,6 +3,7 @@ const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
 const { buildBusinessReflection } = require('../lib/businessReflection');
 const { createApprovedProductionSet, createDefaultSelection } = require('../lib/buildPlanApproval');
+const { understandBusiness } = require('../lib/businessUnderstanding');
 
 function fact(value, label = value) {
   return { value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' };
@@ -11,6 +12,13 @@ function fact(value, label = value) {
 (async function run() {
   const objective = 'increase_conversion_rates';
   assert(getAvailableObjective(objective));
+  const openingUnderstanding = await understandBusiness({
+    objective,
+    answer: 'I want to improve conversions for a monthly bookkeeping service for small ecommerce businesses. Visitors arrive through Google Ads, but many leave without booking a consultation. I do not have reliable conversion-rate data yet.'
+  });
+  assert.strictEqual(openingUnderstanding.understanding.targetAudience.value, 'small ecommerce businesses');
+  assert.strictEqual(openingUnderstanding.understanding.targetAudience.label, 'Small ecommerce businesses');
+  assert.doesNotMatch(openingUnderstanding.understanding.targetAudience.value, /bookkeeping service/i);
   const understanding = {
     currentOffer: fact('A 14-day team scheduling trial'),
     targetAudience: fact('Operations leaders at growing software companies'),
