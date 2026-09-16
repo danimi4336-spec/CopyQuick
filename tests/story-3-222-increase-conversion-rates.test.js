@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
 const { buildBusinessReflection } = require('../lib/businessReflection');
@@ -104,6 +106,11 @@ function fact(value, label = value) {
   assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').internal, true);
   assert.strictEqual(sections.find(section => section.key === 'pageGoal').internal, true);
   assert.strictEqual(sections.find(section => section.key === 'headline').internal, false);
+
+  const buildPlanView = fs.readFileSync(path.join(__dirname, '..', 'views', 'build-plan.ejs'), 'utf8');
+  assert.match(buildPlanView, /selectedFoundationCount = foundationPlanItems\.filter/);
+  assert.match(buildPlanView, /data-plan-count="planningFoundation"><%= selectedFoundationCount %>/);
+  assert.match(buildPlanView, /querySelectorAll\('\[data-plan-count=/);
 
   console.log('Story 3.222 Increase Conversion Rates tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

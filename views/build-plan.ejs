@@ -69,6 +69,7 @@
             <% const allPlanItems = approval.phases.reduce(function(items, phase) { return items.concat(phase.deliverables.map(function(item) { return { ...item, phaseTitle: phase.title }; })); }, []); %>
             <% const outputPlanItems = allPlanItems.filter(function(item) { return item.artifactRole !== 'planning_foundation'; }); %>
             <% const foundationPlanItems = allPlanItems.filter(function(item) { return item.artifactRole === 'planning_foundation'; }); %>
+            <% const selectedFoundationCount = foundationPlanItems.filter(function(item) { return item.selected; }).length; %>
             <% const hasOptionalOutput = outputPlanItems.some(function(item) { return item.recommendationLevel === 'optional'; }); %>
 
             <section class="deliverable-display-section deliverable-output-section" <% if (hasOptionalOutput) { %>id="optional-deliverables"<% } %> aria-labelledby="build-plan-output-title">
@@ -95,7 +96,7 @@
 
             <% if (foundationPlanItems.length) { %>
                 <details class="planning-foundation-disclosure">
-                    <summary><span>Free planning foundation deliverables</span><small><%= foundationPlanItems.length %> internal prerequisite<%= foundationPlanItems.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                    <summary><span>Free planning foundation deliverables</span><small><b data-plan-count="planningFoundation"><%= selectedFoundationCount %></b> internal prerequisite<%= selectedFoundationCount === 1 ? '' : 's' %> · no production credits</small></summary>
                     <div class="planning-foundation-content">
                         <p>CopyQuick uses these internal planning documents to guide the ready-to-use outputs. They are included automatically and are not customer-facing copy.</p>
                         <div class="build-plan-deliverables">
@@ -162,8 +163,8 @@
             }
         });
         Object.keys(counts).forEach(function(key) {
-            const target = document.querySelector('[data-plan-count="' + key + '"]');
-            if (target) target.textContent = counts[key];
+            const targets = document.querySelectorAll('[data-plan-count="' + key + '"]');
+            targets.forEach(function(target) { target.textContent = counts[key]; });
         });
         const available = Number(document.querySelector('[data-available-balance]')?.dataset.availableBalance || 0);
         const selectedCost = document.querySelector('[data-selected-cost]');
