@@ -15,6 +15,11 @@ for (const id of getProductionContractIds()) {
           ? `Hi [First Name],\n\n${repeated} ${repeated} ${repeated}\n\nBest,\n[Sender Name]`
           : repeated)
   ]));
+  if (id === 'organic_content_campaign') {
+    output.introduction = Array.from({ length: 8 }, (_, index) => `## Section ${index + 1}\n\n${Array(14).fill(repeated).join(' ')}`).join('\n\n');
+    output.outline = Array(5).fill(repeated);
+    output.distributionPosts = Array(2).fill(repeated);
+  }
   assert.strictEqual(contract.validateOutput(output), true, `${id} fixture must satisfy its structural contract`);
   assert.deepStrictEqual(validateCustomerReadyOutput(output, contract), {
     valid: false,
