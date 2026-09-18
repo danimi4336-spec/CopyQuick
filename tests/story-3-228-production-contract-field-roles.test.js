@@ -1,6 +1,7 @@
 const assert = require('assert');
 
 const { getProductionArtifactPolicy } = require('../lib/productionArtifactPolicy');
+const { createProductionStrategySnapshot } = require('../lib/buildPlanApproval');
 const { getProductionContract, getProductionContractIds } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 
@@ -21,7 +22,8 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v4');
+assert.strictEqual(organic.version, 'organic_content_campaign:v5');
+assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.deepStrictEqual(organic.publicFieldKeys, ['pillarTitle', 'introduction', 'callToAction', 'distributionPosts']);
 assert.deepStrictEqual(organic.internalFieldKeys, ['campaignOverview', 'searchIntent', 'outline', 'publishingChecklist']);
 
@@ -47,6 +49,10 @@ assert.strictEqual(sections.find(section => section.key === 'outline').internal,
 assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').internal, true);
 assert.strictEqual(sections.find(section => section.key === 'introduction').internal, false);
 assert.strictEqual(sections.find(section => section.key === 'introduction').label, 'Pillar Article Draft');
+assert.strictEqual(sections.find(section => section.key === 'introduction').format, 'markdown');
+assert.strictEqual(sections.find(section => section.key === 'searchIntent').guidanceLabel, 'Hypothesis');
+assert.strictEqual(sections.find(section => section.key === 'outline').guidanceLabel, 'Hypothesis');
+assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').guidanceLabel, 'Checklist');
 
 const prompt = organic.buildPrompt(context);
 assert.match(prompt, /Public-copy fields: pillarTitle, introduction, callToAction, distributionPosts/i);
@@ -86,6 +92,46 @@ assert.deepStrictEqual(validateCustomerReadyOutput(publicationLeak, organic, con
   valid: false,
   code: 'PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'
 });
+
+const placeholderLeak = {
+  ...valid,
+  distributionPosts: ['Read the complete guide at [link].', ...valid.distributionPosts]
+};
+assert.deepStrictEqual(validateCustomerReadyOutput(placeholderLeak, organic, context), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_UNRESOLVED_PLACEHOLDER'
+});
+
+const broaderBehaviorLeak = {
+  ...valid,
+  introduction: `${valid.introduction}\n\nOwners often begin with a basic question about their books.`
+};
+assert.deepStrictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
+});
+
+const exactCtaContext = {
+  ...context,
+  strategySnapshot: {
+    ...context.strategySnapshot,
+    confirmedPrimaryCta: { value: 'Book a free consultation', semanticRole: 'confirmed_fact' }
+  }
+};
+const exactCtaOutput = organic.generateOutput(exactCtaContext);
+assert.strictEqual(exactCtaOutput.callToAction, 'Book a free consultation');
+assert.strictEqual(organic.validateOutput(exactCtaOutput, exactCtaContext), true);
+assert.strictEqual(organic.validateOutput({ ...exactCtaOutput, callToAction: 'Contact us' }, exactCtaContext), false);
+
+const searchSnapshot = createProductionStrategySnapshot({
+  objective: 'improve_search_rankings',
+  strategyResult: { strategy: context.strategySnapshot },
+  confirmedUnderstanding: {
+    primaryCta: { value: 'Book a free consultation', label: 'Book a free consultation', source: 'user_confirmed' }
+  }
+});
+assert.strictEqual(searchSnapshot.confirmedPrimaryCta.value, 'Book a free consultation');
+assert.strictEqual(searchSnapshot.confirmedPrimaryCta.semanticRole, 'confirmed_fact');
 
 const internalEditorialGuidance = {
   ...valid,

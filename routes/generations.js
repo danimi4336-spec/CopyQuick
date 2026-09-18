@@ -12,6 +12,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { generateDeliverable } = require('../lib/generationService');
 const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const { renderSafeMarkdown } = require('../lib/safeMarkdown');
 const { parseJob, parseStrategySnapshot } = require('../lib/productionState');
 const { bundleAssets, brandVoices, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
@@ -655,7 +656,8 @@ router.get('/generation/:id', requireAuth, (req, res) => {
     results,
     contentTypes: getContentTypes(),
     currentPage: 'history',
-    productionDeliverable
+    productionDeliverable,
+    renderSafeMarkdown
   });
 });
 

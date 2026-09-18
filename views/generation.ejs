@@ -47,6 +47,7 @@
                             <section class="production-deliverable-section public-deliverable-section">
                                 <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
                                 <% if (section.isList) { %><ul class="result-text" id="deliverable-<%= i %>"><% section.value.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
+                                <% } else if (section.format === 'markdown') { %><div class="result-text rich-result-text" id="deliverable-<%= i %>"><%- renderSafeMarkdown(section.value) %></div>
                                 <% } else { %><p class="result-text" id="deliverable-<%= i %>"><%= section.value %></p><% } %>
                             </section>
                         <% }); %>
@@ -55,7 +56,7 @@
                             <div class="alert alert-info production-purpose-notice" role="note"><strong>Internal review guidance</strong><br>These notes help you review and publish the asset. They are not part of the customer-facing copy.</div>
                             <% internalSections.forEach(function(section, i) { %>
                                 <section class="production-deliverable-section internal-review-section">
-                                    <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'internal-deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
+                                    <div class="result-header"><h4><%= section.label %><% if (section.guidanceLabel) { %> <span class="result-tag"><%= section.guidanceLabel %></span><% } %></h4><button class="copy-btn" onclick="copyText('<%= 'internal-deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
                                     <% if (section.isList) { %><ul class="internal-result-text" id="internal-deliverable-<%= i %>"><% section.value.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
                                     <% } else { %><p class="internal-result-text" id="internal-deliverable-<%= i %>"><%= section.value %></p><% } %>
                                 </section>

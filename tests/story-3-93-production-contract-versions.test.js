@@ -5,11 +5,12 @@ const { getProductionContract, getProductionContractIds } = require('../lib/prod
 
 for (const id of getProductionContractIds()) {
   const contract = getProductionContract(id);
-  const versionFour = ['outreach_sequence', 'lead_capture_page', 'organic_content_campaign'].includes(id);
-  const currentVersion = versionFour ? `${id}:v4` : `${id}:v3`;
-  const compatibleVersions = versionFour
-    ? [`${id}:v2`, `${id}:v3`, `${id}:v4`]
-    : [`${id}:v2`, `${id}:v3`];
+  const versionNumber = id === 'organic_content_campaign' ? 5
+    : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3;
+  const currentVersion = `${id}:v${versionNumber}`;
+  const compatibleVersions = Array.from({ length: versionNumber - 1 }, function(_, index) {
+    return `${id}:v${index + 2}`;
+  });
   assert.strictEqual(contract.version, currentVersion, id);
   assert.deepStrictEqual(contract.compatibleVersions, compatibleVersions, id);
   assert.strictEqual(contract.acceptsVersion(`${id}:v2`), true, id);
