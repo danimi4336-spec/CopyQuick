@@ -22,8 +22,9 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v5');
+assert.strictEqual(organic.version, 'organic_content_campaign:v6');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
+assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
 assert.deepStrictEqual(organic.publicFieldKeys, ['pillarTitle', 'introduction', 'callToAction', 'distributionPosts']);
 assert.deepStrictEqual(organic.internalFieldKeys, ['campaignOverview', 'searchIntent', 'outline', 'publishingChecklist']);
 
@@ -58,7 +59,7 @@ const prompt = organic.buildPrompt(context);
 assert.match(prompt, /Public-copy fields: pillarTitle, introduction, callToAction, distributionPosts/i);
 assert.match(prompt, /Internal-guidance fields: campaignOverview, searchIntent, outline, publishingChecklist/i);
 assert.match(prompt, /complete pillar article draft, not merely an introduction/i);
-assert.match(prompt, /at least 700 words/i);
+assert.match(prompt, /between 800 and 1,600 words/i);
 
 const shortArticle = { ...valid, introduction: 'A brief introduction that is not a complete pillar article.' };
 assert.deepStrictEqual(validateCustomerReadyOutput(shortArticle, organic, context), {
@@ -109,6 +110,41 @@ const broaderBehaviorLeak = {
 assert.deepStrictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context), {
   valid: false,
   code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
+});
+
+for (const inventedStatement of [
+  'Business owners want clear answers before choosing a service.',
+  'Year-end questions often come up as businesses prepare to close the books.',
+  'Year-end review often includes reconciling bank accounts.',
+  'For many businesses, bookkeeping becomes harder as the company grows.',
+  'Some businesses keep basic transaction capture inside the company. Others prefer outside support.'
+]) {
+  const inventedOutput = { ...valid, introduction: `${valid.introduction}\n\n${inventedStatement}` };
+  assert.deepStrictEqual(validateCustomerReadyOutput(inventedOutput, organic, context), {
+    valid: false,
+    code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
+  }, inventedStatement);
+}
+
+for (const unconfirmedNewness of ['This new guide explains the process.', 'Read our new article about year-end bookkeeping.']) {
+  const newnessOutput = { ...valid, distributionPosts: [unconfirmedNewness, ...valid.distributionPosts] };
+  assert.deepStrictEqual(validateCustomerReadyOutput(newnessOutput, organic, context), {
+    valid: false,
+    code: 'PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'
+  }, unconfirmedNewness);
+}
+
+const repeatedParagraph = String(valid.introduction).split(/\n\s*\n+/)[1];
+const repetitiveOutput = { ...valid, introduction: `${valid.introduction}\n\n## Repeated conclusion\n\n${repeatedParagraph}` };
+assert.deepStrictEqual(validateCustomerReadyOutput(repetitiveOutput, organic, context), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_REPETITIVE_OUTPUT'
+});
+
+const overlongOutput = { ...valid, introduction: Array(3).fill(valid.introduction).join('\n\n') };
+assert.deepStrictEqual(validateCustomerReadyOutput(overlongOutput, organic, context), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_REQUIRED_CONTENT_MISSING'
 });
 
 const exactCtaContext = {

@@ -383,7 +383,21 @@ body {
 .production-deliverable-section .rich-result-text h4 { margin: 1.5rem 0 .65rem; color: #172033; }
 .production-deliverable-section .rich-result-text p { margin: 0 0 1rem; white-space: normal; }
 .production-deliverable-section .rich-result-text ul { margin: 0 0 1rem; padding-left: 1.4rem; }
-.internal-review-section .result-tag { margin-left: .5rem; vertical-align: middle; }
+.internal-review-section .guidance-badge {
+  display: inline-block;
+  margin-left: .5rem;
+  padding: .24rem .55rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  line-height: 1;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
 .production-run-next { display: flex; align-items: center; gap: .8rem; margin-top: 1.25rem; }
 .production-run-next small { color: var(--secondary); font-size: .72rem; }
 @media (max-width: 700px) { .build-plan-page, .production-ready-page { padding: 2.5rem 0 4rem; } .build-plan-page .container, .production-ready-page .container { padding: 0 1rem; } .build-plan-phase-header, .production-ready-phases > section { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-selection-summary, .build-plan-actions, .production-ready-actions { align-items: stretch; flex-direction: column; } .build-plan-actions .btn, .build-plan-actions form, .build-plan-actions button, .production-ready-actions .btn { width: 100%; text-align: center; } }
