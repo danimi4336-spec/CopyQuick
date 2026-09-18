@@ -120,6 +120,8 @@ function fact(value, label = value) {
   assert.match(landingPrompt, /primaryCallToAction must be exactly "Start free trial"/);
   assert.match(landingPrompt, /supplied context, not proof of customer behavior/i);
   assert.match(landingPrompt, /public landing-page copy/i);
+  assert.match(landingPrompt, /Proof Section must be finished visitor-facing reassurance/i);
+  assert.match(landingPrompt, /FAQ item must answer a genuine prospective-customer question/i);
   const sections = landingContract.presentationSections(landing);
   assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').internal, true);
   assert.strictEqual(sections.find(section => section.key === 'pageGoal').internal, true);

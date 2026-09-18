@@ -63,6 +63,30 @@ assert.deepStrictEqual(validateCustomerReadyOutput(editorialLandingPage, landing
   valid: false,
   code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
 });
+const generatedProofLeak = {
+  ...validLandingPage,
+  proofSection: 'This page is designed to clearly explain the service and the steps involved so you can decide whether it fits your needs. Any claims, examples, testimonials, or performance results should be supported by evidence before they are presented here.'
+};
+assert.deepStrictEqual(validateCustomerReadyOutput(generatedProofLeak, landingPage), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
+});
+const generatedFaqLeak = {
+  ...validLandingPage,
+  faq: [
+    ...validLandingPage.faq,
+    'Does this page make performance promises? No. Any performance statement should be supported by evidence before it is used in customer-facing copy.'
+  ]
+};
+assert.deepStrictEqual(validateCustomerReadyOutput(generatedFaqLeak, landingPage), {
+  valid: false,
+  code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
+});
+const visitorFacingProof = {
+  ...validLandingPage,
+  proofSection: 'Start with a free consultation to review your bookkeeping needs and confirm the monthly service scope before work begins.'
+};
+assert.strictEqual(validateCustomerReadyOutput(visitorFacingProof, landingPage).valid, true);
 
 const ctaContext = {
   ...acquisitionContext,
@@ -75,5 +99,9 @@ const exactCtaLandingPage = landingPage.generateOutput(ctaContext);
 assert.strictEqual(exactCtaLandingPage.primaryCallToAction, 'Book a free consultation');
 assert.strictEqual(landingPage.validateOutput(exactCtaLandingPage, ctaContext), true);
 assert.strictEqual(landingPage.validateOutput({ ...exactCtaLandingPage, primaryCallToAction: 'Book a call' }, ctaContext), false);
+const leadCapturePrompt = landingPage.buildPrompt(ctaContext);
+assert.match(leadCapturePrompt, /Proof Section must be finished visitor-facing reassurance/i);
+assert.match(leadCapturePrompt, /FAQ item must answer a genuine prospective-customer question/i);
+assert.match(leadCapturePrompt, /Never ask or answer questions about the page, copy, claims, evidence/i);
 
 console.log('Story 3.91 Production Quality Coverage tests passed');
