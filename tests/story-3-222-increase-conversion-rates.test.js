@@ -6,6 +6,7 @@ const { getAvailableObjective } = require('../lib/objectiveFramework');
 const { buildBusinessReflection } = require('../lib/businessReflection');
 const { createApprovedProductionSet, createDefaultSelection } = require('../lib/buildPlanApproval');
 const { understandBusiness } = require('../lib/businessUnderstanding');
+const { validateApprovedProductionSession } = require('../lib/productionInitialization');
 
 function fact(value, label = value) {
   return { value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' };
@@ -73,6 +74,23 @@ function fact(value, label = value) {
   assert.strictEqual(productionStrategy.confirmedPrimaryCta.value, 'Start free trial');
   assert.strictEqual(productionStrategy.builderDescribedPageExperience.value, understanding.pageExperience.value);
   assert.strictEqual(productionStrategy.observedConversionFriction.value, understanding.conversionFriction.value);
+  const approvedAt = approval.approvedAt;
+  const productionSession = {
+    objective,
+    understanding,
+    answers,
+    planningConfirmedAt: approvedAt,
+    confirmedUnderstanding: understanding,
+    strategyResult: strategy,
+    strategyUpdatedAt: approvedAt,
+    buildPlan: plan,
+    buildPlanSource: { planningConfirmedAt: approvedAt, strategyUpdatedAt: approvedAt },
+    buildPlanFingerprint: approval.productionSet.planFingerprint,
+    buildPlanSelection: { ...createDefaultSelection(plan), approvedAt },
+    approvedProductionSet: approval.productionSet
+  };
+  assert.strictEqual(validateApprovedProductionSession(productionSession).valid, true,
+    'confirmed conversion context must not make a freshly approved strategy appear stale');
 
   const completed = new Map();
   for (const item of items) {
