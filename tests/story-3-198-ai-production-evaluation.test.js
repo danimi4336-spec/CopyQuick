@@ -81,7 +81,7 @@ function providerFor(deliverableId, output) {
     env: enabled
   });
   assert.strictEqual(malformed.ok, false);
-  assert.strictEqual(malformed.failure.code, 'CONTRACT_VALIDATION_FAILED');
+  assert.strictEqual(malformed.failure.code, 'CONTRACT_VALIDATION_SCHEMA');
   assert.strictEqual(malformed.validation, 'failed');
 
   for (const scenario of [

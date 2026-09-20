@@ -7,6 +7,7 @@ assert.strictEqual(boundedRevisionCount('0'), 0);
 assert.strictEqual(boundedRevisionCount('2'), 2);
 assert.strictEqual(boundedRevisionCount('100'), 1);
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'), /do not call any article, guide, post, page, or content new/i);
+assert.match(revisionQualityGuidance('CONTRACT_VALIDATION_ORGANIC_LENGTH'), /800–1,600 substantive words/);
 
 const handler = getProductionContract('customer_profile');
 const strategySnapshot = {
@@ -96,11 +97,30 @@ const context = {
   assert.strictEqual(reconciliationCalls, 1, 'omitted audit mappings are reconstructed without spending a revision');
   assert(reconciledResult.structuredOutput.claimSupport.length > 0);
 
+  let lengthRevisionCalls = 0;
+  await generateDeliverable({
+    job: { deliverable_id: organicHandler.id, title: organicHandler.title, strategic_direction: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot, contract_version: organicHandler.version },
+    productionRun: { objective: 'improve_search_rankings', strategySnapshot: organicStrategySnapshot }, dependencyOutputs: organicDependencies, handler: organicHandler,
+    generatorApi: {
+      provider: 'mock', model: 'length-revision-model',
+      async generateStructuredDeliverable({ prompt }) {
+        lengthRevisionCalls += 1;
+        const output = organicHandler.generateOutput(organicContext);
+        if (lengthRevisionCalls === 1) return { ...output, introduction: '## Scope\nA short draft.\n## Checks\nReview records.\n## Options\nCompare fit.\n## Next step\nChoose carefully.' };
+        assert.match(prompt, /CONTRACT_VALIDATION_ORGANIC_LENGTH/);
+        assert.match(prompt, /800–1,600 substantive words/);
+        return output;
+      }
+    },
+    providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(lengthRevisionCalls, 2);
+
   const invalidCases = [
     {
       name: 'empty output',
       output: { summary: '' },
-      expected: 'CONTRACT_VALIDATION_FAILED'
+      expected: 'CONTRACT_VALIDATION_SCHEMA'
     },
     {
       name: 'generic repetitive output',
