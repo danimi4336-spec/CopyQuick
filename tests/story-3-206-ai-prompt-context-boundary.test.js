@@ -200,7 +200,8 @@ assert(!JSON.stringify(projected).includes('targetAudience'));
     assert.strictEqual(input.dependencyOutputs, undefined);
     assert.strictEqual(input.strategySnapshot, undefined);
   });
-  assert.doesNotMatch(calls[1].prompt, /product_positioning|CONTRACT_|PRODUCTION_QUALITY_/);
+  assert.doesNotMatch(calls[1].prompt, /product_positioning/);
+  assert.match(calls[1].prompt, /CONTRACT_VALIDATION_FAILED/);
   assert.match(calls[1].prompt, /did not pass the required quality checks/);
 
   let leakingAttempts = 0;

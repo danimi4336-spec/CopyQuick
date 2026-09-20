@@ -1,11 +1,12 @@
 const assert = require('assert');
-const { boundedRevisionCount, generateDeliverable } = require('../lib/generationService');
+const { boundedRevisionCount, generateDeliverable, revisionQualityGuidance } = require('../lib/generationService');
 const { getProductionContract } = require('../lib/productionContracts');
 
 assert.strictEqual(boundedRevisionCount(undefined), 1);
 assert.strictEqual(boundedRevisionCount('0'), 0);
 assert.strictEqual(boundedRevisionCount('2'), 2);
 assert.strictEqual(boundedRevisionCount('100'), 1);
+assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'), /do not call any article, guide, post, page, or content new/i);
 
 const handler = getProductionContract('customer_profile');
 const strategySnapshot = {
@@ -36,6 +37,48 @@ const context = {
   });
   assert.strictEqual(calls, 2);
   assert.strictEqual(result.aiModel, 'revision-model');
+
+  const organicHandler = getProductionContract('organic_content_campaign');
+  const organicStrategySnapshot = {
+    primaryCustomer: { value: 'Owners of Toronto businesses', semanticRole: 'confirmed_fact' },
+    customerMotivation: { value: 'Generate qualified leads', semanticRole: 'confirmed_fact' },
+    confirmedOffer: { value: 'Monthly bookkeeping', semanticRole: 'confirmed_fact' },
+    confirmedPrimaryCta: { value: 'Book a free consultation', semanticRole: 'confirmed_fact' }
+  };
+  const organicContext = {
+    objective: 'improve_search_rankings', deliverableId: organicHandler.id, title: organicHandler.title,
+    strategicDirection: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot,
+    strategyText: '', dependencyOutputs: []
+  };
+  const organicDependencies = organicHandler.requiredDependencies.map(function(deliverableId) {
+    const dependencyHandler = getProductionContract(deliverableId);
+    return {
+      deliverableId,
+      title: dependencyHandler.title,
+      contractVersion: dependencyHandler.version,
+      output: dependencyHandler.generateOutput({ ...organicContext, deliverableId, title: dependencyHandler.title })
+    };
+  });
+  organicContext.dependencyOutputs = organicDependencies;
+  let organicCalls = 0;
+  const organicProvider = {
+    provider: 'mock', model: 'revision-model',
+    async generateStructuredDeliverable({ prompt }) {
+      organicCalls += 1;
+      const output = organicHandler.generateOutput(organicContext);
+      if (organicCalls === 1) return { ...output, distributionPosts: ['Read our new article about bookkeeping.', ...output.distributionPosts] };
+      assert.match(prompt, /PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS/);
+      assert.match(prompt, /Do not call any article, guide, post, page, or content new/i);
+      return output;
+    }
+  };
+  const organicResult = await generateDeliverable({
+    job: { deliverable_id: organicHandler.id, title: organicHandler.title, strategic_direction: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot, contract_version: organicHandler.version },
+    productionRun: { objective: 'improve_search_rankings', strategySnapshot: organicStrategySnapshot }, dependencyOutputs: organicDependencies, handler: organicHandler,
+    generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(organicCalls, 2);
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v6');
 
   const invalidCases = [
     {
