@@ -5,6 +5,7 @@ const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
 const { isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
+const { compileOrganicBlocks, validateBlock } = require('../lib/productionContentBlocks');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -36,12 +37,32 @@ assert.match(handler.buildPrompt(context), /Evidence and provenance ledger/);
 assert.match(handler.buildPrompt(context), /may be stated in public copy/);
 assert.match(handler.buildPrompt(context), /direction only, not facts/);
 assert.match(handler.buildPrompt(context), /id: strategy\.primaryCustomer/);
+assert(handler.providerOutputSchema.articleBlocks);
+assert.strictEqual(handler.providerOutputSchema.introduction, undefined);
+assert.strictEqual(handler.providerOutputSchema.claimSupport, undefined);
+assert.match(handler.buildPrompt(context), /Evidence-first article blocks/i);
 assert.strictEqual(isGeneralGuidance('Bookkeeping organizes financial activity so a business can review its records.'), true,
   'stable domain education may discuss a generic business without being mistaken for a customer or offer claim');
 assert.strictEqual(isGeneralGuidance('Your Toronto business receives guaranteed bookkeeping results.'), false,
   'local, specific-entity, and outcome-facing statements are not general guidance');
 assert.strictEqual(isGeneralGuidance('Business owners often prefer monthly bookkeeping.'), false,
   'audience behavior remains outside general guidance');
+
+const generalBlock = {
+  id: 'records', heading: 'Organize the records', supportType: 'general_guidance', sourceIds: [],
+  copy: 'A ledger groups financial entries into categories for later review. Organized records make individual entries easier to locate during a review.'
+};
+assert.strictEqual(validateBlock(generalBlock, context).valid, true);
+assert.strictEqual(validateBlock({
+  ...generalBlock,
+  copy: 'Toronto business owners usually need monthly bookkeeping support.'
+}, context).valid, false);
+const compiledBlocks = compileOrganicBlocks({
+  pillarTitle: 'A practical bookkeeping guide',
+  articleBlocks: Array.from({ length: 6 }, (_, index) => ({ ...generalBlock, id: `block-${index + 1}`, heading: `Review area ${index + 1}` }))
+}, context);
+assert.match(compiledBlocks.introduction, /^## Review area 1/m);
+assert(compiledBlocks.claimSupport.length >= 12);
 
 const usefulAudienceStatement = {
   ...handler.generateOutput(context),

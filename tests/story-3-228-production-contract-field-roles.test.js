@@ -22,7 +22,7 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v8');
+assert.strictEqual(organic.version, 'organic_content_campaign:v9');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v6'), true);
@@ -60,10 +60,10 @@ assert.strictEqual(sections.find(section => section.key === 'outline').guidanceL
 assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').guidanceLabel, 'Checklist');
 
 const prompt = organic.buildPrompt(context);
-assert.match(prompt, /Public-copy fields: pillarTitle, introduction, callToAction, distributionPosts/i);
-assert.match(prompt, /Internal-guidance fields: campaignOverview, searchIntent, outline, publishingChecklist, claimSupport/i);
-assert.match(prompt, /complete pillar article draft, not merely an introduction/i);
-assert.match(prompt, /between 800 and 1,600 words/i);
+assert.match(prompt, /Public-copy fields: pillarTitle, articleBlocks, callToAction, distributionPosts/i);
+assert.match(prompt, /Internal-guidance fields: campaignOverview, searchIntent, outline, publishingChecklist/i);
+assert.match(prompt, /articleBlocks collectively form the complete pillar article draft/i);
+assert.match(prompt, /800 to 1,600 substantive words/i);
 
 const shortArticle = { ...valid, introduction: 'A brief introduction that is not a complete pillar article.' };
 assert.deepStrictEqual(validateCustomerReadyOutput(shortArticle, organic, context), {
@@ -76,14 +76,14 @@ const editorialLeak = {
   introduction: `${valid.introduction}\n\nBecause the available evidence is still incomplete, this content should avoid claims that are not yet validated.`
 };
 assert.strictEqual(validateCustomerReadyOutput(editorialLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
-  'v8 requires public-copy changes to be reflected in the claim support map');
+  'the evidence-aware contract requires public-copy changes to be reflected in the claim support map');
 
 const behaviorLeak = {
   ...valid,
   introduction: valid.introduction.replace('If you are one of', 'Business owners often need professional help before completing their bookkeeping. If you are one of')
 };
 assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
-  'v8 rejects an unsupported audience assertion through claim provenance rather than a phrase blacklist');
+  'the evidence-aware contract rejects an unsupported audience assertion through claim provenance rather than a phrase blacklist');
 
 const publicationLeak = {
   ...valid,

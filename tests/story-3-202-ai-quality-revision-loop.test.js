@@ -79,7 +79,7 @@ const context = {
     generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(organicCalls, 2);
-  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v8');
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v9');
 
   let reconciliationCalls = 0;
   const reconciledResult = await generateDeliverable({
@@ -96,6 +96,46 @@ const context = {
   });
   assert.strictEqual(reconciliationCalls, 1, 'omitted audit mappings are reconstructed without spending a revision');
   assert(reconciledResult.structuredOutput.claimSupport.length > 0);
+
+  let blockRepairCalls = 0;
+  const blockHandler = {
+    id: 'block_repair_test', title: 'Block Repair Test', version: 'block_repair_test:v1', contentType: 'sales_message',
+    requiredContext: ['objective', 'strategySnapshot', 'strategicDirection'], requiredDependencies: [],
+    outputSchema: { summary: 'string' }, providerOutputSchema: { summary: 'string', articleBlocks: 'array' },
+    publicFieldKeys: ['summary'], internalFieldKeys: [], acceptsVersion: version => version === 'block_repair_test:v1',
+    buildPrompt: () => 'Create evidence-first blocks.',
+    normalizeProviderOutput(output) {
+      if (output.articleBlocks.some(block => block.id === 'bad' && block.copy === 'unsupported')) {
+        const error = new Error('invalid block');
+        error.code = 'PRODUCTION_BLOCK_PROVENANCE_FAILED';
+        error.details = { invalidBlocks: [{ id: 'bad' }], validBlockIds: ['good'] };
+        throw error;
+      }
+      return { summary: 'A complete customer-facing summary with enough useful detail to review.' };
+    },
+    normalizeOutput: results => results[0].structuredOutput,
+    validateOutput: output => Boolean(output.summary), validationFailures: () => [],
+    presentOutput: (output, raw) => [{ text: output.summary || 'pending', tone: raw?.[0]?.tone || 'professional' }]
+  };
+  const blockRepairResult = await generateDeliverable({
+    job: { deliverable_id: blockHandler.id, title: blockHandler.title, strategic_direction: 'Create blocks.', strategySnapshot, contract_version: blockHandler.version },
+    productionRun: { objective: 'launch_product', strategySnapshot }, dependencyOutputs: [], handler: blockHandler,
+    generatorApi: {
+      provider: 'mock', model: 'block-repair-model',
+      async generateStructuredDeliverable({ prompt, outputSchema }) {
+        blockRepairCalls += 1;
+        if (blockRepairCalls === 1) {
+          return { summary: 'kept', articleBlocks: [{ id: 'good', copy: 'supported' }, { id: 'bad', copy: 'unsupported' }] };
+        }
+        assert.deepStrictEqual(Object.keys(outputSchema), ['articleBlocks']);
+        assert.match(prompt, /Return only an articleBlocks array/);
+        return { articleBlocks: [{ id: 'bad', copy: 'supported replacement' }] };
+      }
+    },
+    providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(blockRepairCalls, 2);
+  assert.strictEqual(blockRepairResult.structuredOutput.summary, 'A complete customer-facing summary with enough useful detail to review.');
 
   let lengthRevisionCalls = 0;
   await generateDeliverable({
