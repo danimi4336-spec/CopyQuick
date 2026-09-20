@@ -123,6 +123,31 @@ assert(domainEducation.claimSupport.some(item => item === 'general_guidance :: A
 assert.strictEqual(validateClaimSupport(domainEducation, handler, context).valid, true,
   'generic domain education remains usable without being promoted to a sourced claim about this business');
 
+const singleFactContext = buildProductionContext({
+  productionRun: {
+    objective: 'improve_search_rankings',
+    strategySnapshot: {
+      confirmedOffer: strategySnapshot.confirmedOffer,
+      marketPosition: strategySnapshot.marketPosition,
+      suppliedEvidence: strategySnapshot.suppliedEvidence
+    }
+  },
+  job: { deliverable_id: handler.id, title: handler.title, strategic_direction: 'Create useful search education.' },
+  dependencyOutputs
+});
+const singleFactOutput = reconcileClaimSupport({
+  ...valid,
+  pillarTitle: 'A practical bookkeeping review guide',
+  introduction: domainEducation.introduction,
+  callToAction: 'Consider reviewing the records before choosing the next step.',
+  distributionPosts: ['Review the records before choosing the next step.'],
+  claimSupport: []
+}, handler, singleFactContext);
+assert.strictEqual(validateClaimSupport(singleFactOutput, handler, singleFactContext).valid, true,
+  'provenance validates each claim without imposing a separate confirmed-evidence quota');
+assert.strictEqual(evaluateSubstantiveUsefulness(singleFactOutput, handler, singleFactContext).valid, true,
+  'the usefulness contract remains responsible for evidence depth and substantive value');
+
 const qualifiedGuidance = {
   ...valid,
   introduction: `${valid.introduction}\n\nIf records are incomplete, gather the missing source documents before choosing the next review step.`,
