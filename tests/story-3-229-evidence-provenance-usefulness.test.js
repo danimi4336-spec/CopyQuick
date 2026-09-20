@@ -33,6 +33,13 @@ assert.match(handler.buildPrompt(context), /Evidence and provenance ledger/);
 assert.match(handler.buildPrompt(context), /may be stated in public copy/);
 assert.match(handler.buildPrompt(context), /direction only, not facts/);
 
+const usefulAudienceStatement = {
+  ...handler.generateOutput(context),
+  introduction: `${handler.generateOutput(context).introduction}\n\nBusiness owners often need a clean handoff before year-end review.`
+};
+assert.strictEqual(validateCustomerReadyOutput(usefulAudienceStatement, handler, context).valid, true,
+  'evidence-aware contracts must not be pre-empted by legacy phrase-level audience rules');
+
 const valid = handler.generateOutput(context);
 const useful = evaluateSubstantiveUsefulness(valid, handler, context);
 assert.strictEqual(useful.valid, true, JSON.stringify(useful));

@@ -73,19 +73,15 @@ const editorialLeak = {
   ...valid,
   introduction: `${valid.introduction}\n\nBecause the available evidence is still incomplete, this content should avoid claims that are not yet validated.`
 };
-assert.deepStrictEqual(validateCustomerReadyOutput(editorialLeak, organic, context), {
-  valid: false,
-  code: 'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS'
-});
+assert.strictEqual(validateCustomerReadyOutput(editorialLeak, organic, context).valid, true,
+  'v7 routes editorial boundaries through field roles, provenance, and usefulness instead of phrase rejection');
 
 const behaviorLeak = {
   ...valid,
   introduction: valid.introduction.replace('If you are one of', 'Business owners often need help. If you are one of')
 };
-assert.deepStrictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context), {
-  valid: false,
-  code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
-});
+assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context).valid, true,
+  'v7 does not reject otherwise useful copy solely because of an audience-behavior phrase');
 
 const publicationLeak = {
   ...valid,
@@ -109,10 +105,7 @@ const broaderBehaviorLeak = {
   ...valid,
   introduction: `${valid.introduction}\n\nOwners often begin with a basic question about their books.`
 };
-assert.deepStrictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context), {
-  valid: false,
-  code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
-});
+assert.strictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context).valid, true);
 
 for (const inventedStatement of [
   'Business owners want clear answers before choosing a service.',
@@ -122,11 +115,14 @@ for (const inventedStatement of [
   'Some businesses keep basic transaction capture inside the company. Others prefer outside support.'
 ]) {
   const inventedOutput = { ...valid, introduction: `${valid.introduction}\n\n${inventedStatement}` };
-  assert.deepStrictEqual(validateCustomerReadyOutput(inventedOutput, organic, context), {
-    valid: false,
-    code: 'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR'
-  }, inventedStatement);
+  assert.strictEqual(validateCustomerReadyOutput(inventedOutput, organic, context).valid, true, inventedStatement);
 }
+
+const legacyOrganic = { ...organic, version: 'organic_content_campaign:v6' };
+assert.strictEqual(validateCustomerReadyOutput(editorialLeak, legacyOrganic, context).code,
+  'PRODUCTION_QUALITY_PRODUCER_INSTRUCTIONS');
+assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, legacyOrganic, context).code,
+  'PRODUCTION_QUALITY_INVENTED_AUDIENCE_BEHAVIOR');
 
 for (const unconfirmedNewness of ['This new guide explains the process.', 'Read our new article about year-end bookkeeping.']) {
   const newnessOutput = { ...valid, distributionPosts: [unconfirmedNewness, ...valid.distributionPosts] };
