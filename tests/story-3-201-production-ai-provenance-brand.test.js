@@ -19,8 +19,8 @@ const context = buildProductionContext({
   dependencyOutputs: []
 });
 assert.deepStrictEqual(context.brandContext, brandContext);
-assert.match(handler.buildPrompt(context), /Brand name: LunchLoop \[source: Brand context\]/);
-assert.match(handler.buildPrompt(context), /Brand voice: Warm and practical \[source: Brand context\]/);
+assert.match(handler.buildPrompt(context), /Brand name: LunchLoop \[id: brand\.businessName; source: Brand context\]/);
+assert.match(handler.buildPrompt(context), /Brand voice: Warm and practical \[id: brand\.voice; source: Brand context\]/);
 
 (async function run() {
   const output = handler.generateOutput(context);

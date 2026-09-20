@@ -22,6 +22,8 @@ assert.strictEqual(ledger.find(item => item.id === 'strategy.marketPosition').pe
 assert.strictEqual(ledger.find(item => item.id === 'dependency.campaign_brief.summary').permittedUse, 'direction_only');
 assert.match(renderEvidenceLedger(ledger), /CONFIRMED FACTS/);
 assert.match(renderEvidenceLedger(ledger), /RECOMMENDATIONS AND GENERATED PLANS/);
+assert.match(renderEvidenceLedger(ledger), /id: strategy\.confirmedOffer/,
+  'the rendered ledger exposes the exact stable IDs required by the claim-support contract');
 
 const handler = getProductionContract('organic_content_campaign');
 const context = buildProductionContext({
@@ -33,6 +35,7 @@ assert(Object.isFrozen(context.evidenceLedger));
 assert.match(handler.buildPrompt(context), /Evidence and provenance ledger/);
 assert.match(handler.buildPrompt(context), /may be stated in public copy/);
 assert.match(handler.buildPrompt(context), /direction only, not facts/);
+assert.match(handler.buildPrompt(context), /id: strategy\.primaryCustomer/);
 
 const usefulAudienceStatement = {
   ...handler.generateOutput(context),
