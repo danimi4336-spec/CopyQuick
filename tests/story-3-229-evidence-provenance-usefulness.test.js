@@ -4,7 +4,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
-const { validateClaimSupport } = require('../lib/productionClaims');
+const { reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -105,6 +105,9 @@ assert.strictEqual(validateClaimSupport(unsupportedRegulatoryClaim, handler, con
 const incompleteMap = { ...valid, claimSupport: valid.claimSupport.slice(1) };
 assert.strictEqual(validateClaimSupport(incompleteMap, handler, context).valid, false,
   'every substantive public sentence requires provenance');
+const reconciledMap = reconcileClaimSupport(incompleteMap, handler, context);
+assert.strictEqual(validateClaimSupport(reconciledMap, handler, context).valid, true,
+  'the production boundary deterministically restores omitted audit mappings that the finished copy itself supports');
 
 const qualifiedGuidance = {
   ...valid,

@@ -80,6 +80,22 @@ const context = {
   assert.strictEqual(organicCalls, 2);
   assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v8');
 
+  let reconciliationCalls = 0;
+  const reconciledResult = await generateDeliverable({
+    job: { deliverable_id: organicHandler.id, title: organicHandler.title, strategic_direction: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot, contract_version: organicHandler.version },
+    productionRun: { objective: 'improve_search_rankings', strategySnapshot: organicStrategySnapshot }, dependencyOutputs: organicDependencies, handler: organicHandler,
+    generatorApi: {
+      provider: 'mock', model: 'reconciliation-model',
+      async generateStructuredDeliverable() {
+        reconciliationCalls += 1;
+        return { ...organicHandler.generateOutput(organicContext), claimSupport: [] };
+      }
+    },
+    providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(reconciliationCalls, 1, 'omitted audit mappings are reconstructed without spending a revision');
+  assert(reconciledResult.structuredOutput.claimSupport.length > 0);
+
   const invalidCases = [
     {
       name: 'empty output',
