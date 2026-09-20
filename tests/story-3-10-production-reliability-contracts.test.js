@@ -244,10 +244,10 @@ async function run() {
     assert.strictEqual(row.generation_contract, row.contract_version);
     assert.doesNotMatch(JSON.stringify(output), /age 35|\$100,000|female|male/i);
   });
-  assert.match(calls[1].productDescription, /customer_profile:/i);
+  assert.match(calls[1].productDescription, /customer_profile —/i);
   assert.doesNotMatch(calls[1].productDescription, /customer_profile:v1|Completed prerequisite outputs|\{"/);
   assert.match(calls[1].productDescription, /Premium and evidence-aware/);
-  assert.match(calls[4].productDescription, /core_messaging:/i);
+  assert.match(calls[4].productDescription, /core_messaging —/i);
   const downstreamJob = foundationRows[4];
   const dependencyOutputs = loadDependencyOutputs(db, {
     production_run_id: foundationRun,

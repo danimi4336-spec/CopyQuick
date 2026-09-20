@@ -78,7 +78,7 @@ const context = {
     generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(organicCalls, 2);
-  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v6');
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v7');
 
   const invalidCases = [
     {

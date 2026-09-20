@@ -22,9 +22,11 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v6');
+assert.strictEqual(organic.version, 'organic_content_campaign:v7');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
+assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v6'), true);
+assert.strictEqual(organic.usefulnessContract.policy, 'decision_usefulness_v1');
 assert.deepStrictEqual(organic.publicFieldKeys, ['pillarTitle', 'introduction', 'callToAction', 'distributionPosts']);
 assert.deepStrictEqual(organic.internalFieldKeys, ['campaignOverview', 'searchIntent', 'outline', 'publishingChecklist']);
 
