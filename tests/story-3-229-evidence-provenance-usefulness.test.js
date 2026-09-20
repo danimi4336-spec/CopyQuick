@@ -4,7 +4,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
-const { reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
+const { isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -36,6 +36,12 @@ assert.match(handler.buildPrompt(context), /Evidence and provenance ledger/);
 assert.match(handler.buildPrompt(context), /may be stated in public copy/);
 assert.match(handler.buildPrompt(context), /direction only, not facts/);
 assert.match(handler.buildPrompt(context), /id: strategy\.primaryCustomer/);
+assert.strictEqual(isGeneralGuidance('Bookkeeping organizes financial activity so a business can review its records.'), true,
+  'stable domain education may discuss a generic business without being mistaken for a customer or offer claim');
+assert.strictEqual(isGeneralGuidance('Your Toronto business receives guaranteed bookkeeping results.'), false,
+  'local, specific-entity, and outcome-facing statements are not general guidance');
+assert.strictEqual(isGeneralGuidance('Business owners often prefer monthly bookkeeping.'), false,
+  'audience behavior remains outside general guidance');
 
 const usefulAudienceStatement = {
   ...handler.generateOutput(context),
@@ -108,6 +114,14 @@ assert.strictEqual(validateClaimSupport(incompleteMap, handler, context).valid, 
 const reconciledMap = reconcileClaimSupport(incompleteMap, handler, context);
 assert.strictEqual(validateClaimSupport(reconciledMap, handler, context).valid, true,
   'the production boundary deterministically restores omitted audit mappings that the finished copy itself supports');
+const domainEducation = reconcileClaimSupport({
+  ...valid,
+  introduction: `${valid.introduction}\n\nA ledger groups business entries into categories for later review.`,
+  claimSupport: [...valid.claimSupport]
+}, handler, context);
+assert(domainEducation.claimSupport.some(item => item === 'general_guidance :: A ledger groups business entries into categories for later review.'));
+assert.strictEqual(validateClaimSupport(domainEducation, handler, context).valid, true,
+  'generic domain education remains usable without being promoted to a sourced claim about this business');
 
 const qualifiedGuidance = {
   ...valid,
