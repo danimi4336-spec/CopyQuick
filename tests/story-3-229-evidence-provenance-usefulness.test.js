@@ -4,6 +4,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
+const { validateClaimSupport } = require('../lib/productionClaims');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -37,8 +38,8 @@ const usefulAudienceStatement = {
   ...handler.generateOutput(context),
   introduction: `${handler.generateOutput(context).introduction}\n\nBusiness owners often need a clean handoff before year-end review.`
 };
-assert.strictEqual(validateCustomerReadyOutput(usefulAudienceStatement, handler, context).valid, true,
-  'evidence-aware contracts must not be pre-empted by legacy phrase-level audience rules');
+assert.strictEqual(validateCustomerReadyOutput(usefulAudienceStatement, handler, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
+  'evidence-aware contracts reject unsupported additions through the support map rather than phrase-level audience rules');
 
 const valid = handler.generateOutput(context);
 const useful = evaluateSubstantiveUsefulness(valid, handler, context);
@@ -72,6 +73,42 @@ const superficiallyLong = {
     '## Conclusion', Array(30).fill('Readers can consider the information and decide what matters.').join(' ')
   ].join('\n\n')
 };
-assert.deepStrictEqual(validateCustomerReadyOutput(superficiallyLong, handler, context).code, 'PRODUCTION_QUALITY_INSUFFICIENT_USEFULNESS');
+assert.strictEqual(evaluateSubstantiveUsefulness(superficiallyLong, handler, context).valid, false,
+  'long generic prose does not satisfy the substantive-usefulness contract');
+
+const unknownEvidence = { ...valid, claimSupport: [...valid.claimSupport] };
+unknownEvidence.claimSupport[0] = unknownEvidence.claimSupport[0].replace(/^[^:]+/, 'unknown.source');
+assert.strictEqual(validateClaimSupport(unknownEvidence, handler, context).valid, false,
+  'unknown evidence IDs cannot support public claims');
+
+const directionOnlyEvidence = { ...valid, claimSupport: [...valid.claimSupport] };
+directionOnlyEvidence.claimSupport[0] = directionOnlyEvidence.claimSupport[0].replace(/^[^:]+/, 'dependency.campaign_brief.summary');
+assert.strictEqual(validateClaimSupport(directionOnlyEvidence, handler, context).valid, false,
+  'generated planning guidance cannot be promoted into public evidence');
+
+const staleExcerpt = { ...valid, claimSupport: [...valid.claimSupport] };
+staleExcerpt.claimSupport[0] = `${staleExcerpt.claimSupport[0]} changed`;
+assert.strictEqual(validateClaimSupport(staleExcerpt, handler, context).valid, false,
+  'support-map excerpts must exactly match current public copy');
+
+const unsupportedRegulatoryClaim = {
+  ...valid,
+  introduction: `${valid.introduction}\n\nHST records are required for every Toronto bookkeeping review.`,
+  claimSupport: [...valid.claimSupport, 'general_guidance :: HST records are required for every Toronto bookkeeping review.']
+};
+assert.strictEqual(validateClaimSupport(unsupportedRegulatoryClaim, handler, context).valid, false,
+  'local or regulated claims cannot be disguised as general guidance');
+
+const incompleteMap = { ...valid, claimSupport: valid.claimSupport.slice(1) };
+assert.strictEqual(validateClaimSupport(incompleteMap, handler, context).valid, false,
+  'every substantive public sentence requires provenance');
+
+const qualifiedGuidance = {
+  ...valid,
+  introduction: `${valid.introduction}\n\nIf records are incomplete, gather the missing source documents before choosing the next review step.`,
+  claimSupport: [...valid.claimSupport, 'conditional_guidance :: If records are incomplete, gather the missing source documents before choosing the next review step.']
+};
+assert.strictEqual(validateClaimSupport(qualifiedGuidance, handler, context).valid, true,
+  'genuinely conditional guidance remains available without pretending it is evidence');
 
 console.log('Story 3.229 Evidence Provenance & Usefulness Contract tests passed');

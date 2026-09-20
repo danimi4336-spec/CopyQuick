@@ -22,13 +22,15 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v7');
+assert.strictEqual(organic.version, 'organic_content_campaign:v8');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v6'), true);
-assert.strictEqual(organic.usefulnessContract.policy, 'decision_usefulness_v1');
+assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v7'), true);
+assert.strictEqual(organic.usefulnessContract.policy, 'decision_usefulness_v2');
+assert.strictEqual(organic.claimProvenanceContract.policy, 'claim_provenance_v1');
 assert.deepStrictEqual(organic.publicFieldKeys, ['pillarTitle', 'introduction', 'callToAction', 'distributionPosts']);
-assert.deepStrictEqual(organic.internalFieldKeys, ['campaignOverview', 'searchIntent', 'outline', 'publishingChecklist']);
+assert.deepStrictEqual(organic.internalFieldKeys, ['campaignOverview', 'searchIntent', 'outline', 'publishingChecklist', 'claimSupport']);
 
 const context = {
   title: 'Search-Led Content Package',
@@ -59,7 +61,7 @@ assert.strictEqual(sections.find(section => section.key === 'publishingChecklist
 
 const prompt = organic.buildPrompt(context);
 assert.match(prompt, /Public-copy fields: pillarTitle, introduction, callToAction, distributionPosts/i);
-assert.match(prompt, /Internal-guidance fields: campaignOverview, searchIntent, outline, publishingChecklist/i);
+assert.match(prompt, /Internal-guidance fields: campaignOverview, searchIntent, outline, publishingChecklist, claimSupport/i);
 assert.match(prompt, /complete pillar article draft, not merely an introduction/i);
 assert.match(prompt, /between 800 and 1,600 words/i);
 
@@ -73,15 +75,15 @@ const editorialLeak = {
   ...valid,
   introduction: `${valid.introduction}\n\nBecause the available evidence is still incomplete, this content should avoid claims that are not yet validated.`
 };
-assert.strictEqual(validateCustomerReadyOutput(editorialLeak, organic, context).valid, true,
-  'v7 routes editorial boundaries through field roles, provenance, and usefulness instead of phrase rejection');
+assert.strictEqual(validateCustomerReadyOutput(editorialLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
+  'v8 requires public-copy changes to be reflected in the claim support map');
 
 const behaviorLeak = {
   ...valid,
-  introduction: valid.introduction.replace('If you are one of', 'Business owners often need help. If you are one of')
+  introduction: valid.introduction.replace('If you are one of', 'Business owners often need professional help before completing their bookkeeping. If you are one of')
 };
-assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context).valid, true,
-  'v7 does not reject otherwise useful copy solely because of an audience-behavior phrase');
+assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
+  'v8 rejects an unsupported audience assertion through claim provenance rather than a phrase blacklist');
 
 const publicationLeak = {
   ...valid,
@@ -105,17 +107,17 @@ const broaderBehaviorLeak = {
   ...valid,
   introduction: `${valid.introduction}\n\nOwners often begin with a basic question about their books.`
 };
-assert.strictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context).valid, true);
+assert.strictEqual(validateCustomerReadyOutput(broaderBehaviorLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE');
 
 for (const inventedStatement of [
   'Business owners want clear answers before choosing a service.',
   'Year-end questions often come up as businesses prepare to close the books.',
-  'Year-end review often includes reconciling bank accounts.',
+  'Year-end review often includes reconciling bank accounts for every business.',
   'For many businesses, bookkeeping becomes harder as the company grows.',
   'Some businesses keep basic transaction capture inside the company. Others prefer outside support.'
 ]) {
   const inventedOutput = { ...valid, introduction: `${valid.introduction}\n\n${inventedStatement}` };
-  assert.strictEqual(validateCustomerReadyOutput(inventedOutput, organic, context).valid, true, inventedStatement);
+  assert.strictEqual(validateCustomerReadyOutput(inventedOutput, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE', inventedStatement);
 }
 
 const legacyOrganic = { ...organic, version: 'organic_content_campaign:v6' };
