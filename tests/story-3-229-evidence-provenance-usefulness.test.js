@@ -4,7 +4,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
-const { isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
+const { isConditionalGuidance, isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
 const { compileOrganicBlocks, qualifyAsGuidance, validateBlock } = require('../lib/productionContentBlocks');
 
 const strategySnapshot = {
@@ -47,6 +47,10 @@ assert.strictEqual(isGeneralGuidance('Your Toronto business receives guaranteed 
   'local, specific-entity, and outcome-facing statements are not general guidance');
 assert.strictEqual(isGeneralGuidance('Business owners often prefer monthly bookkeeping.'), false,
   'audience behavior remains outside general guidance');
+assert.strictEqual(isConditionalGuidance('Restaurant Bookkeeping in Chicago: What Independent Owners Should Review Each Month'), true,
+  'decision-guide titles remain qualified guidance even when title style omits a question mark');
+assert.strictEqual(isConditionalGuidance('Chicago bookkeeping firms save owners 30 percent each month'), false,
+  'factual and performance-oriented titles still require confirmed evidence');
 
 const generalBlock = {
   id: 'records', heading: 'Organize the records', supportType: 'general_guidance', sourceIds: [],
@@ -190,6 +194,15 @@ assert.strictEqual(validateClaimSupport(incompleteMap, handler, context).valid, 
 const reconciledMap = reconcileClaimSupport(incompleteMap, handler, context);
 assert.strictEqual(validateClaimSupport(reconciledMap, handler, context).valid, true,
   'the production boundary deterministically restores omitted audit mappings that the finished copy itself supports');
+const reconciledDecisionGuideTitle = reconcileClaimSupport({
+  ...valid,
+  pillarTitle: 'Restaurant Bookkeeping in Chicago: What Independent Owners Should Review Each Month',
+  claimSupport: valid.claimSupport.filter(item => !item.includes(` :: ${valid.pillarTitle}`))
+}, handler, context);
+assert(reconciledDecisionGuideTitle.claimSupport.includes(
+  'conditional_guidance :: Restaurant Bookkeeping in Chicago: What Independent Owners Should Review Each Month'));
+assert.strictEqual(validateClaimSupport(reconciledDecisionGuideTitle, handler, context).valid, true,
+  'the backend restores provenance for an industry-specific decision-guide title without model-authored audit metadata');
 const reconciledDistribution = reconcileClaimSupport({
   ...valid,
   distributionPosts: ['Bookkeeping always makes every Toronto company more profitable.'],
