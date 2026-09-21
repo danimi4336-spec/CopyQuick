@@ -12,6 +12,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { loadProductionValidationContext } = require('../lib/productionValidationContext');
+const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { renderSafeMarkdown } = require('../lib/safeMarkdown');
 const { parseJob } = require('../lib/productionState');
 const { bundleAssets, brandVoices, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
