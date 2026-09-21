@@ -174,7 +174,7 @@ function regenerateProductionWithAi() {
     var planningDeliverable = button && button.dataset.artifactRole === 'planning_foundation';
     var confirmation = planningDeliverable
         ? 'Regenerate this planning foundation? This optional regeneration uses 1 generation credit and replaces the current planning document. It will not create customer-facing sales copy.'
-        : 'Create a new AI version of this deliverable? This uses 1 generation credit and replaces the content shown on this page.';
+        : 'Create a new AI version of this deliverable? One generation credit is used only when the AI version passes validation. A recovered deterministic fallback is not charged. The accepted content replaces what is shown on this page.';
     if (!confirm(confirmation)) return;
     if (button) { button.disabled = true; button.textContent = 'Creating AI version…'; }
     fetch('/generation/' + genId + '/regenerate-production', {

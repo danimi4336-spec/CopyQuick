@@ -1,11 +1,13 @@
 const assert = require('assert');
-const { boundedRevisionCount, generateDeliverable, revisionFailureDiagnostics, revisionQualityGuidance } = require('../lib/generationService');
+const { boundedRevisionCount, generateDeliverable, productionRegenerationUsageUnits, revisionFailureDiagnostics, revisionQualityGuidance } = require('../lib/generationService');
 const { getProductionContract } = require('../lib/productionContracts');
 
 assert.strictEqual(boundedRevisionCount(undefined), 1);
 assert.strictEqual(boundedRevisionCount('0'), 0);
 assert.strictEqual(boundedRevisionCount('2'), 2);
 assert.strictEqual(boundedRevisionCount('100'), 1);
+assert.strictEqual(productionRegenerationUsageUnits({ fallbackUsed: false }), 1);
+assert.strictEqual(productionRegenerationUsageUnits({ fallbackUsed: true }), 0);
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'), /do not call any article, guide, post, page, or content new/i);
 assert.match(revisionQualityGuidance('CONTRACT_VALIDATION_ORGANIC_LENGTH'), /800–1,600 substantive words/);
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_INSUFFICIENT_USEFULNESS'), /at least five distinct verbs/i);

@@ -9,7 +9,7 @@ const generator = require('../lib/generator');
 const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
-const { generateDeliverable } = require('../lib/generationService');
+const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
 const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { renderSafeMarkdown } = require('../lib/safeMarkdown');
@@ -748,7 +748,13 @@ router.post('/generation/:id/regenerate-production', requireAuth, requireGenerat
       usagePeriodId: usageSnapshot.usagePeriod.id,
       eventType: 'production_regeneration',
       sourceRoute: 'POST /generation/:id/regenerate-production',
-      metadata: { deliverableId: gen.deliverable_id, provider: generated.provider, model: generated.aiModel },
+      units: productionRegenerationUsageUnits(generated),
+      metadata: {
+        deliverableId: gen.deliverable_id,
+        provider: generated.provider,
+        model: generated.aiModel,
+        fallbackUsed: Boolean(generated.fallbackUsed)
+      },
       persistGeneration: (txDb) => {
         const updated = txDb.prepare(`
           UPDATE generations
