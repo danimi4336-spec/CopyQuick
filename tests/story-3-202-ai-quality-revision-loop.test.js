@@ -79,7 +79,7 @@ const context = {
     generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(organicCalls, 2);
-  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v10');
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v14');
 
   let reconciliationCalls = 0;
   const reconciledResult = await generateDeliverable({
@@ -155,6 +155,25 @@ const context = {
     providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(lengthRevisionCalls, 2);
+
+  let fallbackCalls = 0;
+  const fallbackResult = await generateDeliverable({
+    job: { deliverable_id: organicHandler.id, title: organicHandler.title, strategic_direction: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot, contract_version: organicHandler.version },
+    productionRun: { objective: 'improve_search_rankings', strategySnapshot: organicStrategySnapshot }, dependencyOutputs: organicDependencies, handler: organicHandler,
+    generatorApi: {
+      provider: 'mock', model: 'persistently-short-model',
+      async generateStructuredDeliverable() {
+        fallbackCalls += 1;
+        const output = organicHandler.generateOutput(organicContext);
+        return { ...output, introduction: '## Scope\nA short draft.\n## Checks\nReview records.\n## Options\nCompare fit.\n## Next step\nChoose carefully.' };
+      }
+    },
+    providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(fallbackCalls, 2, 'the provider receives one bounded revision before fallback');
+  assert.strictEqual(fallbackResult.provider, 'hybrid');
+  assert.match(fallbackResult.aiModel, /persistently-short-model\+.*deterministic/i);
+  assert.strictEqual(organicHandler.validateOutput(fallbackResult.structuredOutput, organicContext), true);
 
   const invalidCases = [
     {

@@ -5,7 +5,7 @@ const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
 const { isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
-const { compileOrganicBlocks, validateBlock } = require('../lib/productionContentBlocks');
+const { compileOrganicBlocks, qualifyAsGuidance, validateBlock } = require('../lib/productionContentBlocks');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -66,6 +66,14 @@ assert.strictEqual(validateBlock({
   ...generalBlock,
   copy: 'Toronto business owners usually need monthly bookkeeping support.'
 }, context).valid, false);
+const partiallyUnsupportedBlock = validateBlock({
+  ...generalBlock,
+  copy: `${generalBlock.copy} Toronto business owners usually need monthly bookkeeping support.`
+}, context);
+assert.strictEqual(partiallyUnsupportedBlock.valid, true, 'isolated unsupported sentences do not discard an otherwise useful block');
+assert(partiallyUnsupportedBlock.sanitizedCopy.includes('Consider whether Toronto business owners usually need monthly bookkeeping support.'),
+  'unsupported assertions are preserved only as explicitly qualified guidance');
+assert.strictEqual(qualifyAsGuidance('Records are always complete.'), 'Consider whether records are always complete.');
 const compiledBlocks = compileOrganicBlocks({
   pillarTitle: 'A practical bookkeeping guide',
   articleBlocks: Array.from({ length: 6 }, (_, index) => ({ ...generalBlock, id: `block-${index + 1}`, heading: `Review area ${index + 1}` }))
@@ -85,6 +93,35 @@ const useful = evaluateSubstantiveUsefulness(valid, handler, context);
 assert.strictEqual(useful.valid, true, JSON.stringify(useful));
 assert(useful.metrics.developedSectionCount >= 5);
 assert(useful.metrics.groundedEvidenceIds.length >= 2);
+
+const suppliedOfferOnlyContext = buildProductionContext({
+  productionRun: { objective: 'improve_search_rankings', strategySnapshot: {
+    ...strategySnapshot,
+    confirmedOffer: undefined,
+    customerMotivation: { value: 'Generate qualified leads', semanticRole: 'confirmed_fact' },
+    marketingFocus: { value: 'Validate supplied topics: small business bookkeeping; year-end bookkeeping questions', semanticRole: 'strategic_recommendation' },
+    confirmedPrimaryCta: { value: 'Book a free consultation', semanticRole: 'confirmed_fact' }
+  } },
+  job: {
+    deliverable_id: handler.id,
+    title: handler.title,
+    strategic_direction: 'Builder-provided offer description: I run a Toronto bookkeeping firm with service pages and a practical advice blog. Treat this as unverified context, not proof of performance, demand, differentiation, claims, or substantiation.',
+    strategySnapshot: {
+      ...strategySnapshot,
+      confirmedOffer: undefined,
+      customerMotivation: { value: 'Generate qualified leads', semanticRole: 'confirmed_fact' },
+      marketingFocus: { value: 'Validate supplied topics: small business bookkeeping; year-end bookkeeping questions', semanticRole: 'strategic_recommendation' },
+      confirmedPrimaryCta: { value: 'Book a free consultation', semanticRole: 'confirmed_fact' }
+    }
+  },
+  dependencyOutputs
+});
+const suppliedOfferFallback = handler.generateOutput(suppliedOfferOnlyContext);
+assert.strictEqual(validateCustomerReadyOutput(suppliedOfferFallback, handler, suppliedOfferOnlyContext).valid, true,
+  'the deterministic fallback remains provenance-safe when the offer is supplied context rather than a confirmed fact');
+assert.match(suppliedOfferFallback.pillarTitle, /small business bookkeeping/i);
+assert.doesNotMatch(suppliedOfferFallback.introduction, /I run a Toronto bookkeeping firm/i,
+  'unverified builder descriptions never leak into deterministic public copy');
 
 const genericPadding = {
   ...valid,
