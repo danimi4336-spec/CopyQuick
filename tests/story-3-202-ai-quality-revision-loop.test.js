@@ -8,6 +8,7 @@ assert.strictEqual(boundedRevisionCount('2'), 2);
 assert.strictEqual(boundedRevisionCount('100'), 1);
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'), /do not call any article, guide, post, page, or content new/i);
 assert.match(revisionQualityGuidance('CONTRACT_VALIDATION_ORGANIC_LENGTH'), /800–1,600 substantive words/);
+assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_INSUFFICIENT_USEFULNESS'), /at least five distinct verbs/i);
 assert.match(revisionFailureDiagnostics({ details: {
   failures: ['cover the industry-specific reader decision dimensions'],
   metrics: { developedSectionCount: 6, coveredTopics: ['scope'] }
