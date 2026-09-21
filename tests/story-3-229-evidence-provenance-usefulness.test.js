@@ -53,6 +53,15 @@ const generalBlock = {
   copy: 'A ledger groups financial entries into categories for later review. Organized records make individual entries easier to locate during a review.'
 };
 assert.strictEqual(validateBlock(generalBlock, context).valid, true);
+const mixedSafeBlock = validateBlock({
+  id: 'mixed-safe',
+  heading: 'Toronto bookkeeping decisions without a standalone factual claim',
+  copy: 'The service includes monthly bookkeeping and financial reporting. Review the records before deciding which follow-up work may be useful.',
+  supportType: 'confirmed_fact',
+  sourceIds: ['strategy.confirmedOffer']
+}, context);
+assert.strictEqual(mixedSafeBlock.valid, true, 'a block may combine sourced facts with safely qualified guidance');
+assert.strictEqual(mixedSafeBlock.mappings.length, 2);
 assert.strictEqual(validateBlock({
   ...generalBlock,
   copy: 'Toronto business owners usually need monthly bookkeeping support.'

@@ -5,7 +5,7 @@ const { getProductionContract, getProductionContractIds } = require('../lib/prod
 
 for (const id of getProductionContractIds()) {
   const contract = getProductionContract(id);
-  const versionNumber = id === 'organic_content_campaign' ? 9
+  const versionNumber = id === 'organic_content_campaign' ? 10
     : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3;
   const currentVersion = `${id}:v${versionNumber}`;
   const compatibleVersions = Array.from({ length: versionNumber - 1 }, function(_, index) {

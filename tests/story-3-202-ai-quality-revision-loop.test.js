@@ -79,7 +79,7 @@ const context = {
     generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(organicCalls, 2);
-  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v9');
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v10');
 
   let reconciliationCalls = 0;
   const reconciledResult = await generateDeliverable({

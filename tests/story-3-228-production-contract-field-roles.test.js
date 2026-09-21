@@ -22,7 +22,7 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v9');
+assert.strictEqual(organic.version, 'organic_content_campaign:v10');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v6'), true);
