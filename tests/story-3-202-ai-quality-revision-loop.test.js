@@ -175,6 +175,26 @@ const context = {
   assert.match(fallbackResult.aiModel, /persistently-short-model\+.*deterministic/i);
   assert.strictEqual(organicHandler.validateOutput(fallbackResult.structuredOutput, organicContext), true);
 
+  let providerFailureCalls = 0;
+  const providerFailureResult = await generateDeliverable({
+    job: { deliverable_id: organicHandler.id, title: organicHandler.title, strategic_direction: 'Create grounded search content.', strategySnapshot: organicStrategySnapshot, contract_version: organicHandler.version },
+    productionRun: { objective: 'improve_search_rankings', strategySnapshot: organicStrategySnapshot }, dependencyOutputs: organicDependencies, handler: organicHandler,
+    generatorApi: {
+      provider: 'mock', model: 'unavailable-model',
+      async generateStructuredDeliverable() {
+        providerFailureCalls += 1;
+        const error = new Error('provider timed out');
+        error.code = 'AI_PROVIDER_TIMEOUT';
+        throw error;
+      }
+    },
+    providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
+  });
+  assert.strictEqual(providerFailureCalls, 1, 'provider failures fall back immediately instead of spending another long attempt');
+  assert.strictEqual(providerFailureResult.provider, 'hybrid');
+  assert.match(providerFailureResult.aiModel, /unavailable-model\+.*deterministic/i);
+  assert.strictEqual(organicHandler.validateOutput(providerFailureResult.structuredOutput, organicContext), true);
+
   const invalidCases = [
     {
       name: 'empty output',
