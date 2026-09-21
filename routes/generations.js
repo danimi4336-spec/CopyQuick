@@ -10,10 +10,10 @@ const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
-const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const { loadProductionValidationContext } = require('../lib/productionValidationContext');
 const { renderSafeMarkdown } = require('../lib/safeMarkdown');
-const { parseJob, parseStrategySnapshot } = require('../lib/productionState');
+const { parseJob } = require('../lib/productionState');
 const { bundleAssets, brandVoices, audiencePresets, resolveBundleAsset } = require('../lib/generatorModes');
 const { GENERATION_METADATA_LIMITS, boundedQueryText, buildPaginationPages, parseHistoryPage, validateOptionalText } = require('../lib/generationMetadata');
 const { parseStoredGenerationResults } = require('../lib/generationResults');
@@ -603,7 +603,8 @@ router.get('/generation/:id', requireAuth, (req, res) => {
     const contract = getProductionContract(gen.deliverable_id);
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
-    const quality = validateCustomerReadyOutput(output, contract);
+    const validationContext = loadProductionValidationContext(db, { userId, generation: gen });
+    const quality = validateCustomerReadyOutput(output, contract, validationContext);
     const legacySections = gen.deliverable_id === 'outreach_sequence'
       && output && typeof output.summary === 'string' && Array.isArray(output.content)
       ? [
@@ -972,7 +973,8 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
     const contract = getProductionContract(gen.deliverable_id);
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
-    if (!validateCustomerReadyOutput(output, contract).valid) return res.status(409).send('This deliverable needs review before export.');
+    const validationContext = loadProductionValidationContext(db, { userId, generation: gen });
+    if (!validateCustomerReadyOutput(output, contract, validationContext).valid) return res.status(409).send('This deliverable needs review before export.');
     const sections = contract.presentationSections(output).filter(section => !section.internal);
     if (format === 'txt') content = sections.map(section => `${section.label}\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
     else if (format === 'md') content = `# ${gen.title}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
