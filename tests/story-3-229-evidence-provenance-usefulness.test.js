@@ -122,6 +122,15 @@ assert.strictEqual(validateCustomerReadyOutput(suppliedOfferFallback, handler, s
 assert.match(suppliedOfferFallback.pillarTitle, /small business bookkeeping/i);
 assert.doesNotMatch(suppliedOfferFallback.introduction, /I run a Toronto bookkeeping firm/i,
   'unverified builder descriptions never leak into deterministic public copy');
+assert.strictEqual(suppliedOfferOnlyContext.compositionBrief.primaryTopic, 'small business bookkeeping');
+assert.deepStrictEqual(suppliedOfferOnlyContext.compositionBrief.supportingTopics, ['year-end bookkeeping questions']);
+assert.strictEqual(suppliedOfferOnlyContext.compositionBrief.domainId, 'bookkeeping_services');
+assert.match(handler.buildPrompt(suppliedOfferOnlyContext), /Intermediate composition brief:/);
+assert.match(handler.buildPrompt(suppliedOfferOnlyContext), /Primary article topic: small business bookkeeping/);
+assert.match(handler.buildPrompt(suppliedOfferOnlyContext), /Supporting topics: year-end bookkeeping questions/);
+assert.match(suppliedOfferFallback.pillarTitle, /small business bookkeeping/i);
+assert.doesNotMatch(suppliedOfferFallback.pillarTitle, /year-end bookkeeping questions/i,
+  'supporting topics are not concatenated into the primary title');
 
 const genericPadding = {
   ...valid,

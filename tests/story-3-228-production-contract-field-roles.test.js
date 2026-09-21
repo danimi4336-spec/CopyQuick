@@ -22,7 +22,7 @@ for (const id of getProductionContractIds()) {
 }
 
 const organic = getProductionContract('organic_content_campaign');
-assert.strictEqual(organic.version, 'organic_content_campaign:v14');
+assert.strictEqual(organic.version, 'organic_content_campaign:v15');
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v4'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v5'), true);
 assert.strictEqual(organic.acceptsVersion('organic_content_campaign:v6'), true);
@@ -80,7 +80,7 @@ assert.strictEqual(validateCustomerReadyOutput(editorialLeak, organic, context).
 
 const behaviorLeak = {
   ...valid,
-  introduction: valid.introduction.replace('If you are one of', 'Business owners often need professional help before completing their bookkeeping. If you are one of')
+  introduction: `${valid.introduction}\n\nBusiness owners often need professional help before completing their bookkeeping.`
 };
 assert.strictEqual(validateCustomerReadyOutput(behaviorLeak, organic, context).code, 'PRODUCTION_QUALITY_CLAIM_PROVENANCE',
   'the evidence-aware contract rejects an unsupported audience assertion through claim provenance rather than a phrase blacklist');
