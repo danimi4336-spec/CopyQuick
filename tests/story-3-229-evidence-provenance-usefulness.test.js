@@ -190,6 +190,17 @@ assert.strictEqual(validateClaimSupport(incompleteMap, handler, context).valid, 
 const reconciledMap = reconcileClaimSupport(incompleteMap, handler, context);
 assert.strictEqual(validateClaimSupport(reconciledMap, handler, context).valid, true,
   'the production boundary deterministically restores omitted audit mappings that the finished copy itself supports');
+const reconciledDistribution = reconcileClaimSupport({
+  ...valid,
+  distributionPosts: ['Bookkeeping always makes every Toronto company more profitable.'],
+  claimSupport: valid.claimSupport
+}, handler, context);
+assert.strictEqual(reconciledDistribution.distributionPosts[0],
+  'Consider whether bookkeeping always makes every Toronto company more profitable.');
+assert(reconciledDistribution.claimSupport.includes(
+  'conditional_guidance :: Consider whether bookkeeping always makes every Toronto company more profitable.'));
+assert.strictEqual(validateClaimSupport(reconciledDistribution, handler, context).valid, true,
+  'unsupported generated distribution prose is safely qualified instead of forcing the entire article onto the deterministic fallback');
 const domainEducation = reconcileClaimSupport({
   ...valid,
   introduction: `${valid.introduction}\n\nA ledger groups business entries into categories for later review.`,

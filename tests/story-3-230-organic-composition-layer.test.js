@@ -3,6 +3,7 @@ const { buildProductionContext } = require('../lib/generationService');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { evaluateCompositionFit } = require('../lib/productionComposition');
+const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
 
 const handler = getProductionContract('organic_content_campaign');
 const strategySnapshot = {
@@ -64,6 +65,11 @@ assert.match(petFallback.introduction, /temperament, handling needs/i);
 assert.doesNotMatch(petFallback.introduction, /warranty responsibilities|construction materials/i);
 assert.strictEqual(evaluateCompositionFit(petFallback, petContext.compositionBrief).valid, true);
 assert.deepStrictEqual(validateCustomerReadyOutput(petFallback, handler, petContext), { valid: true, code: null });
+const petUsefulness = evaluateSubstantiveUsefulness(petFallback, handler, petContext);
+assert.strictEqual(petUsefulness.valid, true, JSON.stringify(petUsefulness));
+assert(petUsefulness.metrics.coveredTopics.length >= 4);
+assert(petUsefulness.metrics.coveredTopics.every(topic => petContext.compositionBrief.decisionDimensions.includes(topic)),
+  'usefulness is measured against the active industry composition rather than bookkeeping-only vocabulary');
 const mismatchedPetOutput = {
   ...petFallback,
   introduction: petFallback.introduction
@@ -71,5 +77,15 @@ const mismatchedPetOutput = {
     .replace(/temperament, handling needs, and the working environment/gi, 'construction materials')
 };
 assert.strictEqual(validateCustomerReadyOutput(mismatchedPetOutput, handler, petContext).code, 'PRODUCTION_QUALITY_DOMAIN_FIT');
+const coatCompositionLanguage = {
+  ...petFallback,
+  introduction: petFallback.introduction.replace(
+    'Consider the pet’s coat, skin, age, and current condition, temperament, handling needs, and the working environment, which grooming services are included and appropriate.',
+    'Consider whether a double coat contains a dense undercoat that changes the grooming approach.'
+  )
+};
+assert.notStrictEqual(validateCustomerReadyOutput(coatCompositionLanguage, handler, petContext).code,
+  'PRODUCTION_QUALITY_UNSUPPORTED_CLAIM',
+  'ordinary industry prose using “contains” is not misclassified as an unsupported product-ingredient claim');
 
 console.log('Story 3.230 Organic Composition Layer tests passed');
