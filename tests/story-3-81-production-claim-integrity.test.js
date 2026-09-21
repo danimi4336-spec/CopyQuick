@@ -36,11 +36,13 @@ const rejected = [
 
 for (const claim of rejected) {
   assert.strictEqual(containsUnsupportedClaim(claim), true, claim);
+  const validation = validateCustomerReadyOutput(profile(claim), contract);
   assert.strictEqual(
-    validateCustomerReadyOutput(profile(claim), contract).code,
+    validation.code,
     'PRODUCTION_QUALITY_UNSUPPORTED_CLAIM',
     claim
   );
+  assert.match(validation.details.unsupportedClaims[0].excerpt, /\S/, claim);
 }
 
 const allowedBoundaries = [

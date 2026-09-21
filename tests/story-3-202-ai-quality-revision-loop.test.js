@@ -12,6 +12,9 @@ assert.match(revisionFailureDiagnostics({ details: {
   failures: ['cover the industry-specific reader decision dimensions'],
   metrics: { developedSectionCount: 6, coveredTopics: ['scope'] }
 } }), /coveredTopics.*scope/);
+assert.match(revisionFailureDiagnostics({ details: {
+  unsupportedClaims: [{ rule: 'unsupported_claim_4', excerpt: 'This approach is guaranteed to deliver results.' }]
+} }), /guaranteed to deliver results/);
 
 const handler = getProductionContract('customer_profile');
 const strategySnapshot = {
