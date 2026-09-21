@@ -2,6 +2,7 @@ const assert = require('assert');
 const { buildProductionContext } = require('../lib/generationService');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const { evaluateCompositionFit } = require('../lib/productionComposition');
 
 const handler = getProductionContract('organic_content_campaign');
 const strategySnapshot = {
@@ -41,5 +42,34 @@ assert(fallback.outline.some(item => /property conditions/i.test(item)));
 assert.match(fallback.introduction, /property conditions/i);
 assert.strictEqual(handler.validateOutput(fallback, context), true);
 assert.deepStrictEqual(validateCustomerReadyOutput(fallback, handler, context), { valid: true, code: null });
+
+const petStrategySnapshot = {
+  confirmedOffer: { value: 'A Denver mobile dog-grooming service offering bathing, coat trimming, nail care, and recurring appointments', semanticRole: 'confirmed_fact' },
+  primaryCustomer: { value: 'Denver dog owners who value convenient, low-stress grooming', semanticRole: 'confirmed_fact' },
+  customerMotivation: { value: 'Generate qualified leads', semanticRole: 'confirmed_fact' },
+  marketingFocus: { value: 'Validate supplied topics: mobile dog grooming; preparing a dog for grooming; recurring grooming schedules', semanticRole: 'strategic_recommendation' },
+  confirmedPrimaryCta: { value: 'Schedule a mobile grooming appointment', semanticRole: 'confirmed_fact' }
+};
+const petContext = buildProductionContext({
+  productionRun: { objective: 'improve_search_rankings', strategySnapshot: petStrategySnapshot },
+  job: { deliverable_id: handler.id, title: handler.title, strategic_direction: 'Create grounded pet-care education.', strategySnapshot: petStrategySnapshot },
+  dependencyOutputs: []
+});
+assert.strictEqual(petContext.compositionBrief.domainId, 'pet_care_services');
+assert(petContext.compositionBrief.domainVocabulary.includes('pet temperament'));
+assert(petContext.compositionBrief.decisionDimensions.some(item => /coat, skin, age/i.test(item)));
+const petFallback = handler.generateOutput(petContext);
+assert.match(petFallback.introduction, /coat, skin, age/i);
+assert.match(petFallback.introduction, /temperament, handling needs/i);
+assert.doesNotMatch(petFallback.introduction, /warranty responsibilities|construction materials/i);
+assert.strictEqual(evaluateCompositionFit(petFallback, petContext.compositionBrief).valid, true);
+assert.deepStrictEqual(validateCustomerReadyOutput(petFallback, handler, petContext), { valid: true, code: null });
+const mismatchedPetOutput = {
+  ...petFallback,
+  introduction: petFallback.introduction
+    .replace(/the pet’s coat, skin, age, and current condition/gi, 'the property condition')
+    .replace(/temperament, handling needs, and the working environment/gi, 'construction materials')
+};
+assert.strictEqual(validateCustomerReadyOutput(mismatchedPetOutput, handler, petContext).code, 'PRODUCTION_QUALITY_DOMAIN_FIT');
 
 console.log('Story 3.230 Organic Composition Layer tests passed');

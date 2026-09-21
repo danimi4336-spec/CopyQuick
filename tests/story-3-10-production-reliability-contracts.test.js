@@ -213,6 +213,22 @@ async function run() {
   }, /ownership was lost/);
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM generations WHERE production_job_id = ?').get(staleClaim.id).count, 0);
 
+  const fallbackUser = createUser(db);
+  const fallbackRunId = createRun(db, fallbackUser, [{ id: 'customer_profile' }]);
+  const fallbackClaim = claimNextRunnableJob(db, fallbackUser, fallbackRunId, { claimToken: 'fallback-token' });
+  const fallbackRun = db.prepare('SELECT * FROM production_runs WHERE id = ?').get(fallbackRunId);
+  const fallbackPayload = {
+    ...generatedPayload(fallbackClaim, getProductionContract('customer_profile')),
+    fallbackUsed: true,
+    fallbackReasonCode: 'AI_PROVIDER_TIMEOUT',
+    fallbackReasonMessage: 'The AI provider timed out.'
+  };
+  persistCompletedJob(db, fallbackRun, fallbackClaim, fallbackPayload);
+  const persistedFallback = db.prepare('SELECT status, last_error_code, error_message FROM production_jobs WHERE id = ?').get(fallbackClaim.id);
+  assert.deepStrictEqual(persistedFallback, {
+    status: 'completed', last_error_code: 'AI_PROVIDER_TIMEOUT', error_message: 'The AI provider timed out.'
+  });
+
   const foundationUser = createUser(db);
   const foundationRun = createRun(db, foundationUser, [
     { id: 'customer_profile' },

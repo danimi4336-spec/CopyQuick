@@ -79,7 +79,7 @@ const context = {
     generatorApi: organicProvider, providerRuntime: { run: ({ invoke, signal }) => invoke({ signal }) }
   });
   assert.strictEqual(organicCalls, 2);
-  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v15');
+  assert.strictEqual(organicResult.contractVersion, 'organic_content_campaign:v16');
 
   let reconciliationCalls = 0;
   const reconciledResult = await generateDeliverable({
@@ -173,6 +173,8 @@ const context = {
   assert.strictEqual(fallbackCalls, 2, 'the provider receives one bounded revision before fallback');
   assert.strictEqual(fallbackResult.provider, 'hybrid');
   assert.match(fallbackResult.aiModel, /persistently-short-model\+.*deterministic/i);
+  assert.strictEqual(fallbackResult.fallbackUsed, true);
+  assert.strictEqual(fallbackResult.fallbackReasonCode, 'CONTRACT_VALIDATION_ORGANIC_LENGTH');
   assert.strictEqual(organicHandler.validateOutput(fallbackResult.structuredOutput, organicContext), true);
 
   let providerFailureCalls = 0;
@@ -193,6 +195,8 @@ const context = {
   assert.strictEqual(providerFailureCalls, 1, 'provider failures fall back immediately instead of spending another long attempt');
   assert.strictEqual(providerFailureResult.provider, 'hybrid');
   assert.match(providerFailureResult.aiModel, /unavailable-model\+.*deterministic/i);
+  assert.strictEqual(providerFailureResult.fallbackUsed, true);
+  assert.strictEqual(providerFailureResult.fallbackReasonCode, 'AI_PROVIDER_TIMEOUT');
   assert.strictEqual(organicHandler.validateOutput(providerFailureResult.structuredOutput, organicContext), true);
 
   const invalidCases = [

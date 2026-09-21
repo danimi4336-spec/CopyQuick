@@ -42,6 +42,14 @@
                             <% } %>
                         </div>
                     <% } %>
+                    <% if (productionDeliverable && productionDeliverable.source.mode === 'recovered_fallback') { %>
+                        <div class="alert alert-info production-purpose-notice" role="status">
+                            <strong>Recovered fallback:</strong> The OpenAI response was not accepted, so CopyQuick produced a validated deterministic version instead.
+                            <% if (productionDeliverable.fallbackRecovery && productionDeliverable.fallbackRecovery.code) { %>
+                                <br><span>Reason: <%= productionDeliverable.fallbackRecovery.code %></span>
+                            <% } %>
+                        </div>
+                    <% } %>
                     <% if (productionDeliverable && productionDeliverable.sections.length) { %>
                         <% productionDeliverable.sections.filter(function(section) { return !section.internal; }).forEach(function(section, i) { %>
                             <section class="production-deliverable-section public-deliverable-section">
@@ -82,7 +90,7 @@
             <!-- Actions -->
             <div class="detail-actions-card">
                 <% if (!productionDeliverable) { %><button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button><% } %>
-                <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { %><button class="btn btn-primary" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" onclick="regenerateProductionWithAi()"><%= productionDeliverable.artifactRole === 'planning_foundation' ? '✨ Regenerate Planning Foundation' : '✨ Create Improved AI Version' %></button><% } %>
+                <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { var productionActionLabel = productionDeliverable.artifactRole === 'planning_foundation' ? '✨ Regenerate Planning Foundation' : productionDeliverable.source.mode === 'recovered_fallback' ? '✨ Retry AI Generation' : '✨ Create Improved AI Version'; %><button class="btn btn-primary" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" data-default-label="<%= productionActionLabel %>" onclick="regenerateProductionWithAi()"><%= productionActionLabel %></button><% } %>
                 <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>" class="btn btn-primary">← Back to Production Plan</a><% } %>
                 <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
                 <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
@@ -188,7 +196,7 @@ function regenerateProductionWithAi() {
         location.reload();
     }).catch(function(error) {
         showToast(error.message);
-        if (button) { button.disabled = false; button.textContent = planningDeliverable ? '✨ Regenerate Planning Foundation' : '✨ Create Improved AI Version'; }
+        if (button) { button.disabled = false; button.textContent = button.dataset.defaultLabel; }
     });
 }
 

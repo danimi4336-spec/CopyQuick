@@ -594,7 +594,8 @@ router.get('/generation/:id', requireAuth, (req, res) => {
   if (gen.generation_type === 'production' && gen.production_job_id) {
     const production = db.prepare(`
       SELECT production_runs.id AS run_id, production_jobs.title AS job_title,
-             production_jobs.production_run_id, usage_events.metadata AS usage_metadata
+             production_jobs.production_run_id, production_jobs.last_error_code,
+             production_jobs.error_message, usage_events.metadata AS usage_metadata
       FROM production_jobs JOIN production_runs ON production_runs.id = production_jobs.production_run_id
       LEFT JOIN usage_events ON usage_events.id = production_runs.usage_event_id
       WHERE production_jobs.id = ? AND production_jobs.generation_id = ? AND production_runs.user_id = ?
@@ -633,6 +634,10 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       title: production?.job_title || gen.title,
       customerReady: quality.valid,
       source: storedProductionSource(gen.ai_model),
+      fallbackRecovery: production?.last_error_code ? {
+        code: production.last_error_code,
+        message: production.error_message || 'The AI response did not pass production validation.'
+      } : null,
       generationMethod: 'Structured Production Engine',
       canRegenerateWithAi: providerStatus.live,
       providerStatus,
@@ -760,8 +765,16 @@ router.post('/generation/:id/regenerate-production', requireAuth, requireGenerat
           error.code = 'GENERATION_NOT_FOUND';
           throw error;
         }
-        txDb.prepare('UPDATE production_jobs SET contract_version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-          .run(generated.contractVersion, job.id);
+        txDb.prepare(`
+          UPDATE production_jobs
+          SET contract_version = ?, last_error_code = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(
+          generated.contractVersion,
+          generated.fallbackUsed ? generated.fallbackReasonCode : null,
+          generated.fallbackUsed ? generated.fallbackReasonMessage : null,
+          job.id
+        );
         return genId;
       },
       finalizeGeneration: (txDb, resource) => {

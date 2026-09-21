@@ -43,6 +43,10 @@ assert.strictEqual(storedProductionSource('CopyQuick Deterministic').live, false
 assert.deepStrictEqual(storedProductionSource('gpt-test'), {
   mode: 'ai', live: true, provider: 'openai', model: 'gpt-test', label: 'OpenAI production AI'
 });
+assert.deepStrictEqual(storedProductionSource('gpt-test+CopyQuick Deterministic'), {
+  mode: 'recovered_fallback', live: false, provider: 'hybrid',
+  model: 'gpt-test+CopyQuick Deterministic', label: 'Recovered deterministic fallback'
+});
 
 (async function run() {
   let request;
