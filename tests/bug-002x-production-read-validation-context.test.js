@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const { loadProductionValidationContext } = require('../lib/productionValidationContext');
 
 const job = {
@@ -73,5 +75,9 @@ assert.strictEqual(context.deliverableId, 'organic_content_campaign');
 assert.strictEqual(context.dependencyOutputs.length, 1);
 assert.ok(context.compositionBrief, 'organic read validation must reconstruct the intermediate composition brief');
 assert.strictEqual(loadProductionValidationContext(db, { userId: 7, generation: { id: 133 } }), null);
+
+const generationView = fs.readFileSync(path.join(__dirname, '..', 'views', 'generation.ejs'), 'utf8');
+assert.match(generationView, /source\.mode === 'ai' \? '✨ Regenerate AI Version'/,
+  'an existing OpenAI result must offer regeneration rather than claiming no AI version exists');
 
 console.log('production read validation context regression test passed');
