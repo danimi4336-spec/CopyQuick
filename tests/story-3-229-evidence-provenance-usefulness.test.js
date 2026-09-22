@@ -101,10 +101,14 @@ assert.strictEqual(repairedOperationalClaim, 'That sequence provides a checkpoin
 assert.strictEqual(containsUnsupportedClaim(repairedOperationalClaim, { productComposition: false }), false);
 assert.strictEqual(cleanEditorialText('Consider whether This step is about scope. Consider whether choose a reporting cadence.'),
   'This step is about scope. Choose a reporting cadence.');
+assert.strictEqual(cleanEditorialText('Consider whether The practical question is clear.'),
+  'The practical question is clear.');
 assert.strictEqual(cleanEditorialText('Some restaurants need a full monthly close. Others need account reconciliation.'),
   'Depending on the situation, the work may require a full monthly close. Alternatively, the work may require account reconciliation.');
 assert.strictEqual(cleanEditorialText('Bookkeeping questions rarely begin with one account alone.'),
   'Bookkeeping questions may involve more than one account.');
+assert.strictEqual(cleanEditorialText('A review is usually more manageable because that often determines scope. The most useful question is often simple: what comes next?'),
+  'A review can be more manageable because that can help indicate scope. A useful question is: what comes next?');
 assert(inspectEditorialOutput({ ...valid, distributionPosts: ['Some restaurants often need a cleanup.'] }, handler)
   .some(item => item.rule === 'audience_generalization'));
 const malformedEditorial = {
