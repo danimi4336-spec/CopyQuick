@@ -1,7 +1,7 @@
 const assert = require('assert');
 const { buildProductionContext } = require('../lib/generationService');
 const { getProductionContract } = require('../lib/productionContracts');
-const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const { containsUnsupportedClaim, validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/productionEvidence');
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
 const { isConditionalGuidance, isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
@@ -96,6 +96,9 @@ assert.strictEqual(validateCustomerReadyOutput(usefulAudienceStatement, handler,
 const valid = handler.generateOutput(context);
 assert.strictEqual(cleanEditorialText('Consider whether For owners who need support, bookkeeping works best when records are ready .'),
   'For owners who need support, bookkeeping can work more effectively when records are ready.');
+const repairedOperationalClaim = cleanEditorialText('That sequence helps prevent work from getting repeated or overlooked.');
+assert.strictEqual(repairedOperationalClaim, 'That sequence provides a checkpoint for identifying repeated or overlooked work.');
+assert.strictEqual(containsUnsupportedClaim(repairedOperationalClaim, { productComposition: false }), false);
 const malformedEditorial = {
   ...valid,
   introduction: `${valid.introduction}\n\nConsider whether For owners who need support, bookkeeping works best when records are ready .`
