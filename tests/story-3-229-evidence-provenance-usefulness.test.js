@@ -6,6 +6,7 @@ const { buildEvidenceLedger, renderEvidenceLedger } = require('../lib/production
 const { evaluateSubstantiveUsefulness } = require('../lib/productionUsefulness');
 const { isConditionalGuidance, isGeneralGuidance, reconcileClaimSupport, validateClaimSupport } = require('../lib/productionClaims');
 const { compileOrganicBlocks, qualifyAsGuidance, validateBlock } = require('../lib/productionContentBlocks');
+const { cleanEditorialText, inspectEditorialOutput, repairEditorialOutput } = require('../lib/productionEditorial');
 
 const strategySnapshot = {
   confirmedOffer: { value: 'Monthly bookkeeping and financial reporting', semanticRole: 'confirmed_fact', sourceFields: ['search_site'] },
@@ -93,6 +94,18 @@ assert.strictEqual(validateCustomerReadyOutput(usefulAudienceStatement, handler,
   'evidence-aware contracts reject unsupported additions through the support map rather than phrase-level audience rules');
 
 const valid = handler.generateOutput(context);
+assert.strictEqual(cleanEditorialText('Consider whether For owners who need support, bookkeeping works best when records are ready .'),
+  'For owners who need support, bookkeeping can work more effectively when records are ready.');
+const malformedEditorial = {
+  ...valid,
+  introduction: `${valid.introduction}\n\nConsider whether For owners who need support, bookkeeping works best when records are ready .`
+};
+const editorialFailure = validateCustomerReadyOutput(malformedEditorial, handler, context);
+assert.strictEqual(editorialFailure.code, 'PRODUCTION_QUALITY_EDITORIAL');
+assert(editorialFailure.details.editorialIssues.some(item => item.rule === 'malformed_transition'));
+const editorialRepair = repairEditorialOutput(malformedEditorial, handler);
+assert.strictEqual(inspectEditorialOutput(editorialRepair, handler).length, 0);
+assert.match(editorialRepair.introduction, /For owners who need support, bookkeeping can work more effectively when records are ready\./);
 const useful = evaluateSubstantiveUsefulness(valid, handler, context);
 assert.strictEqual(useful.valid, true, JSON.stringify(useful));
 assert(useful.metrics.developedSectionCount >= 5);

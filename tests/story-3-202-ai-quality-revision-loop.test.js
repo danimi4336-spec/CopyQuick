@@ -21,6 +21,7 @@ assert.match(generationRouteSource,
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_UNCONFIRMED_PUBLICATION_STATUS'), /do not call any article, guide, post, page, or content new/i);
 assert.match(revisionQualityGuidance('CONTRACT_VALIDATION_ORGANIC_LENGTH'), /800–1,600 substantive words/);
 assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_INSUFFICIENT_USEFULNESS'), /at least five distinct verbs/i);
+assert.match(revisionQualityGuidance('PRODUCTION_QUALITY_EDITORIAL'), /malformed-transition/i);
 assert.match(revisionFailureDiagnostics({ details: {
   failures: ['cover the industry-specific reader decision dimensions'],
   metrics: { developedSectionCount: 6, coveredTopics: ['scope'] }
@@ -28,6 +29,9 @@ assert.match(revisionFailureDiagnostics({ details: {
 assert.match(revisionFailureDiagnostics({ details: {
   unsupportedClaims: [{ rule: 'unsupported_claim_4', excerpt: 'This approach is guaranteed to deliver results.' }]
 } }), /guaranteed to deliver results/);
+assert.match(revisionFailureDiagnostics({ details: {
+  editorialIssues: [{ field: 'introduction', rule: 'malformed_transition', excerpt: 'Consider whether For owners who need support' }]
+} }), /malformed_transition/);
 
 const handler = getProductionContract('customer_profile');
 const strategySnapshot = {
