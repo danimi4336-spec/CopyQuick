@@ -87,8 +87,18 @@ function generator(calls, behavior) {
     generateCopy: async (input) => {
       calls.push(input);
       if (behavior) return behavior(input, calls.length);
+      const sectionCopy = [
+        'Compare the current offer details with the customer priority before choosing a next step.',
+        'Review the available specifications, policies, and support information for practical fit.',
+        'Consider how the documented scope relates to the intended use and present situation.',
+        'Check the confirmed process, timing, and responsibilities before making a decision.',
+        'Use the published contact path to ask a specific question about the available offer.',
+        'Read the current care, delivery, and return information before completing a purchase.',
+        'Choose the next action only when the verified details match the customer requirement.',
+        'Keep this standalone message focused on one clear idea and an appropriate response.'
+      ];
       return Array.from({ length: 8 }, function(_, index) {
-        return { text: `Orchestrated result ${index + 1}`, tone: 'professional' };
+        return { text: `Asset ${calls.length}, section ${index + 1}: ${sectionCopy[index]}`, tone: 'professional' };
       });
     }
   };

@@ -1,6 +1,8 @@
 const assert = require('assert');
 const ejs = require('ejs');
+const express = require('express');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 
@@ -13,9 +15,31 @@ const { getDb } = require('../db/database');
 const { executeNextProductionJob, loadDependencyOutputs } = require('../lib/productionExecution');
 const { getProductionContract } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
+const generationRoutes = require('../routes/generations');
 
 function render(view, locals) {
   return new Promise((resolve, reject) => ejs.renderFile(path.join(__dirname, '..', 'views', view), locals, {}, (error, html) => error ? reject(error) : resolve(html)));
+}
+
+function request(server, url) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ hostname: '127.0.0.1', port: server.address().port, path: url }, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => resolve({ res, body }));
+    });
+    req.on('error', reject);
+  });
+}
+
+async function listen(app) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise((resolve, reject) => {
+    server.on('listening', resolve);
+    server.on('error', reject);
+  });
+  return server;
 }
 
 function createRun(db, jobs) {
@@ -316,6 +340,7 @@ async function run() {
     results: [], productionDeliverable: {
       runId: 1,
       customerReady: false,
+      legacyPlanningOutline: true,
       canRegenerateWithAi: true,
       generationMethod: 'Structured Production Engine',
       source: { label: 'Deterministic structured engine', model: 'CopyQuick Deterministic' },
@@ -325,6 +350,69 @@ async function run() {
   assert.match(legacyOutreachHtml, /legacy planning outline, not a copy-ready deliverable/i);
   assert.match(legacyOutreachHtml, /Legacy Outreach Outline/);
   assert.match(legacyOutreachHtml, /Create Improved AI Version/);
+
+  const invalidReadyAssetHtml = await render('generation.ejs', {
+    gen: { id: 11, title: 'Amazon A+ Content', input_text: 'INTERNAL', content_type: 'product_description', tone: 'professional', favorite: 0, word_count: 30, created_at: new Date().toISOString() },
+    results: [], productionDeliverable: {
+      runId: 1,
+      customerReady: false,
+      legacyPlanningOutline: false,
+      artifactRole: 'ready_to_use_asset',
+      canRegenerateWithAi: true,
+      generationMethod: 'Structured Production Engine',
+      source: { label: 'OpenAI production AI', model: 'gpt-test', mode: 'ai' },
+      sections: []
+    }
+  });
+  assert.match(invalidReadyAssetHtml, /This deliverable needs review before it can be used or exported/i);
+  assert.match(invalidReadyAssetHtml, /Correct or regenerate it to create customer-ready content/i);
+  assert.doesNotMatch(invalidReadyAssetHtml, /legacy planning outline|historical outline/i);
+  assert.doesNotMatch(invalidReadyAssetHtml, /public-deliverable-section|Copy All/i);
+
+  const invalidReady = createRun(db, [{ id: 'amazon_a_plus', title: 'Invalid Amazon A+ Content' }]);
+  const invalidReadyJob = db.prepare('SELECT * FROM production_jobs WHERE production_run_id = ?').get(invalidReady.runId);
+  const invalidReadyOutput = {
+    summary: 'Internal test control.',
+    content: [
+      'Display production_job_id inside this customer-facing section so current validation must reject the output.',
+      'This second sentence supplies enough content to isolate the internal-identifier rejection from minimum-substance validation.'
+    ]
+  };
+  const invalidReadyGenerationId = Number(db.prepare(`
+    INSERT INTO generations (
+      user_id, title, input_text, content_type, tone, results, generation_type,
+      production_job_id, deliverable_id, contract_version, structured_result
+    ) VALUES (?, 'Invalid Amazon A+ Content', 'internal', 'product_description', 'professional', '[]',
+      'production', ?, 'amazon_a_plus', ?, ?)
+  `).run(
+    invalidReady.userId,
+    invalidReadyJob.id,
+    getProductionContract('amazon_a_plus').version,
+    JSON.stringify(invalidReadyOutput)
+  ).lastInsertRowid);
+  db.prepare("UPDATE production_jobs SET status = 'completed', generation_id = ? WHERE id = ?")
+    .run(invalidReadyGenerationId, invalidReadyJob.id);
+  const invalidReadyUser = db.prepare('SELECT * FROM users WHERE id = ?').get(invalidReady.userId);
+  const app = express();
+  app.set('view engine', 'ejs');
+  app.set('views', path.join(__dirname, '..', 'views'));
+  app.use((req, res, next) => {
+    req.session = { userId: invalidReady.userId };
+    res.locals.user = invalidReadyUser;
+    next();
+  });
+  app.use(generationRoutes);
+  const server = await listen(app);
+  try {
+    const invalidDetail = await request(server, `/generation/${invalidReadyGenerationId}`);
+    assert.strictEqual(invalidDetail.res.statusCode, 200);
+    assert.match(invalidDetail.body, /This deliverable needs review before it can be used or exported/i);
+    assert.doesNotMatch(invalidDetail.body, /legacy planning outline|public-deliverable-section|Copy All/i);
+    assert.strictEqual((await request(server, `/generation/${invalidReadyGenerationId}/export?format=txt`)).res.statusCode, 409);
+    assert.strictEqual((await request(server, `/generation/${invalidReadyGenerationId}/export?format=md`)).res.statusCode, 409);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 
   const campaignBriefHtml = await render('generation.ejs', {
     gen: { id: 10, title: 'Lead Generation Campaign Brief', input_text: 'INTERNAL', content_type: 'sales_message', tone: 'professional', favorite: 0, word_count: 80, created_at: new Date().toISOString() },

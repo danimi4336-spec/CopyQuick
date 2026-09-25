@@ -635,6 +635,7 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       runId: production?.run_id || null,
       title: production?.job_title || gen.title,
       customerReady: quality.valid,
+      legacyPlanningOutline: legacySections.length > 0,
       source: storedProductionSource(gen.ai_model),
       fallbackRecovery: production?.last_error_code ? {
         code: production.last_error_code,

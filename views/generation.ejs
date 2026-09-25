@@ -32,7 +32,11 @@
                 <h3><%= productionDeliverable ? 'Production Deliverable' : 'Generated Content' %></h3>
                 <div class="detail-results">
                     <% if (productionDeliverable && !productionDeliverable.customerReady) { %>
-                        <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready deliverable. Create an improved AI version below to replace it with complete content.</div>
+                        <% if (productionDeliverable.legacyPlanningOutline) { %>
+                            <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready deliverable. Create an improved AI version below to replace it with complete content.</div>
+                        <% } else { %>
+                            <div class="alert alert-info" role="status">This deliverable needs review before it can be used or exported. Correct or regenerate it to create customer-ready content.</div>
+                        <% } %>
                     <% } %>
                     <% if (productionDeliverable && productionDeliverable.purposeNotice) { %>
                         <div class="alert alert-info production-purpose-notice" role="status">
