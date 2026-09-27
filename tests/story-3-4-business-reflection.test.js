@@ -238,8 +238,8 @@ async function run() {
     assert.strictEqual(madeUncertain.res.statusCode, 303);
 
     const unresolvedPage = await request(authenticated, 'GET', '/discovery/reflection');
-    assert.match(unresolvedPage.body, /I&#39;m not sure yet/);
-    assert.match(unresolvedPage.body, /remains unresolved and can be refined later/);
+    assert.match(unresolvedPage.body, /Not established yet/);
+    assert.match(unresolvedPage.body, /Needed before execution/);
     assert.match(unresolvedPage.body, /important decision is still open/);
     assert.match(unresolvedPage.body, /disabled aria-disabled="true"/);
     const unresolvedToken = unresolvedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];

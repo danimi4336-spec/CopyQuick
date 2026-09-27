@@ -68,11 +68,19 @@
             </section>
         <% } %>
 
+        <% if (reflection.diagnosableUnknowns.length) { %>
+            <section class="reflection-improvements" aria-labelledby="reflection-diagnostic-title">
+                <h2 id="reflection-diagnostic-title">What CopyQuick will help determine</h2>
+                <p>These details are not established yet. Planning can continue by turning them into diagnostic checks rather than guessing.</p>
+                <ul><% reflection.diagnosableUnknowns.forEach(function(item) { %><li><%= item.domain %></li><% }); %></ul>
+            </section>
+        <% } %>
+
         <section class="reflection-readiness <%= planningReadiness.ready ? 'ready' : 'blocked' %>">
             <% if (planningReadiness.ready) { %>
                 <div>
                     <h2>We know enough to build a useful strategy.</h2>
-                    <p><%= objective === 'get_more_customers' ? 'The essential customer-acquisition decisions are established. Any future unknowns will remain clearly marked rather than guessed.' : 'The essential product decisions are established. Optional unknowns will remain clearly marked rather than guessed.' %></p>
+                    <p><%= reflection.diagnosableUnknowns.length ? 'Planning can continue. CopyQuick will turn unresolved diagnostic questions into work to investigate rather than inventing answers.' : (objective === 'get_more_customers' ? 'The essential customer-acquisition decisions are established. Any future unknowns will remain clearly marked rather than guessed.' : 'The essential product decisions are established. Optional unknowns will remain clearly marked rather than guessed.') %></p>
                 </div>
             <% } else { %>
                 <div>
