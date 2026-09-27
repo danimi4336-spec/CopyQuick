@@ -12,7 +12,7 @@ const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
 const { getSavedPlan, saveBuildPlan } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
-const { backfillLegacyBrandBrain, explicitCurrentInput, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory } = require('../lib/businessMemory');
+const { backfillLegacyBrandBrain, explicitCurrentInput, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
 const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
 const {
   buildApprovalView,
@@ -147,7 +147,7 @@ function applyDurableMemory(req, objective, initialDescription, understandingRes
   const explicit = explicitCurrentInput(objective, initialDescription);
   Object.assign(understandingResult.understanding, explicit);
   understandingResult.unknowns = (understandingResult.unknowns || []).filter(key => !explicit[key]);
-  const remembered = memoryUnderstanding(db, { userId, objective, initialDescription });
+  const remembered = memoryUnderstanding(db, { userId, objective, initialDescription, subjectId: discoverySession?.memorySubjectIds?.offer });
   const merged = mergeCurrentWithMemory(understandingResult.understanding, remembered);
   understandingResult.understanding = merged.understanding;
   understandingResult.unknowns = (understandingResult.unknowns || []).filter(field => {
@@ -160,6 +160,29 @@ function applyDurableMemory(req, objective, initialDescription, understandingRes
     discoverySession.memoryConflicts = merged.conflicts.filter(item => !resolved.has(String(item.recordId)));
   }
   return merged;
+}
+
+async function initializeDiscovery(req, objective, answer, subjectResolution) {
+  const understandingResult = await understandBusiness({ objective, answer });
+  const memorySubjectIds = { business: subjectResolution.business?.id || null, offer: subjectResolution.offer?.id || null };
+  const memoryContext = subjectResolution.offer ? {
+    offerLabel: subjectResolution.offer.displayLabel || subjectResolution.offer.label,
+    selection: subjectResolution.selection
+  } : null;
+  const shell = { objective, memorySubjectIds };
+  const memoryMerge = applyDurableMemory(req, objective, answer, understandingResult, shell);
+  const answers = { initial_description: answer };
+  const intelligenceResult = analyzeDiscovery({ objective, understanding: understandingResult.understanding, unknowns: understandingResult.unknowns, answers });
+  const now = new Date().toISOString();
+  req.session.discoverySession = {
+    objective, answers, understanding: understandingResult.understanding, unknowns: understandingResult.unknowns,
+    interpretation: understandingResult.interpretation, memorySources: memoryMerge.sources, memoryConflicts: memoryMerge.conflicts,
+    memorySubjectIds, memoryContext, completedQuestions: ['initial_description'], completion: intelligenceResult.completion,
+    knowledgeDomains: intelligenceResult.knowledgeDomains, nextQuestion: intelligenceResult.nextQuestion,
+    reasoning: intelligenceResult.reasoning, remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
+    planningReadiness: intelligenceResult.planningReadiness, discoveryCompleteForNow: intelligenceResult.discoveryCompleteForNow,
+    discoveryPolicyVersion: DISCOVERY_POLICY_VERSION, stepHistory: [], startedAt: req.session.discoverySession?.startedAt || now, updatedAt: now
+  };
 }
 
 function canViewReflection(discoverySession) {
@@ -285,6 +308,18 @@ router.get('/discovery', requireAuth, (req, res) => {
 router.post('/discovery', requireAuth, async (req, res) => {
   const questionId = typeof req.body.questionId === 'string' ? req.body.questionId : 'initial_description';
 
+  if (questionId === 'offer_subject_selection') {
+    const pending = req.session.discoverySession;
+    if (!pending?.offerSelectionPending || !pending.pendingInitialDescription) return res.redirect(303, '/discovery');
+    const db = req.app.locals.copyquickDb || getDb();
+    const userId = req.session.userId || req.session.passport?.user;
+    const choice = String(req.body.offerSubjectId || '');
+    const resolution = resolveObjectiveSubjects(db, { userId, initialDescription: pending.pendingInitialDescription, selectedOfferId: choice === 'new' ? null : choice, newOffer: choice === 'new' });
+    if (resolution.invalid || (!resolution.offer && choice !== 'new')) return validationError(req, res, 'Choose a remembered offer or a different/new offer.');
+    await initializeDiscovery(req, pending.objective, pending.pendingInitialDescription, resolution);
+    return res.redirect(303, '/discovery');
+  }
+
   if (questionId === 'initial_description') {
     const answer = typeof req.body.whatBuilding === 'string' ? req.body.whatBuilding.trim() : '';
     if (!answer) {
@@ -296,39 +331,15 @@ router.post('/discovery', requireAuth, async (req, res) => {
 
     const now = new Date().toISOString();
     const objective = activeObjective(req);
-    const understandingResult = await understandBusiness({ objective, answer });
     const db = req.app.locals.copyquickDb || getDb();
     const userId = req.session.userId || req.session.passport?.user;
     backfillLegacyBrandBrain(db, { userId });
-    const memoryMerge = applyDurableMemory(req, objective, answer, understandingResult);
-    const answers = { initial_description: answer };
-    const intelligenceResult = analyzeDiscovery({
-      objective,
-      understanding: understandingResult.understanding,
-      unknowns: understandingResult.unknowns,
-      answers
-    });
-    req.session.discoverySession = {
-      objective,
-      answers,
-      understanding: understandingResult.understanding,
-      unknowns: understandingResult.unknowns,
-      interpretation: understandingResult.interpretation,
-      memorySources: memoryMerge.sources,
-      memoryConflicts: memoryMerge.conflicts,
-      completedQuestions: ['initial_description'],
-      completion: intelligenceResult.completion,
-      knowledgeDomains: intelligenceResult.knowledgeDomains,
-      nextQuestion: intelligenceResult.nextQuestion,
-      reasoning: intelligenceResult.reasoning,
-      remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
-      planningReadiness: intelligenceResult.planningReadiness,
-      discoveryCompleteForNow: intelligenceResult.discoveryCompleteForNow,
-      discoveryPolicyVersion: DISCOVERY_POLICY_VERSION,
-      stepHistory: [],
-      startedAt: req.session.discoverySession?.startedAt || now,
-      updatedAt: now
-    };
+    const resolution = resolveObjectiveSubjects(db, { userId, initialDescription: answer });
+    if (resolution.requiresSelection) {
+      req.session.discoverySession = { objective, offerSelectionPending: true, pendingInitialDescription: answer, rememberedOffers: resolution.offers, startedAt: req.session.discoverySession?.startedAt || now };
+      return res.redirect(303, '/discovery');
+    }
+    await initializeDiscovery(req, objective, answer, resolution);
     return res.redirect(303, '/discovery');
   }
 
@@ -773,7 +784,9 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
     objective: discoverySession.objective,
     understanding: discoverySession.confirmedUnderstanding || discoverySession.understanding,
     answers: discoverySession.answers,
-    referenceId: result.productionSet.planFingerprint
+    referenceId: result.productionSet.planFingerprint,
+    subjectIds: discoverySession.memorySubjectIds || {},
+    correctionFields: Object.keys(discoverySession.answers?.reflection_edits || {})
   });
   discoverySession.memorySubjectIds = {
     business: promotion.subjects.business?.id || null,

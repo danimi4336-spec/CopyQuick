@@ -66,14 +66,15 @@
             <p>Your current description differs from something CopyQuick remembered. The current objective uses what you just said; choose whether memory should change.</p>
             <% reflection.memoryConflicts.forEach(function(conflict) { %>
               <div class="reflection-field">
-                <strong><%= conflict.field.replace(/([A-Z])/g, ' $1') %></strong>
+                <strong><%= conflict.displayLabel %></strong>
                 <p>Remembered: <%= conflict.rememberedValue %><br>Current objective: <%= conflict.currentValue %></p>
                 <form action="/discovery/reflection/memory/<%= conflict.recordId %>" method="POST">
                   <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                  <button class="btn btn-outline" name="action" value="replace" type="submit">Use current going forward</button>
-                  <button class="btn btn-outline" name="action" value="add" type="submit">Both are current</button>
-                  <button class="btn btn-outline" name="action" value="keep" type="submit">Keep remembered value</button>
-                  <button class="btn btn-outline" name="action" value="objective_only" type="submit">Current objective only</button>
+                  <button class="btn btn-outline" aria-label="Use current <%= conflict.displayLabel.toLowerCase() %> going forward" name="action" value="replace" type="submit">Use current going forward</button>
+                  <button class="btn btn-outline" aria-label="Keep both values for <%= conflict.displayLabel.toLowerCase() %>" name="action" value="add" type="submit">Both are current</button>
+                  <button class="btn btn-outline" aria-label="Keep remembered <%= conflict.displayLabel.toLowerCase() %>" name="action" value="keep" type="submit">Keep remembered value</button>
+                  <button class="btn btn-outline" aria-label="Use current <%= conflict.displayLabel.toLowerCase() %> for this objective only" name="action" value="objective_only" type="submit">Current objective only</button>
+                  <small class="text-secondary">Current objective only uses this value here without changing what CopyQuick remembers.</small>
                 </form>
               </div>
             <% }); %>

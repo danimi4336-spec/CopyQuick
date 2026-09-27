@@ -5,7 +5,22 @@
                 <span>Understanding your business...</span>
             </div>
 
-            <% if (editingInitialDescription || !discoverySession || !Array.isArray(discoverySession.completedQuestions) || !discoverySession.completedQuestions.includes('initial_description')) { %>
+            <% if (discoverySession && discoverySession.offerSelectionPending) { %>
+                <header class="discovery-header">
+                    <h1 id="discovery-title">Which offer is this objective about?</h1>
+                    <p>Choose what you want to work on so CopyQuick can reuse the right business context.</p>
+                </header>
+                <% if (error) { %><div class="alert alert-error discovery-error" role="alert"><%= error %></div><% } %>
+                <form action="/discovery" method="POST" class="discovery-form">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="questionId" value="offer_subject_selection">
+                    <fieldset class="discovery-question-fieldset"><legend>Remembered offers</legend><div class="discovery-choice-grid">
+                    <% discoverySession.rememberedOffers.forEach(function(offer) { %><label class="discovery-choice"><input type="radio" name="offerSubjectId" value="<%= offer.id %>" required><span><%= offer.displayLabel %></span></label><% }); %>
+                    <label class="discovery-choice"><input type="radio" name="offerSubjectId" value="new" required><span>A different or new offer</span></label>
+                    </div></fieldset>
+                    <div class="discovery-actions"><a href="/welcome" class="btn btn-outline btn-lg">← Back</a><button type="submit" class="btn btn-primary btn-lg">Continue <span aria-hidden="true">→</span></button></div>
+                </form>
+            <% } else if (editingInitialDescription || !discoverySession || !Array.isArray(discoverySession.completedQuestions) || !discoverySession.completedQuestions.includes('initial_description')) { %>
                 <header class="discovery-header">
                     <h1 id="discovery-title">Let's Build Something Amazing</h1>
                     <p>We'll begin with what you know today, then adapt the conversation as we learn about your business. You can keep your answer simple—we'll help bring the important details into focus.</p>
@@ -40,6 +55,7 @@
                     <h1 id="discovery-title">Here’s what I understand so far</h1>
                     <p class="discovery-original-answer">“<%= discoverySession.answers.initial_description %>”</p>
                 </header>
+                <% if (discoverySession.memoryContext) { %><div class="alert alert-info" role="status">Using what CopyQuick remembers about <strong><%= discoverySession.memoryContext.offerLabel %></strong>. You do not need to explain it again.</div><% } %>
 
                 <% if (understandingSummary.length) { %>
                     <ul class="discovery-understanding-list" aria-label="Business understanding">
