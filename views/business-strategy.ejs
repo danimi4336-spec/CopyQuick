@@ -10,15 +10,16 @@
         <% if (error) { %><div class="alert alert-error strategy-alert" role="alert"><%= error %></div><% } %>
 
         <% const sections = [
+            ...(strategyResult.strategy.businessObjective ? [['businessObjective', objective === 'improve_search_rankings' ? 'Business & Search Objective' : 'Business Objective']] : []),
             ['marketPosition', 'Market Position'],
             ['primaryCustomer', 'Primary Customer'],
             ['customerMotivation', 'Customer Motivation'],
             ['competitiveApproach', 'Competitive Approach'],
             ['pricingPosition', 'Pricing Position'],
-            ['primarySalesChannel', 'Primary Sales Channel'],
+            ['primarySalesChannel', objective === 'get_more_customers' ? 'Current Acquisition Source' : objective === 'increase_conversion_rates' ? 'Current Traffic Source' : objective === 'improve_search_rankings' ? 'Search Channel Context' : 'Primary Sales Channel'],
             ['communicationStyle', 'Communication Style'],
             ['marketingFocus', 'Marketing Focus'],
-            ['launchApproach', objective === 'get_more_customers' ? 'Acquisition Approach' : 'Launch Strategy'],
+            ['launchApproach', objective === 'get_more_customers' ? 'Recommended Acquisition Direction' : objective === 'increase_conversion_rates' ? 'Conversion Testing Approach' : objective === 'improve_search_rankings' ? 'Search Execution Approach' : 'Launch Strategy'],
             ['risks', 'Strategic Risks']
         ]; %>
         <div class="strategy-grid">

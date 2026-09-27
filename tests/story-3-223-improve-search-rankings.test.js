@@ -36,6 +36,7 @@ function fact(value, label = value) {
   const strategy = runtime.strategy.build({ understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategy.status, /Search Evidence Required/);
   assert.strictEqual(strategy.strategy.primaryCustomer.semanticRole, 'confirmed_fact');
+  assert.strictEqual(strategy.strategy.customerMotivation.value, 'Unknown');
   assert.match(JSON.stringify(strategy), /No keyword volume, ranking, traffic, backlink, competitor, crawl, or SERP metric is assumed/);
   assert.doesNotMatch(JSON.stringify(strategy), /search volume:\s*\d|ranking:\s*\d|domain authority:\s*\d|backlinks?:\s*\d/i);
 
@@ -44,9 +45,7 @@ function fact(value, label = value) {
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Establish Search Evidence', 'Build Search Content', 'Measure & Improve']);
   const items = plan.phases.flatMap(phase => phase.deliverables);
   assert.deepStrictEqual(items.map(item => item.id), [
-    'acquisition_snapshot', 'acquisition_channel_strategy', 'campaign_brief',
-    'conversion_path_brief', 'organic_content_campaign', 'acquisition_measurement_plan',
-    'acquisition_experiment_backlog'
+    'search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'search_measurement_plan'
   ]);
 
   const completed = new Map();
@@ -66,7 +65,7 @@ function fact(value, label = value) {
     assert.doesNotMatch(visible, /search volume:\s*\d|monthly searches|domain authority:\s*\d|backlinks?:\s*\d|currently ranks? #?\d/i);
     completed.set(item.id, generated.structuredOutput);
   }
-  const content = completed.get('organic_content_campaign');
-  assert(content.pillarTitle && content.outline.length && content.introduction && content.callToAction);
+  assert.strictEqual(completed.has('organic_content_campaign'), false,
+    'search execution is suppressed until a search-specific content contract can consume typed prerequisites');
   console.log('Story 3.223 Improve Search Rankings tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -49,7 +49,8 @@ function fact(value, label = value) {
   const strategy = runtime.strategy.build({ understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategy.status, /Conversion Hypotheses/);
   assert.strictEqual(strategy.strategy.primaryCustomer.semanticRole, 'confirmed_fact');
-  assert.match(strategy.strategy.marketingFocus.value, /experiments/i);
+  assert.match(strategy.strategy.marketingFocus.value, /path/i);
+  assert.strictEqual(strategy.strategy.customerMotivation.value, 'Unknown');
   assert.doesNotMatch(JSON.stringify(strategy), /conversion rate (?:is|of) \d|statistically significant/i);
 
   const plan = runtime.buildPlan({ confirmedUnderstanding: understanding, strategyResult: strategy, answers });
@@ -57,9 +58,7 @@ function fact(value, label = value) {
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Diagnose Conversion', 'Improve Offer & Page', 'Test & Measure']);
   const items = plan.phases.flatMap(phase => phase.deliverables);
   assert.deepStrictEqual(items.map(item => item.id), [
-    'acquisition_snapshot', 'acquisition_channel_strategy', 'campaign_brief',
-    'conversion_path_brief', 'lead_capture_page', 'acquisition_measurement_plan',
-    'acquisition_experiment_backlog'
+    'conversion_diagnostic_brief', 'conversion_page_brief', 'conversion_measurement_plan'
   ]);
 
   const approval = createApprovedProductionSet({
@@ -109,9 +108,8 @@ function fact(value, label = value) {
     assert.doesNotMatch(visible, /conversion rate (?:is|of) \d|\d+% conversion/i);
     completed.set(item.id, generated.structuredOutput);
   }
-  const landing = completed.get('lead_capture_page');
-  assert(landing.headline && landing.primaryCallToAction && landing.faq.length);
-  assert.strictEqual(landing.primaryCallToAction, 'Start free trial');
+  assert.strictEqual(completed.has('lead_capture_page'), false,
+    'a lead-capture asset must not be selected for a purchase-conversion problem by generic fallback');
   const landingContract = runtime.production.contract('lead_capture_page');
   const landingPrompt = landingContract.buildPrompt({
     objective, title: 'Lead Capture Page', strategicDirection: 'Improve the page',
@@ -122,11 +120,6 @@ function fact(value, label = value) {
   assert.match(landingPrompt, /public landing-page copy/i);
   assert.match(landingPrompt, /Proof Section must be finished visitor-facing reassurance/i);
   assert.match(landingPrompt, /FAQ item must answer a genuine prospective-customer question/i);
-  const sections = landingContract.presentationSections(landing);
-  assert.strictEqual(sections.find(section => section.key === 'publishingChecklist').internal, true);
-  assert.strictEqual(sections.find(section => section.key === 'pageGoal').internal, true);
-  assert.strictEqual(sections.find(section => section.key === 'headline').internal, false);
-
   const buildPlanView = fs.readFileSync(path.join(__dirname, '..', 'views', 'build-plan.ejs'), 'utf8');
   assert.match(buildPlanView, /selectedFoundationCount = foundationPlanItems\.filter/);
   assert.match(buildPlanView, /data-plan-count="planningFoundation"><%= selectedFoundationCount %>/);

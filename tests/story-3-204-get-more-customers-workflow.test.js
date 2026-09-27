@@ -29,34 +29,35 @@ const { generateDeliverable } = require('../lib/generationService');
   assert.strictEqual(evaluateRequirements({ objective, understanding, answers }).ready, true);
   const strategyResult = buildStrategy({ objective, understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategyResult.status, /Strategy Ready/);
-  assert.match(strategyResult.strategy.launchApproach.value, /Acquisition path/);
+  assert.match(strategyResult.strategy.launchApproach.value, /Evaluate acquisition channels/);
+  assert.strictEqual(strategyResult.strategy.customerMotivation.value, 'Unknown');
   const plan = buildPlan({ objective, confirmedUnderstanding: understanding, strategyResult, answers });
   assert.strictEqual(plan.readiness.ready, true);
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Diagnose & Focus', 'Build the Acquisition System', 'Measure & Improve']);
   const deliverables = plan.phases.flatMap(phase => phase.deliverables);
   getProductionContractIds().forEach(id => assert(getProductionArtifactPolicy(id), `${id} must have an explicit artifact and billing policy`));
-  assert.strictEqual(deliverables.length, 9);
+  assert.strictEqual(deliverables.length, 6);
   assert.deepStrictEqual(
     deliverables.filter(item => getProductionArtifactPolicy(item.id)?.readyToUse).map(item => item.id),
-    ['referral_campaign_kit', 'outreach_sequence', 'sales_call_script']
+    []
   );
   const defaultSelection = createDefaultSelection(plan);
   const approvalView = buildApprovalView(plan, defaultSelection);
   assert.deepStrictEqual(
     defaultSelection.selectedDeliverableIds.filter(id => getProductionArtifactPolicy(id)?.readyToUse),
-    ['referral_campaign_kit', 'sales_call_script'],
-    'the default referral plan should include two channel-appropriate assets while leaving the general email sequence optional'
+    [],
+    'a current referral source must not silently become the recommended execution channel'
   );
   assert.strictEqual(approvalView.counts.planningFoundation, 5);
-  assert.strictEqual(approvalView.counts.readyToUseAssets, 2);
-  assert.strictEqual(approvalView.counts.productionUnits, 2);
+  assert.strictEqual(approvalView.counts.readyToUseAssets, 0);
+  assert.strictEqual(approvalView.counts.productionUnits, 0);
   deliverables.forEach(item => {
     const contract = getProductionContract(item.id);
     assert(contract, `production contract exists for ${item.id}`);
     assert.deepStrictEqual(contract.requiredDependencies, item.dependencies);
     assert.strictEqual(
       contract.artifactRole,
-      ['referral_campaign_kit', 'outreach_sequence', 'sales_call_script'].includes(item.id) ? 'ready_to_use_asset' : 'planning_foundation',
+      'planning_foundation',
       `${item.id} must have an explicit user-facing artifact role`
     );
   });
@@ -65,9 +66,9 @@ const { generateDeliverable } = require('../lib/generationService');
     usageSnapshot: { used: 0, monthlyLimit: 10, remaining: 10 }
   });
   assert.strictEqual(productionCost.valid, true);
-  assert.strictEqual(productionCost.productionUnitCount, 3, 'each copy-ready acquisition asset consumes one production credit');
+  assert.strictEqual(productionCost.productionUnitCount, 0);
   assert.strictEqual(productionCost.planningFoundationCount, 6);
-  assert.strictEqual(productionCost.readyToUseAssetCount, 3);
+  assert.strictEqual(productionCost.readyToUseAssetCount, 0);
   const freeFoundationCost = calculateProductionCost({
     approvedProductionSet: { selectedDeliverables: deliverables.filter(item => !getProductionArtifactPolicy(item.id)?.readyToUse) },
     usageSnapshot: { used: 10, monthlyLimit: 10, remaining: 0 }
@@ -75,15 +76,7 @@ const { generateDeliverable } = require('../lib/generationService');
   assert.strictEqual(freeFoundationCost.productionUnitCount, 0);
   assert.strictEqual(freeFoundationCost.canAfford, true, 'free planning foundation remains available with no production credits left');
 
-  const expectedAssetsByChannel = {
-    referrals: ['referral_campaign_kit', 'outreach_sequence', 'sales_call_script'],
-    organic_search: ['organic_content_campaign', 'lead_capture_page', 'outreach_sequence', 'sales_call_script'],
-    social: ['social_lead_campaign', 'lead_capture_page', 'outreach_sequence', 'sales_call_script'],
-    paid_ads: ['paid_ad_copy_set', 'lead_capture_page', 'outreach_sequence', 'sales_call_script'],
-    outbound: ['outreach_sequence', 'sales_call_script'],
-    mixed_channels: ['multi_channel_campaign_kit', 'lead_capture_page', 'outreach_sequence', 'sales_call_script'],
-    no_reliable_channel: ['multi_channel_campaign_kit', 'lead_capture_page', 'sales_call_script']
-  };
+  const expectedAssetsByChannel = Object.fromEntries(['referrals','organic_search','social','paid_ads','outbound','mixed_channels','no_reliable_channel'].map(channel => [channel, []]));
   Object.entries(expectedAssetsByChannel).forEach(([channel, expectedIds]) => {
     const channelUnderstanding = {
       ...understanding,
