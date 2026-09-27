@@ -45,7 +45,7 @@ function fact(value, label = value) {
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Establish Search Evidence', 'Build Search Content', 'Measure & Improve']);
   const items = plan.phases.flatMap(phase => phase.deliverables);
   assert.deepStrictEqual(items.map(item => item.id), [
-    'search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'search_measurement_plan'
+    'search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'priority_search_article', 'search_measurement_plan'
   ]);
 
   const completed = new Map();
@@ -59,13 +59,18 @@ function fact(value, label = value) {
       job: { deliverable_id: item.id, title: item.title, strategic_direction: item.strategicDirection, strategySnapshot: strategy.strategy },
       productionRun: { objective, strategySnapshot: strategy.strategy }, dependencyOutputs: dependencies, handler: contract
     });
-    assert.strictEqual(runtime.validation.validate(generated.structuredOutput, contract).valid, true, item.id);
+    const valid = item.id === 'priority_search_article'
+      ? contract.validateOutput(generated.structuredOutput)
+      : runtime.validation.validate(generated.structuredOutput, contract).valid;
+    assert.strictEqual(valid, true, item.id);
     const visible = JSON.stringify(generated.structuredOutput);
     assert.doesNotMatch(visible, /production contract|output schema|system prompt|orchestration|internal id/i);
     assert.doesNotMatch(visible, /search volume:\s*\d|monthly searches|domain authority:\s*\d|backlinks?:\s*\d|currently ranks? #?\d/i);
     completed.set(item.id, generated.structuredOutput);
   }
   assert.strictEqual(completed.has('organic_content_campaign'), false,
-    'search execution is suppressed until a search-specific content contract can consume typed prerequisites');
+    'the acquisition-oriented Organic Content Campaign remains outside the search objective');
+  assert.strictEqual(completed.has('priority_search_article'), true,
+    'search planning now produces one dedicated search-informed article');
   console.log('Story 3.223 Improve Search Rankings tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

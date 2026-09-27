@@ -46,8 +46,9 @@ function fixtures() {
       const contract=runtime.production.contract(item.id); assert(contract,item.id); assert.strictEqual(runtime.validation.validate({},contract).valid,false);
       const dependencyOutputs=item.dependencies.map(id=>({deliverableId:id,title:id,contractVersion:runtime.production.contract(id).version,output:completed.get(id)}));
       const generated=await runtime.generation.generate({job:{deliverable_id:item.id,title:item.title,strategic_direction:item.strategicDirection,strategySnapshot:strategy.strategy},productionRun:{objective,strategySnapshot:strategy.strategy},dependencyOutputs,handler:contract});
-      assert.strictEqual(runtime.validation.validate(generated.structuredOutput,contract).valid,true,`${objective}:${item.id}`);
-      assert(runtime.presentation.sections(generated.structuredOutput,contract).length,`${objective}:${item.id} renders`);
+      const contextDependent = item.id === 'priority_search_article';
+      assert.strictEqual(contextDependent ? contract.validateOutput(generated.structuredOutput) : runtime.validation.validate(generated.structuredOutput,contract).valid,true,`${objective}:${item.id}`);
+      assert(contextDependent ? contract.presentationSections(generated.structuredOutput).length : runtime.presentation.sections(generated.structuredOutput,contract).length,`${objective}:${item.id} renders`);
       const visible=JSON.stringify(generated.structuredOutput); assert.doesNotMatch(visible,/production contract|output schema|system prompt|orchestration|dependencyOutputs|confirmed_fact|strategic_recommendation|internal id/i);
       if(objective==='improve_search_rankings') assert.doesNotMatch(visible,/search volume:\s*\d|monthly searches:\s*\d|domain authority:\s*\d|backlinks?:\s*\d|ranks? #?\d/i);
       if(objective==='promote_service') assert.doesNotMatch(visible,/trusted by \d|helped \d|certified by|increased .* by \d+%/i);

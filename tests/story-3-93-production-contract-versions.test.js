@@ -8,7 +8,8 @@ for (const id of getProductionContractIds()) {
   const versionNumber = ({
     campaign_brief: 4, product_positioning: 4, value_proposition: 4,
     outreach_sequence: 5, lead_capture_page: 5, paid_ad_copy_set: 4,
-    search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4
+    search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4,
+    priority_search_article: 1
   })[id] || (id === 'organic_content_campaign' ? 16
     : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3);
   const currentVersion = `${id}:v${versionNumber}`;
@@ -17,9 +18,10 @@ for (const id of getProductionContractIds()) {
   });
   assert.strictEqual(contract.version, currentVersion, id);
   assert.deepStrictEqual(contract.compatibleVersions, compatibleVersions, id);
-  assert.strictEqual(contract.acceptsVersion(`${id}:v2`), true, id);
-  assert.strictEqual(contract.acceptsVersion(`${id}:v3`), true, id);
-  assert.strictEqual(contract.acceptsVersion(`${id}:v1`), false, id);
+  assert.strictEqual(contract.acceptsVersion(currentVersion), true, id);
+  if (versionNumber > 1) assert.strictEqual(contract.acceptsVersion(`${id}:v2`), true, id);
+  if (versionNumber > 2) assert.strictEqual(contract.acceptsVersion(`${id}:v3`), true, id);
+  if (versionNumber > 1) assert.strictEqual(contract.acceptsVersion(`${id}:v1`), false, id);
   assert.strictEqual(contract.acceptsVersion(`other:v3`), false, id);
 }
 

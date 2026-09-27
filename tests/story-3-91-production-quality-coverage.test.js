@@ -9,9 +9,12 @@ for (const id of getProductionContractIds()) {
   const contract = getProductionContract(id);
   const output = Object.fromEntries(Object.entries(contract.outputSchema).map(([key, type]) => [
     key,
-    type === 'array'
+    type === 'blocks'
+      ? Array.from({ length: 5 }, (_, index) => ({ heading: `Section ${index + 1}`, body: repeated }))
+      : type === 'array' || type === 'optional_array'
       ? (id === 'outreach_sequence' ? [repeated, repeated, repeated] : [repeated])
-      : (id === 'outreach_sequence' && /Body$/.test(key)
+      : type === 'optional_string' ? repeated
+        : (id === 'outreach_sequence' && /Body$/.test(key)
           ? `Hi [First Name],\n\n${repeated} ${repeated} ${repeated}\n\nBest,\n[Sender Name]`
           : repeated)
   ]));

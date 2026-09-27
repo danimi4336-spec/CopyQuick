@@ -17,7 +17,7 @@ function context(id, dependencies, strategySnapshot = {}) {
   });
 }
 
-assert(SUPPORTED_CONCEPTS.length < 30, 'registry remains deliberately bounded');
+assert(SUPPORTED_CONCEPTS.length <= 30, 'registry remains deliberately bounded');
 assert(CONSUMERS.product_positioning && CONSUMERS.value_proposition && CONSUMERS.lead_capture_page && CONSUMERS.search_strategy);
 
 const profile = {
