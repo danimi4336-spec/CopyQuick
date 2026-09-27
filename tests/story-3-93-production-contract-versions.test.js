@@ -5,8 +5,12 @@ const { getProductionContract, getProductionContractIds } = require('../lib/prod
 
 for (const id of getProductionContractIds()) {
   const contract = getProductionContract(id);
-  const versionNumber = id === 'organic_content_campaign' ? 16
-    : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3;
+  const versionNumber = ({
+    campaign_brief: 4, product_positioning: 4, value_proposition: 4,
+    outreach_sequence: 5, lead_capture_page: 5, paid_ad_copy_set: 4,
+    search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4
+  })[id] || (id === 'organic_content_campaign' ? 16
+    : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3);
   const currentVersion = `${id}:v${versionNumber}`;
   const compatibleVersions = Array.from({ length: versionNumber - 1 }, function(_, index) {
     return `${id}:v${index + 2}`;

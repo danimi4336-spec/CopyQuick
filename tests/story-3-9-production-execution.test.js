@@ -190,9 +190,10 @@ async function run() {
   assert.strictEqual(second.outcome, 'completed');
   assert.strictEqual(second.dependencyOutputs.length, 1);
   assert.deepStrictEqual(second.dependencyOutputs[0].result, JSON.parse(firstGeneration.results));
-  assert.match(calls[1].productDescription, /Customer Profile —/);
+  assert.match(calls[1].productDescription, /Approved synthesis decisions/);
+  assert.doesNotMatch(calls[1].productDescription, /Customer Profile —/);
   assert.doesNotMatch(calls[1].productDescription, /Completed prerequisite outputs|\{"/);
-  assert.match(calls[1].productDescription, /Primary Customer:/);
+  assert.match(calls[1].productDescription, /Audience:/);
   assert.match(calls[1].productDescription, /Evidence and provenance ledger/);
   assert.match(calls[1].productDescription, /Purpose:/);
   assert.match(calls[1].productDescription, /Approved source context:/);

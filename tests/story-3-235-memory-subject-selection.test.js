@@ -33,7 +33,10 @@ assert(remodel.subjects.offer.id);
 resolution = resolveObjectiveSubjects(db, { userId: userA, initialDescription: 'I want more website visitors to book consultations.' });
 assert.strictEqual(resolution.selection, 'automatic');
 assert.strictEqual(resolution.offer.id, remodel.subjects.offer.id, 'one remembered offer auto-binds without repeated identity');
-const remembered = memoryUnderstanding(db, { userId: userA, objective: 'increase_conversion_rates', initialDescription: 'Improve bookings.', subjectId: resolution.offer.id });
+resolution = resolveObjectiveSubjects(db, { userId: userA, initialDescription: 'I run an online accounting software company for small businesses.' });
+assert.strictEqual(resolution.selection, 'new', 'a clearly different offer is not auto-bound merely because only one remembered offer exists');
+assert.strictEqual(resolution.offer, null);
+const remembered = memoryUnderstanding(db, { userId: userA, objective: 'increase_conversion_rates', initialDescription: 'Improve bookings.', subjectId: remodel.subjects.offer.id });
 assert.match(remembered.understanding.currentOffer.label, /kitchen/i);
 assert.match(remembered.understanding.targetAudience.label, /homeowners/i);
 

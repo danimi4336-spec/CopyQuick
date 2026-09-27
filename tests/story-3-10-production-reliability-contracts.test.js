@@ -256,11 +256,12 @@ async function run() {
   foundationRows.slice(0, 4).forEach(function(row) {
     const output = JSON.parse(row.structured_result);
     expectedFields[row.deliverable_id].forEach(function(field) { assert(Object.hasOwn(output, field)); });
-    assert.strictEqual(row.contract_version, `${row.deliverable_id}:v3`);
+    assert.strictEqual(row.contract_version, getProductionContract(row.deliverable_id).version);
     assert.strictEqual(row.generation_contract, row.contract_version);
     assert.doesNotMatch(JSON.stringify(output), /age 35|\$100,000|female|male/i);
   });
-  assert.match(calls[1].productDescription, /customer_profile —/i);
+  assert.match(calls[1].productDescription, /Approved synthesis decisions/i);
+  assert.doesNotMatch(calls[1].productDescription, /customer_profile —/i);
   assert.doesNotMatch(calls[1].productDescription, /customer_profile:v1|Completed prerequisite outputs|\{"/);
   assert.match(calls[1].productDescription, /Premium and evidence-aware/);
   assert.match(calls[4].productDescription, /core_messaging —/i);

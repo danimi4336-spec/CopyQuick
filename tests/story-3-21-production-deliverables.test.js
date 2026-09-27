@@ -192,7 +192,7 @@ async function run() {
     },
     dependencyOutputs: []
   });
-  assert.strictEqual(outreachContract.version, 'outreach_sequence:v4');
+  assert.strictEqual(outreachContract.version, 'outreach_sequence:v5');
   assert.strictEqual(outreachContract.validateOutput(outreachOutput), true);
   assert.strictEqual(validateCustomerReadyOutput(outreachOutput, outreachContract).valid, true);
   assert.match(outreachContract.buildPrompt({
