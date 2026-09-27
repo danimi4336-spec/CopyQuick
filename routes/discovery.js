@@ -12,6 +12,7 @@ const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
 const { getSavedPlan, saveBuildPlan } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
+const { backfillLegacyBrandBrain, explicitCurrentInput, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory } = require('../lib/businessMemory');
 const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
 const {
   buildApprovalView,
@@ -140,6 +141,27 @@ function applyIntelligenceResult(discoverySession, intelligenceResult) {
   discoverySession.discoveryPolicyVersion = DISCOVERY_POLICY_VERSION;
 }
 
+function applyDurableMemory(req, objective, initialDescription, understandingResult, discoverySession = null) {
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const explicit = explicitCurrentInput(objective, initialDescription);
+  Object.assign(understandingResult.understanding, explicit);
+  understandingResult.unknowns = (understandingResult.unknowns || []).filter(key => !explicit[key]);
+  const remembered = memoryUnderstanding(db, { userId, objective, initialDescription });
+  const merged = mergeCurrentWithMemory(understandingResult.understanding, remembered);
+  understandingResult.understanding = merged.understanding;
+  understandingResult.unknowns = (understandingResult.unknowns || []).filter(field => {
+    const value = merged.understanding[field];
+    return !value || value.value === null || value.value === 'unsure' || value.source === 'unknown';
+  });
+  if (discoverySession) {
+    discoverySession.memorySources = { ...(discoverySession.memorySources || {}), ...merged.sources };
+    const resolved = new Set((discoverySession.memoryResolvedRecordIds || []).map(String));
+    discoverySession.memoryConflicts = merged.conflicts.filter(item => !resolved.has(String(item.recordId)));
+  }
+  return merged;
+}
+
 function canViewReflection(discoverySession) {
   return Boolean(discoverySession?.planningReadiness?.discoveryCompleteForNow || discoverySession?.reflectionStartedAt);
 }
@@ -237,7 +259,9 @@ function renderReflection(req, res, options = {}) {
     objective: discoverySession.objective,
     answers: discoverySession.answers,
     understanding: discoverySession.understanding,
-    planningReadiness: discoverySession.planningReadiness
+    planningReadiness: discoverySession.planningReadiness,
+    memorySources: discoverySession.memorySources,
+    memoryConflicts: discoverySession.memoryConflicts
   });
   return res.status(options.status || 200).render('business-reflection', {
     title: 'Business Reflection - CopyQuick',
@@ -273,6 +297,10 @@ router.post('/discovery', requireAuth, async (req, res) => {
     const now = new Date().toISOString();
     const objective = activeObjective(req);
     const understandingResult = await understandBusiness({ objective, answer });
+    const db = req.app.locals.copyquickDb || getDb();
+    const userId = req.session.userId || req.session.passport?.user;
+    backfillLegacyBrandBrain(db, { userId });
+    const memoryMerge = applyDurableMemory(req, objective, answer, understandingResult);
     const answers = { initial_description: answer };
     const intelligenceResult = analyzeDiscovery({
       objective,
@@ -286,6 +314,8 @@ router.post('/discovery', requireAuth, async (req, res) => {
       understanding: understandingResult.understanding,
       unknowns: understandingResult.unknowns,
       interpretation: understandingResult.interpretation,
+      memorySources: memoryMerge.sources,
+      memoryConflicts: memoryMerge.conflicts,
       completedQuestions: ['initial_description'],
       completion: intelligenceResult.completion,
       knowledgeDomains: intelligenceResult.knowledgeDomains,
@@ -364,6 +394,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       answer: discoverySession.answers.initial_description,
       existingUnderstanding: confirmedUnderstanding
     });
+    applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
     const intelligenceResult = analyzeDiscovery({
       objective: discoverySession.objective,
       understanding: understandingResult.understanding,
@@ -417,6 +448,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       answer: discoverySession.answers.initial_description,
       existingUnderstanding: confirmedUnderstanding
     });
+    applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
     const intelligenceResult = analyzeDiscovery({
       objective: discoverySession.objective,
       understanding: understandingResult.understanding,
@@ -480,6 +512,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
     answer: discoverySession.answers.initial_description,
     existingUnderstanding: confirmedUnderstanding
   });
+  applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
   const intelligenceResult = analyzeDiscovery({
     objective: discoverySession.objective,
     understanding: understandingResult.understanding,
@@ -557,6 +590,7 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
     answer: edit.answers.initial_description,
     existingUnderstanding: edit.existingUnderstanding
   });
+  applyDurableMemory(req, discoverySession.objective, edit.answers.initial_description, understandingResult, discoverySession);
   const intelligenceResult = analyzeDiscovery({
     objective: discoverySession.objective,
     understanding: understandingResult.understanding,
@@ -732,7 +766,44 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
   discoverySession.buildPlanSelection.approvedAt = result.approvedAt;
   discoverySession.buildPlanSelection.updatedAt = result.approvedAt;
   discoverySession.approvedProductionSet = result.productionSet;
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const promotion = promoteObjectiveMemory(db, {
+    userId,
+    objective: discoverySession.objective,
+    understanding: discoverySession.confirmedUnderstanding || discoverySession.understanding,
+    answers: discoverySession.answers,
+    referenceId: result.productionSet.planFingerprint
+  });
+  discoverySession.memorySubjectIds = {
+    business: promotion.subjects.business?.id || null,
+    offer: promotion.subjects.offer?.id || null
+  };
+  discoverySession.approvedProductionSet.strategySnapshot.memorySubjects = discoverySession.memorySubjectIds;
+  discoverySession.memoryPromotion = promotion.results.map(item => ({ field: item.field, outcome: item.outcome }));
   return res.redirect(303, '/discovery/production-ready');
+});
+
+router.post('/discovery/reflection/memory/:recordId', requireAuth, (req, res) => {
+  const discoverySession = req.session.discoverySession;
+  if (!discoverySession) return res.redirect(303, '/discovery');
+  const conflict = (discoverySession.memoryConflicts || []).find(item => String(item.recordId) === String(req.params.recordId));
+  if (!conflict) return res.status(404).send('Not found');
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const action = String(req.body.action || 'objective_only');
+  const outcome = reconcileMemory(db, { userId, recordId: req.params.recordId, action, value: conflict.currentValue, label: conflict.currentValue });
+  if (!outcome.valid) return res.status(404).send('Not found');
+  if (action === 'keep') {
+    discoverySession.understanding[conflict.field] = {
+      value: conflict.rememberedValue, label: conflict.rememberedValue, confidence: 1,
+      source: 'remembered_confirmed', memoryRecordId: conflict.recordId
+    };
+  }
+  discoverySession.memoryConflicts = (discoverySession.memoryConflicts || []).filter(item => item !== conflict);
+  discoverySession.memoryResolvedRecordIds = (discoverySession.memoryResolvedRecordIds || []).concat(String(conflict.recordId));
+  refreshDiscoveryPolicy(discoverySession);
+  return res.redirect(303, '/discovery/reflection');
 });
 
 router.get('/discovery/production-ready', requireAuth, (req, res) => {

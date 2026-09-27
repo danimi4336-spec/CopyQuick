@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 7;
+const MAX_SUPPORTED_SCHEMA_VERSION = 8;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -241,6 +241,61 @@ const PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION = Object.freeze({
   }
 });
 
+const BUSINESS_MEMORY_MIGRATION = Object.freeze({
+  version: 8,
+  name: 'structured_business_memory',
+  kind: 'migration',
+  policy: 'additive',
+  rollbackCompatible: false,
+  statements: Object.freeze([
+    `CREATE TABLE business_memory_subjects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      scope_type TEXT NOT NULL CHECK(scope_type IN ('business', 'offer')),
+      canonical_key TEXT NOT NULL,
+      label TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'removed')),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(user_id, scope_type, canonical_key)
+    )`,
+    `CREATE TABLE business_memory_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id),
+      subject_id INTEGER NOT NULL REFERENCES business_memory_subjects(id),
+      concept TEXT NOT NULL,
+      value_json TEXT NOT NULL,
+      canonical_value TEXT NOT NULL,
+      label TEXT NOT NULL,
+      provenance TEXT NOT NULL CHECK(provenance IN ('confirmed_fact', 'inferred_fact')),
+      confidence REAL NOT NULL CHECK(confidence >= 0 AND confidence <= 1),
+      status TEXT NOT NULL CHECK(status IN ('active', 'pending_review', 'superseded', 'removed')),
+      freshness_class TEXT NOT NULL CHECK(freshness_class IN ('stable', 'review_periodically', 'current_state')),
+      observed_at TEXT NOT NULL,
+      review_after TEXT,
+      source_objective TEXT,
+      source_reference_type TEXT NOT NULL,
+      source_reference_id TEXT,
+      source_field TEXT,
+      confirmed_at TEXT,
+      superseded_by_id INTEGER REFERENCES business_memory_records(id),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+    'CREATE INDEX idx_business_memory_subjects_owner ON business_memory_subjects(user_id, status, scope_type)',
+    'CREATE INDEX idx_business_memory_records_current ON business_memory_records(user_id, subject_id, concept, status)',
+    'CREATE INDEX idx_business_memory_records_review ON business_memory_records(user_id, status, review_after)',
+    'CREATE INDEX idx_business_memory_records_source ON business_memory_records(user_id, source_reference_type, source_reference_id)'
+  ]),
+  validate(db) {
+    for (const table of ['business_memory_subjects', 'business_memory_records']) {
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) {
+        throw new MigrationError('Structured business memory migration validation failed.', 'MIGRATION_VALIDATION_FAILED');
+      }
+    }
+  }
+});
+
 const MIGRATIONS = Object.freeze([
   BASELINE_MIGRATION,
   BILLING_RECONCILIATION_MIGRATION,
@@ -248,7 +303,8 @@ const MIGRATIONS = Object.freeze([
   SUBSCRIPTION_CHECKOUT_INTENT_MIGRATION,
   SAVED_BUILD_PLANS_MIGRATION,
   SAVED_BUILD_PLAN_FINGERPRINT_MIGRATION,
-  PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION
+  PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION,
+  BUSINESS_MEMORY_MIGRATION
 ]);
 
 function migrationChecksum(migration) {

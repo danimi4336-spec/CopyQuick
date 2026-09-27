@@ -6,6 +6,7 @@ const { objectiveUniverse, getAvailableObjective } = require('../lib/businessJou
 const { normalizeStoredBrandBrain, validateBrandBrain } = require('../lib/brandBrainValidation');
 const { applyApprovedBrandBrainProposal, loadBrandObjectiveProposal } = require('../lib/brandObjectiveIntegration');
 const { getSavedPlan, resumeSavedPlan, syncSavedPlanLifecycle } = require('../lib/savedBuildPlans');
+const { brandBrainProjection, reconcileMemory, resetMemory, syncBrandBrainMemory } = require('../lib/businessMemory');
 
 function emptyBrandBrain(userId) {
   return {
@@ -93,10 +94,9 @@ router.get('/brand-brain', requireAuth, (req, res) => {
   const enrichment = req.query.fromRun
     ? loadBrandObjectiveProposal(db, { userId: req.session.userId, productionRunId: req.query.fromRun, existing: brain })
     : null;
-  const fields = ['business_name', 'industry', 'target_audience', 'brand_voice', 'unique_value', 'competitors', 'goals', 'key_messages'];
-  const filled = fields.filter(f => brain[f] && brain[f].trim()).length;
-  const pct = Math.round((filled / fields.length) * 100);
-  res.render('brand-brain', { title: 'Brand Brain - CopyQuick', brain, pct, enrichment, saved: req.query.saved === '1', currentPage: 'brand-brain' });
+  const memory = brandBrainProjection(db, { userId: req.session.userId });
+  const pct = memory.confirmedCoverage;
+  res.render('brand-brain', { title: 'Brand Brain - CopyQuick', brain, pct, memory, enrichment, saved: req.query.saved === '1', currentPage: 'brand-brain' });
 });
 
 function saveBrandBrain(db, userId, values) {
@@ -119,6 +119,7 @@ router.post('/brand-brain/enrich/:productionRunId', requireAuth, (req, res) => {
   const approvedFields = Array.isArray(req.body.approvedFields) ? req.body.approvedFields : req.body.approvedFields ? [req.body.approvedFields] : [];
   const values = applyApprovedBrandBrainProposal({ existing: brain, proposal: enrichment.proposal, approvedFields });
   saveBrandBrain(db, req.session.userId, values);
+  syncBrandBrainMemory(db, { userId: req.session.userId, values });
   return res.redirect(303, '/brand-brain?saved=1');
 });
 
@@ -130,12 +131,27 @@ router.post('/brand-brain', requireAuth, (req, res) => {
       title: 'Brand Brain - CopyQuick',
       brain: { ...emptyBrandBrain(req.session.userId), ...validation.values },
       pct: 0,
+      memory: brandBrainProjection(db, { userId: req.session.userId }),
       error: 'Please shorten or correct the highlighted business details and try again.',
       currentPage: 'brand-brain'
     });
   }
   saveBrandBrain(db, req.session.userId, validation.values);
+  syncBrandBrainMemory(db, { userId: req.session.userId, values: validation.values });
   res.redirect('/brand-brain');
+});
+
+router.post('/brand-brain/memory/:recordId/remove', requireAuth, (req, res) => {
+  const db = req.app.locals.copyquickDb || getDb();
+  const result = reconcileMemory(db, { userId: req.session.userId, recordId: req.params.recordId, action: 'remove' });
+  if (!result.valid) return res.status(404).send('Not found');
+  return res.redirect(303, '/brand-brain');
+});
+
+router.post('/brand-brain/memory/reset', requireAuth, (req, res) => {
+  const db = req.app.locals.copyquickDb || getDb();
+  resetMemory(db, { userId: req.session.userId });
+  return res.redirect(303, '/brand-brain');
 });
 
 // ====== Campaign Studio ======

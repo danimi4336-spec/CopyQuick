@@ -6,10 +6,26 @@
         </div>
         <div class="brain-pct">
             <div class="brain-pct-circle"><%= pct %>%</div>
-            <span class="brain-pct-label">Complete</span>
+            <span class="brain-pct-label">Confirmed knowledge coverage</span>
         </div>
     </div>
     <div class="brain-progress-bar fade-in"><div class="brain-progress-fill" style="width:<%= pct %>%"></div></div>
+    <% if (typeof memory !== 'undefined') { %>
+      <section class="card fade-in" style="margin-bottom:1.5rem;padding:1.5rem;">
+        <h2>Current Understanding</h2>
+        <p class="text-secondary">Confirmed knowledge CopyQuick can safely reuse. This is coverage, not a claim that CopyQuick knows everything.</p>
+        <% if (!memory.current.length) { %><p>No confirmed reusable knowledge yet. CopyQuick learns durable facts from approved objective plans and the preferences below.</p><% } %>
+        <% memory.current.forEach(function(item) { %>
+          <div style="padding:.75rem 0;border-bottom:1px solid var(--border);">
+            <strong><%= item.concept.replace(/_/g, ' ') %>:</strong> <%= item.label %>
+            <% if (item.source_objective) { %><small class="text-secondary">Learned from <%= item.source_objective.replace(/_/g, ' ') %></small><% } %>
+            <form action="/brand-brain/memory/<%= item.id %>/remove" method="POST" style="display:inline;float:right"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="btn btn-outline" type="submit">Mark outdated</button></form>
+          </div>
+        <% }); %>
+      </section>
+      <% if (memory.needsReview.length) { %><section class="card fade-in" style="margin-bottom:1.5rem;padding:1.5rem;"><h2>Needs Review</h2><% memory.needsReview.forEach(function(item) { %><p><strong><%= item.concept.replace(/_/g, ' ') %>:</strong> <%= item.label %></p><% }); %></section><% } %>
+      <% if (memory.history.length) { %><details class="card fade-in" style="margin-bottom:1.5rem;padding:1.5rem;"><summary><strong>History</strong></summary><% memory.history.forEach(function(item) { %><p><%= item.concept.replace(/_/g, ' ') %>: <%= item.label %> (<%= item.status %>)</p><% }); %></details><% } %>
+    <% } %>
     <% if (typeof saved !== 'undefined' && saved) { %><div class="alert alert-success" role="status">Approved brand decisions were added to Brand Brain.</div><% } %>
     <% if (typeof error !== 'undefined' && error) { %><div class="alert alert-error" role="alert"><%= error %></div><% } %>
     <% if (typeof enrichment !== 'undefined' && enrichment) { %>

@@ -104,7 +104,7 @@ function run() {
   assert.strictEqual(cli.status, 0, cli.stderr);
   const output = JSON.parse(cli.stdout);
   assert.strictEqual(output.status, 'healthy');
-  assert.strictEqual(output.migration.currentVersion, 7);
+  assert.strictEqual(output.migration.currentVersion, 8);
   assert.strictEqual(output.storage.quickCheck, 'ok');
   assert.strictEqual(output.generation.mode, 'running');
   assert(!cli.stdout.includes(databasePath));

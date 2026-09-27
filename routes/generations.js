@@ -21,6 +21,7 @@ const { parseStoredGenerationResults } = require('../lib/generationResults');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
 const { getLatestProductionResume } = require('../lib/productionResume');
+const { boundedProductionMemory, brandBrainProjection } = require('../lib/businessMemory');
 const {
   configuredProductionProvider,
   productionProviderStatus,
@@ -171,6 +172,7 @@ function loadDashboardSnapshot(db, user, options = {}) {
   const userId = user.id;
   const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId) || {};
   const brainFilled = DASHBOARD_BRAIN_FIELDS.filter((field) => brain[field] && brain[field].trim()).length;
+  const memoryProjection = brandBrainProjection(db, { userId });
 
   return {
     history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId),
@@ -187,7 +189,7 @@ function loadDashboardSnapshot(db, user, options = {}) {
     audiencePresets,
     brain,
     brainFilled,
-    brainPct: Math.round((brainFilled / DASHBOARD_BRAIN_FIELDS.length) * 100),
+    brainPct: Math.round(memoryProjection.current.length ? memoryProjection.confirmedCoverage : (brainFilled / DASHBOARD_BRAIN_FIELDS.length) * 100),
     aiCredits: Object.hasOwn(options, 'aiCredits') ? options.aiCredits : getAiCredits(db, user)
   };
 }
@@ -727,18 +729,20 @@ router.post('/generation/:id/regenerate-production', requireAuth, requireGenerat
       SELECT business_name, brand_voice, brand_voice_custom, unique_value, key_messages
       FROM brand_brain WHERE user_id = ?
     `).get(userId);
-    const brandContext = brand ? {
+    const legacyBrandContext = brand ? {
       businessName: String(brand.business_name || '').slice(0, 200),
       voice: String(brand.brand_voice === 'custom' ? brand.brand_voice_custom : brand.brand_voice || '').slice(0, 300),
       uniqueValue: String(brand.unique_value || '').slice(0, 1000),
       keyMessages: String(brand.key_messages || '').slice(0, 1000)
     } : null;
+    const strategySnapshot = parseStrategySnapshot(rawRun.strategy_snapshot, 'run_strategy_snapshot');
+    const brandContext = boundedProductionMemory(db, { userId, subjectIds: strategySnapshot.memorySubjects || {} }) || legacyBrandContext;
     const handler = getProductionContract(job.deliverable_id);
     const generated = await generateDeliverable({
       job,
       productionRun: {
         ...rawRun,
-        strategySnapshot: parseStrategySnapshot(rawRun.strategy_snapshot, 'run_strategy_snapshot'),
+        strategySnapshot,
         brandContext
       },
       dependencyOutputs: loadDependencyOutputs(db, job),

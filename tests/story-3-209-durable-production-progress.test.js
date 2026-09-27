@@ -10,7 +10,7 @@ const {
 
 const db = new Database(':memory:');
 runMigrationEngine(db, { logger: () => {} });
-assert.strictEqual(MAX_SUPPORTED_SCHEMA_VERSION, 7);
+assert.strictEqual(MAX_SUPPORTED_SCHEMA_VERSION, 8);
 assert(db.pragma('table_info(production_runs)').some(column => column.name === 'production_plan_snapshot'));
 
 const userId = Number(db.prepare("INSERT INTO users (email, name) VALUES ('durable-progress@example.com', 'Durable Progress')").run().lastInsertRowid);
