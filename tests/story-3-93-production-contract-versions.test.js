@@ -9,19 +9,17 @@ for (const id of getProductionContractIds()) {
     campaign_brief: 4, product_positioning: 4, value_proposition: 4,
     outreach_sequence: 5, lead_capture_page: 5, paid_ad_copy_set: 4,
     search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4,
-    priority_search_article: 1
+    priority_search_article: 2, research_evidence_pack: 1
   })[id] || (id === 'organic_content_campaign' ? 16
     : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3);
   const currentVersion = `${id}:v${versionNumber}`;
-  const compatibleVersions = Array.from({ length: versionNumber - 1 }, function(_, index) {
-    return `${id}:v${index + 2}`;
-  });
+  const compatibleVersions = id === 'priority_search_article' ? ['priority_search_article:v1'] : Array.from({ length: versionNumber - 1 }, function(_, index) { return `${id}:v${index + 2}`; });
   assert.strictEqual(contract.version, currentVersion, id);
   assert.deepStrictEqual(contract.compatibleVersions, compatibleVersions, id);
   assert.strictEqual(contract.acceptsVersion(currentVersion), true, id);
   if (versionNumber > 1) assert.strictEqual(contract.acceptsVersion(`${id}:v2`), true, id);
   if (versionNumber > 2) assert.strictEqual(contract.acceptsVersion(`${id}:v3`), true, id);
-  if (versionNumber > 1) assert.strictEqual(contract.acceptsVersion(`${id}:v1`), false, id);
+  if (versionNumber > 1) assert.strictEqual(contract.acceptsVersion(`${id}:v1`), id === 'priority_search_article', id);
   assert.strictEqual(contract.acceptsVersion(`other:v3`), false, id);
 }
 

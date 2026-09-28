@@ -11,6 +11,10 @@ for (const id of getProductionContractIds()) {
     key,
     type === 'blocks'
       ? Array.from({ length: 5 }, (_, index) => ({ heading: `Section ${index + 1}`, body: repeated }))
+      : type === 'article_blocks_v2'
+        ? Array.from({ length: 5 }, (_, index) => ({ heading: `Section ${index + 1}`, body: repeated, claims: [{ claimKey: `claim-${index + 1}`, text: repeated, evidenceRequired: false, evidenceKeys: [] }] }))
+      : type === 'object_array' ? [{}]
+      : type === 'boolean' ? false
       : type === 'array' || type === 'optional_array'
       ? (id === 'outreach_sequence' ? [repeated, repeated, repeated] : [repeated])
       : type === 'optional_string' ? repeated
@@ -22,6 +26,16 @@ for (const id of getProductionContractIds()) {
     output.introduction = Array.from({ length: 8 }, (_, index) => `## Section ${index + 1}\n\n${Array(14).fill(repeated).join(' ')}`).join('\n\n');
     output.outline = Array(5).fill(repeated);
     output.distributionPosts = Array(2).fill(repeated);
+  }
+  if (id === 'priority_search_article') {
+    output.articleBlocks = Array.from({ length: 5 }, (_, index) => ({ heading: `Section ${index + 1}`, body: repeated, claims: [{ claimKey: `claim-${index + 1}`, text: repeated, evidenceRequired: false, evidenceKeys: [] }] }));
+    output.sources = [];
+  }
+  if (id === 'research_evidence_pack') {
+    Object.assign(output, { researchSummary: repeated, researchQuestions: [repeated], sourcesUsed: [], supportedFindings: [], unsupportedQuestions: [], conflicts: [], freshnessNotes: [repeated], sources: [], evidenceItems: [], claimMappings: [], rejectedSources: [], researchTrace: [], noExternalEvidenceRequired: true, essentialEvidenceMissing: false });
+    assert.strictEqual(contract.validateOutput(output), true, `${id} fixture must satisfy its structural contract`);
+    assert.strictEqual(validateCustomerReadyOutput(output, contract).valid, true, `${id} uses evidence-specific validation rather than copy repetition`);
+    continue;
   }
   assert.strictEqual(contract.validateOutput(output), true, `${id} fixture must satisfy its structural contract`);
   assert.deepStrictEqual(validateCustomerReadyOutput(output, contract), {

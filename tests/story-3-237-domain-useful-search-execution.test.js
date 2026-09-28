@@ -36,7 +36,12 @@ function context(briefOutput = brief(), snapshot = strategySnapshot) {
       deliverable_id: contract.id, title: contract.title, strategic_direction: 'Create one useful search-informed article.',
       strategySnapshot: snapshot, contract_version: contract.version
     },
-    dependencyOutputs: [{ deliverableId: 'priority_content_brief', title: 'Priority Content Brief', contractVersion: 'priority_content_brief:v4', output: briefOutput }]
+    dependencyOutputs: [
+      { deliverableId: 'priority_content_brief', title: 'Priority Content Brief', contractVersion: 'priority_content_brief:v4', output: briefOutput },
+      { deliverableId: 'research_evidence_pack', title: 'Research Evidence Pack', contractVersion: 'research_evidence_pack:v1', output: {
+        researchSummary: 'No external evidence required for this article.', researchQuestions: [], sourcesUsed: [], supportedFindings: [], unsupportedQuestions: [], conflicts: [], freshnessNotes: ['No external source freshness review was required.'], sources: [], evidenceItems: [], claimMappings: [], rejectedSources: [], researchTrace: [], noExternalEvidenceRequired: true, essentialEvidenceMissing: false
+      } }
+    ]
   });
 }
 
@@ -50,12 +55,12 @@ function invalidWith(mutator) {
 assert(contract, 'dedicated contract exists');
 assert.strictEqual(contract.id, 'priority_search_article');
 assert.strictEqual(contract.title, 'Priority Search Article');
-assert.strictEqual(contract.version, 'priority_search_article:v1');
+assert.strictEqual(contract.version, 'priority_search_article:v2');
 assert.strictEqual(contract.validationProfile.family, 'search_editorial');
 assert.strictEqual(contract.readyToUse, true);
 assert.strictEqual(getProductionArtifactPolicy(contract.id).readyToUse, true);
-assert.deepStrictEqual(contract.requiredDependencies, ['priority_content_brief']);
-assert.deepStrictEqual(MINIMUM_PRODUCTION_DEPENDENCIES.priority_search_article, ['priority_content_brief']);
+assert.deepStrictEqual(contract.requiredDependencies, ['priority_content_brief', 'research_evidence_pack']);
+assert.deepStrictEqual(MINIMUM_PRODUCTION_DEPENDENCIES.priority_search_article, ['priority_content_brief', 'research_evidence_pack']);
 assert(!contract.requiredDependencies.includes('search_measurement_plan'));
 
 const understanding = { websiteContext: { value: 'Accounting software site' } };
@@ -67,7 +72,7 @@ const planItems = plan.phases.flatMap(phase => phase.deliverables);
 const articleItem = planItems.find(item => item.id === contract.id);
 assert(articleItem);
 assert.strictEqual(articleItem.recommendationLevel, 'recommended');
-assert.deepStrictEqual(articleItem.dependencies, ['priority_content_brief']);
+assert.deepStrictEqual(articleItem.dependencies, ['priority_content_brief', 'research_evidence_pack']);
 
 const ctx = context();
 assert.strictEqual(ctx.synthesis.enabled, true);
@@ -172,9 +177,9 @@ assert.doesNotMatch(prompt, /synthesisTrace|sourceDeliverable|sourceField|permit
     handler: contract,
     productionRun: { user_id: 1, objective: 'improve_search_rankings', strategySnapshot },
     job: { deliverable_id: contract.id, title: contract.title, strategic_direction: 'Create one useful search-informed article.', strategySnapshot, contract_version: contract.version },
-    dependencyOutputs: [{ deliverableId: 'priority_content_brief', output: brief() }]
+    dependencyOutputs: context().dependencyOutputs
   });
-  assert.strictEqual(generated.contractVersion, 'priority_search_article:v1');
+  assert.strictEqual(generated.contractVersion, 'priority_search_article:v2');
   assert.strictEqual(generated.structuredOutput.callToAction, '');
   assert.match(JSON.stringify(generated.structuredOutput.articleBlocks), /invoice|receivable|cash/i);
   assert.doesNotMatch(JSON.stringify(generated.structuredOutput), /synthesisTrace|sourceDeliverable|SYNTHESIS_/);

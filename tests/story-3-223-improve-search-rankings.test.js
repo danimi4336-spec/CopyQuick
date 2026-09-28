@@ -45,7 +45,7 @@ function fact(value, label = value) {
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Establish Search Evidence', 'Build Search Content', 'Measure & Improve']);
   const items = plan.phases.flatMap(phase => phase.deliverables);
   assert.deepStrictEqual(items.map(item => item.id), [
-    'search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'priority_search_article', 'search_measurement_plan'
+    'search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'research_evidence_pack', 'priority_search_article', 'search_measurement_plan'
   ]);
 
   const completed = new Map();

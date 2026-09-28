@@ -60,7 +60,7 @@ function publicContract(fields = ['body']) {
   assert.match(searchStrategy.insights.topicTerritory.value, /bookkeeping.*invoicing.*cash flow/i);
   assert.strictEqual(searchStrategy.insights.customerMotivation.unresolved, true);
   const searchPlan = buildPlan({ objective: 'improve_search_rankings', confirmedUnderstanding: search, strategyResult: searchStrategy, answers: {} });
-  assert.deepStrictEqual(searchPlan.phases.flatMap(phase => phase.deliverables).map(item => item.id), ['search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'priority_search_article', 'search_measurement_plan']);
+  assert.deepStrictEqual(searchPlan.phases.flatMap(phase => phase.deliverables).map(item => item.id), ['search_evidence_snapshot', 'search_strategy', 'priority_content_brief', 'research_evidence_pack', 'priority_search_article', 'search_measurement_plan']);
   assert.doesNotMatch(JSON.stringify(searchPlan), /Acquisition Snapshot|Acquisition Channel Strategy/);
 
   [null, 'unsure', 'unknown', "I'm not sure yet", 'not established', 'needs confirmation'].forEach(value => assert.strictEqual(isUnresolvedValue(value), true));

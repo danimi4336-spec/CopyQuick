@@ -18,7 +18,10 @@ for (const id of getProductionContractIds()) {
   );
   assert.strictEqual(new Set([...contract.publicFieldKeys, ...contract.internalFieldKeys]).size, schemaKeys.length, `${id} roles must not overlap`);
   if (getProductionArtifactPolicy(id).readyToUse) assert(contract.publicFieldKeys.length > 0, `${id} must expose public copy`);
-  else assert.strictEqual(contract.publicFieldKeys.length, 0, `${id} planning foundation must remain internal`);
+  else if (id === 'research_evidence_pack') {
+    assert.deepStrictEqual(contract.publicFieldKeys, ['researchSummary', 'researchQuestions', 'sourcesUsed', 'supportedFindings', 'unsupportedQuestions', 'conflicts', 'freshnessNotes']);
+    assert(contract.internalFieldKeys.includes('researchTrace') && contract.internalFieldKeys.includes('evidenceItems'));
+  } else assert.strictEqual(contract.publicFieldKeys.length, 0, `${id} planning foundation must remain internal`);
 }
 
 const organic = getProductionContract('organic_content_campaign');
