@@ -34,7 +34,8 @@ function contextFor(id, dependencies) {
 (async () => {
   const packContract = getProductionContract('research_evidence_pack');
   const articleContract = getProductionContract('priority_search_article');
-  assert.strictEqual(packContract.version, 'research_evidence_pack:v1');
+  assert.strictEqual(packContract.version, 'research_evidence_pack:v2');
+  assert(packContract.acceptsVersion('research_evidence_pack:v1'));
   assert.strictEqual(packContract.readyToUse, false);
   assert.strictEqual(articleContract.version, 'priority_search_article:v2');
   assert(articleContract.acceptsVersion('priority_search_article:v1'));
@@ -113,6 +114,6 @@ function contextFor(id, dependencies) {
 
   const generatedPack = await generateDeliverable({ handler: packContract, productionRun: { objective: 'improve_search_rankings', strategySnapshot: snapshot }, job: { deliverable_id: packContract.id, title: packContract.title, strategic_direction: 'Research only targeted needs.', strategySnapshot: snapshot, contract_version: packContract.version }, dependencyOutputs: [briefDependency(baseBrief)] });
   assert.strictEqual(generatedPack.provider, 'deterministic');
-  assert.strictEqual(generatedPack.contractVersion, 'research_evidence_pack:v1');
+  assert.strictEqual(generatedPack.contractVersion, 'research_evidence_pack:v2');
   console.log('Story 3.238A Research-Backed Editorial Evidence tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

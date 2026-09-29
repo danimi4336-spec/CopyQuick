@@ -114,6 +114,40 @@ CopyQuick includes an opt-in OpenAI Responses API adapter for structured product
 
 Startup fails closed when OpenAI is explicitly selected without a key or when an unsupported provider is named. Prompts and model responses are not written to operational logs. The adapter sends `store: false` on Responses API requests.
 
+## OpenAI Web Search research adapter
+
+Research Evidence Pack v2 can use a separately enabled OpenAI Web Search
+adapter. Article generation keeps its existing provider and model. The adapter
+submits one normalized Research Need per Responses request, sets
+`max_tool_calls: 1`, requests native source metadata, and treats every returned
+finding as candidate evidence until CopyQuick's source, qualifier, entailment,
+and citation policies accept it. CopyQuick never fetches the returned URL.
+
+- `OPENAI_RESEARCH_ENABLED=false` keeps live research off by default.
+- `OPENAI_RESEARCH_MODEL` defaults to `gpt-4.1-mini-2025-04-14`.
+- `OPENAI_RESEARCH_MAX_WEB_CALLS` defaults to and cannot exceed `5` per pack.
+- `OPENAI_RESEARCH_TIMEOUT_MS` defaults to `60000` and cannot exceed `120000`.
+- `OPENAI_RESEARCH_MAX_OUTPUT_TOKENS` defaults to `1200` and cannot exceed `4000`.
+- `EXA_API_KEY` enables exact-URL Exa Contents extraction only after OpenAI has registered an eligible source; the key is never sent to OpenAI or included in generated output.
+- `EXA_CONTENTS_TIMEOUT_MS` defaults to `12000` and cannot exceed `20000`. Exa extraction never performs search, accepts only the registered canonical URL, and does not use Exa summaries as evidence.
+- The adapter reuses `OPENAI_API_KEY`; no second research credential is used.
+- Acceptance mode always disables the live research adapter.
+
+The same research model may perform a bounded structured entailment check
+without Web Search. Search actions and entailment tokens are recorded separately
+inside internal pack telemetry and do not change customer generation units.
+Provider-native citation numbers are never rendered; CopyQuick assigns public
+citations only after evidence acceptance.
+
+When deterministic passage parsing finds bounded candidate windows but cannot
+structure a complete proposition, the optional proposition parser may make one
+strict Structured Outputs request per retrieved source. It receives at most
+three source-local windows, has no tools or Web Search, and cannot establish
+authority or evidence on its own. `OPENAI_PROPOSITION_PARSER_MODEL` defaults to
+`OPENAI_RESEARCH_MODEL`; `OPENAI_PROPOSITION_PARSER_TIMEOUT_MS` defaults to
+12000. CopyQuick independently verifies every returned field and support-window
+reference before normal evidence validation.
+
 ## Activation checklist
 
 Before enabling any live provider adapter:
