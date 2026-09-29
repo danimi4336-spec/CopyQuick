@@ -41,6 +41,17 @@ function storageSummary(health) {
     offsiteLastSuccessAt: health.offsiteBackup?.lastSuccessAt
   };
 }
+function researchSummary(db) {
+  const rows = db.prepare("SELECT structured_result FROM generations WHERE deliverable_id = 'research_evidence_pack' AND is_deleted = 0 ORDER BY id DESC LIMIT 100").all();
+  const values = rows.map(row => { try { return JSON.parse(row.structured_result || '{}').researchOperations; } catch (_) { return null; } }).filter(Boolean);
+  const count = values.length, supported = values.filter(item => ['SUPPORTED', 'PARTIAL'].includes(item.status)).length, insufficient = values.filter(item => ['INSUFFICIENT', 'BLOCKED'].includes(item.status)).length;
+  const failures = values.flatMap(item => item.providerFailures || []);
+  return { status: failures.some(item => ['AUTHORIZATION_FAILURE', 'BILLING_FAILURE'].includes(item.failureCategory)) ? 'unavailable' : failures.length ? 'degraded' : 'healthy', openCircuitCount: 0,
+    authorizationFailureCount: failures.filter(item => item.failureCategory === 'AUTHORIZATION_FAILURE').length, rateLimitedCount: failures.filter(item => item.failureCategory === 'RATE_LIMITED').length,
+    timeoutCount: failures.filter(item => item.failureCategory === 'TIMEOUT').length, recentRunCount: count, supportRate: count ? supported / count : 0, insufficientRate: count ? insufficient / count : 0,
+    fallbackRate: count ? values.filter(item => ['PARTIAL', 'PROVIDER_UNAVAILABLE', 'BUDGET_EXHAUSTED'].includes(item.status)).length / count : 0,
+    meanLatencyMs: count ? values.reduce((sum, item) => sum + (Number(item.durationMs) || 0), 0) / count : 0, estimatedCostUsd: values.reduce((sum, item) => sum + (Number(item.estimatedCostUsd) || 0), 0) };
+}
 
 function main(args = process.argv.slice(2)) {
   if (args.length) {
@@ -68,6 +79,7 @@ function main(args = process.argv.slice(2)) {
       billing,
       generation: getGenerationControlState({ env: process.env, fsApi: fs }),
       productionRecovery
+      ,research: researchSummary(db)
     });
     console.log(JSON.stringify(result, null, 2));
     return exitCodeForOperationalStatus(result);
@@ -83,4 +95,4 @@ function main(args = process.argv.slice(2)) {
 
 if (require.main === module) process.exitCode = main();
 
-module.exports = { main, migrationSummary, storageSummary };
+module.exports = { main, migrationSummary, researchSummary, storageSummary };

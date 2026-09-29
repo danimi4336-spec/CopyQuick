@@ -116,7 +116,7 @@ Startup fails closed when OpenAI is explicitly selected without a key or when an
 
 ## OpenAI Web Search research adapter
 
-Research Evidence Pack v2 can use a separately enabled OpenAI Web Search
+Research Evidence Pack v3 can use a separately enabled OpenAI Web Search
 adapter. Article generation keeps its existing provider and model. The adapter
 submits one normalized Research Need per Responses request, sets
 `max_tool_calls: 1`, requests native source metadata, and treats every returned
@@ -147,6 +147,18 @@ authority or evidence on its own. `OPENAI_PROPOSITION_PARSER_MODEL` defaults to
 `OPENAI_RESEARCH_MODEL`; `OPENAI_PROPOSITION_PARSER_TIMEOUT_MS` defaults to
 12000. CopyQuick independently verifies every returned field and support-window
 reference before normal evidence validation.
+
+## Research operations limits
+
+Research Evidence Pack v3 uses one shared operations budget across every
+research need. Calls reserve provider-action, time, and estimated-cost allowance
+before invocation and reconcile observed usage afterward. Defaults may be
+lowered with `RESEARCH_NEED_COST_LIMIT_USD`, `RESEARCH_NEED_TIMEOUT_MS`,
+`RESEARCH_PACK_COST_LIMIT_USD`, `RESEARCH_PACK_TIMEOUT_MS`, and
+`RESEARCH_PACK_MAX_EXTERNAL_CALLS`; configuration cannot raise the checked-in
+hard ceilings. OpenAI research and Exa extraction have separate process-local
+circuit breakers. Customer output receives outcome summaries, not provider
+names, tokens, costs, internal codes, or circuit details.
 
 ## Activation checklist
 

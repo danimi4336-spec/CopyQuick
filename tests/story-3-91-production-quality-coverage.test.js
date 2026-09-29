@@ -32,7 +32,7 @@ for (const id of getProductionContractIds()) {
     output.sources = [];
   }
   if (id === 'research_evidence_pack') {
-    Object.assign(output, { researchSummary: repeated, researchQuestions: [repeated], sourcesUsed: [], supportedFindings: [], unsupportedQuestions: [], conflicts: [], freshnessNotes: [repeated], sources: [], evidenceItems: [], claimMappings: [], rejectedSources: [], researchTrace: [], providerSummary: {}, researchAvailabilityStatus: 'not_required', noExternalEvidenceRequired: true, essentialEvidenceMissing: false });
+    Object.assign(output, { researchSummary: repeated, researchQuestions: [repeated], sourcesUsed: [], supportedFindings: [], unsupportedQuestions: [], conflicts: [], freshnessNotes: [repeated], sources: [], evidenceItems: [], claimMappings: [], rejectedSources: [], researchTrace: [], providerSummary: {}, researchAvailabilityStatus: 'not_required', researchOperations: {}, researchStatus: 'No research needed', questionsChecked: 0, supportedQuestionCount: 0, questionsNeedingEvidence: 0, sourcesUsedCount: 0, lastCheckedAt: '2026-09-29T12:00:00.000Z', limitationNote: '', noExternalEvidenceRequired: true, essentialEvidenceMissing: false });
     assert.strictEqual(contract.validateOutput(output), true, `${id} fixture must satisfy its structural contract`);
     assert.strictEqual(validateCustomerReadyOutput(output, contract).valid, true, `${id} uses evidence-specific validation rather than copy repetition`);
     continue;

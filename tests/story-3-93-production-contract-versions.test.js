@@ -9,12 +9,12 @@ for (const id of getProductionContractIds()) {
     campaign_brief: 4, product_positioning: 4, value_proposition: 4,
     outreach_sequence: 5, lead_capture_page: 5, paid_ad_copy_set: 4,
     search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4,
-    priority_search_article: 2, research_evidence_pack: 2
+    priority_search_article: 2, research_evidence_pack: 3
   })[id] || (id === 'organic_content_campaign' ? 16
     : ['outreach_sequence', 'lead_capture_page'].includes(id) ? 4 : 3);
   const currentVersion = `${id}:v${versionNumber}`;
   const compatibleVersions = id === 'priority_search_article' ? ['priority_search_article:v1']
-    : id === 'research_evidence_pack' ? ['research_evidence_pack:v1']
+    : id === 'research_evidence_pack' ? ['research_evidence_pack:v1', 'research_evidence_pack:v2']
       : Array.from({ length: versionNumber - 1 }, function(_, index) { return `${id}:v${index + 2}`; });
   assert.strictEqual(contract.version, currentVersion, id);
   assert.deepStrictEqual(contract.compatibleVersions, compatibleVersions, id);
