@@ -302,7 +302,7 @@ async function run() {
     await request(owner, 'GET', `/test/authenticate/${routeUser}`);
     const studioBefore = await request(owner, 'GET', `/production/${routeRunId}`);
     assert.strictEqual(studioBefore.res.statusCode, 200);
-    assert.match(studioBefore.body, /0 of \d+ completed/);
+    assert.match(studioBefore.body, /Creating your assets · 0 of \d+ complete/);
     assert.match(studioBefore.body, /Continue Production/);
     assert.doesNotMatch(studioBefore.body, /\d+%|almost done|AI is working/i);
     const token = studioBefore.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
@@ -312,7 +312,7 @@ async function run() {
     assert.strictEqual(executed.res.statusCode, 303);
     assert.strictEqual(executed.res.headers.location, `/production/${routeRunId}`);
     const studioAfter = await request(owner, 'GET', `/production/${routeRunId}`);
-    assert.match(studioAfter.body, /1 of \d+ completed/);
+    assert.match(studioAfter.body, /Creating your assets · 1 of \d+ complete/);
     assert.match(studioAfter.body, /View Deliverable/);
     assert.match(studioAfter.body, /completed/);
   } finally {

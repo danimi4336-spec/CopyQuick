@@ -17,6 +17,9 @@ const {
 const { productionPlanName } = require('../lib/productionPlanIdentity');
 const { listProductionHistoryPage } = require('../lib/productionResume');
 const {
+  customerPurpose,
+  customerReadiness,
+  customerStatusLabel,
   getProductionArtifactPolicy,
   isPlanningFoundation,
   isReadyToUseAsset
@@ -197,8 +200,19 @@ router.get('/production/:id', requireAuth, (req, res) => {
 
   const phases = [];
   production.jobs.forEach(function(job) {
-    job.display_description = productionJobDescription(job);
+    let structured = null;
+    if (job.generation_id) {
+      const generation = db.prepare('SELECT structured_result FROM generations WHERE id = ? AND user_id = ? AND is_deleted = 0').get(job.generation_id, user.id);
+      try { structured = JSON.parse(generation?.structured_result || 'null'); } catch (_) { structured = null; }
+    }
+    job.display_description = customerPurpose(job.deliverable_id, job.title) || productionJobDescription(job);
     job.artifactPolicy = getProductionArtifactPolicy(job.deliverable_id);
+    job.readiness = customerReadiness({ deliverableId: job.deliverable_id, status: job.status, valid: Boolean(structured) || job.status !== 'completed', essentialEvidenceMissing: Boolean(structured?.essentialEvidenceMissing) });
+    job.customer_status = customerStatusLabel(job.readiness, job.status);
+    job.researchSummary = job.deliverable_id === 'research_evidence_pack' && structured ? {
+      status: Number(structured.questionsNeedingEvidence) > 0 && structured.researchStatus === 'No research needed' ? 'Research limited' : structured.researchStatus || '', sources: Number(structured.sourcesUsedCount) || 0,
+      lastCheckedAt: structured.lastCheckedAt || '', limitation: structured.limitationNote || ''
+    } : null;
     let phase = phases.find(function(existing) { return existing.id === job.phase; });
     if (!phase) {
       phase = { id: job.phase, title: job.phase_title || job.phase, jobs: [] };
@@ -207,6 +221,14 @@ router.get('/production/:id', requireAuth, (req, res) => {
     phase.jobs.push(job);
   });
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
+  const needsAttention = production.jobs.filter(job => ['NEEDS_INFORMATION', 'NEEDS_SAFE_REVIEW', 'COULD_NOT_COMPLETE'].includes(job.readiness));
+  const readyForReview = production.jobs.filter(job => job.readiness === 'READY_FOR_REVIEW');
+  const researchSources = production.jobs.filter(job => job.deliverable_id === 'research_evidence_pack' && !needsAttention.includes(job));
+  const strategyPlanning = production.jobs.filter(job => job.artifactPolicy?.role === 'planning_foundation' && job.deliverable_id !== 'research_evidence_pack' && !needsAttention.includes(job));
+  const recommended = readyForReview[0] || needsAttention[0] || researchSources[0] || strategyPlanning[0] || null;
+  const delivery = { readyForReview, needsAttention, researchSources, strategyPlanning, recommended,
+    supportingCount: researchSources.length + strategyPlanning.length,
+    terminal: ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'].includes(production.status) };
   const executionNotice = req.session.productionExecutionNotice || null;
   req.session.productionExecutionNotice = null;
   const hasExpiredLease = production.jobs.some(function(job) {
@@ -229,6 +251,7 @@ router.get('/production/:id', requireAuth, (req, res) => {
     planName: productionPlanName(production, progressSet),
     planProgress,
     synthesis: getProductionSynthesis(db, user.id, production.id),
+    delivery,
     executionNotice,
     hasExpiredLease
   });

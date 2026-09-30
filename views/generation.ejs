@@ -13,12 +13,19 @@
         <div class="gen-detail-main fade-in">
             <!-- Title -->
             <div class="gen-detail-header">
-                <h1 class="gen-detail-title" id="genTitle"><%= gen.title || gen.input_text.substring(0, 50) %></h1>
+                <div><span class="build-plan-eyebrow"><%= productionDeliverable ? productionDeliverable.readinessLabel : 'Generated content' %></span><h1 class="gen-detail-title" id="genTitle"><%= gen.title || gen.input_text.substring(0, 50) %></h1><% if (productionDeliverable) { %><p class="delivery-purpose"><%= productionDeliverable.purpose %></p><% } %></div>
                 <div class="gen-detail-actions-top">
                     <button class="icon-btn <%= gen.favorite ? 'active' : '' %>" id="favBtn" onclick="toggleFav()" title="Favorite">⭐</button>
                     <% if (!productionDeliverable) { %><button class="icon-btn" onclick="deleteGen()" title="Delete">🗑️</button><% } %>
                 </div>
             </div>
+
+            <% if (productionDeliverable) { %><div class="detail-actions-card delivery-actions-top" aria-label="Deliverable actions">
+                <% if (productionDeliverable.primaryAction === 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-primary">Download Markdown</a><% } else if (productionDeliverable.customerReady) { %><button class="btn btn-primary" onclick="copyAll()">Copy asset</button><% } %>
+                <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">Download TXT</a>
+                <% if (productionDeliverable.primaryAction !== 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">Download Markdown</a><% } %>
+                <a href="/production/<%= productionDeliverable.runId %>" class="btn btn-outline">← Back to results</a>
+            </div><% } %>
 
             <% if (!productionDeliverable) { %>
             <div class="detail-card">
@@ -29,7 +36,7 @@
 
             <!-- Results -->
             <div class="detail-card">
-                <h3><%= productionDeliverable ? 'Production Deliverable' : 'Generated Content' %></h3>
+                <% if (!productionDeliverable) { %><h3>Generated Content</h3><% } %>
                 <div class="detail-results">
                     <% if (productionDeliverable && !productionDeliverable.customerReady) { %>
                         <% if (productionDeliverable.legacyPlanningOutline) { %>
@@ -57,7 +64,7 @@
                     <% if (productionDeliverable && productionDeliverable.sections.length) { %>
                         <% productionDeliverable.sections.filter(function(section) { return !section.internal; }).forEach(function(section, i) { %>
                             <section class="production-deliverable-section public-deliverable-section">
-                                <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
+                                <div class="result-header"><h4><%= section.label %></h4><button class="copy-btn" onclick="copyText('<%= 'deliverable-' + i %>', this)" title="Copy <%= section.label %>" aria-label="Copy <%= section.label %>">📋 Copy</button></div>
                                 <% if (section.isList) { %><ul class="result-text" id="deliverable-<%= i %>"><% section.value.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
                                 <% } else if (section.format === 'markdown') { %><div class="result-text rich-result-text" id="deliverable-<%= i %>"><%- renderSafeMarkdown(section.value) %></div>
                                 <% } else { %><p class="result-text" id="deliverable-<%= i %>"><%= section.value %></p><% } %>
@@ -65,14 +72,13 @@
                         <% }); %>
                         <% var internalSections = productionDeliverable.sections.filter(function(section) { return section.internal; }); %>
                         <% if (internalSections.length) { %>
-                            <div class="alert alert-info production-purpose-notice" role="note"><strong>Internal review guidance</strong><br>These notes help you review and publish the asset. They are not part of the customer-facing copy.</div>
-                            <% internalSections.forEach(function(section, i) { %>
+                            <details class="editorial-review-disclosure"><summary>Editorial review</summary><p>These notes help you review and publish the asset. They are not part of the customer-facing copy.</p><% internalSections.forEach(function(section, i) { %>
                                 <section class="production-deliverable-section internal-review-section">
-                                    <div class="result-header"><h4><%= section.label %><% if (section.guidanceLabel) { %> <span class="guidance-badge"><%= section.guidanceLabel %></span><% } %></h4><button class="copy-btn" onclick="copyText('<%= 'internal-deliverable-' + i %>', this)" title="Copy">📋 Copy</button></div>
+                                    <div class="result-header"><h4><%= section.label %><% if (section.guidanceLabel) { %> <span class="guidance-badge"><%= section.guidanceLabel %></span><% } %></h4><button class="copy-btn" onclick="copyText('<%= 'internal-deliverable-' + i %>', this)" aria-label="Copy <%= section.label %>">📋 Copy</button></div>
                                     <% if (section.isList) { %><ul class="internal-result-text" id="internal-deliverable-<%= i %>"><% section.value.forEach(function(item) { %><li><%= item %></li><% }); %></ul>
                                     <% } else { %><p class="internal-result-text" id="internal-deliverable-<%= i %>"><%= section.value %></p><% } %>
                                 </section>
-                            <% }); %>
+                            <% }); %></details>
                         <% } %>
                     <% } else if (!productionDeliverable) { %>
                     <% var resultsList = typeof results === 'string' ? JSON.parse(results) : results; %>
@@ -94,8 +100,7 @@
             <!-- Actions -->
             <div class="detail-actions-card">
                 <% if (!productionDeliverable) { %><button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button><% } %>
-                <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { var productionActionLabel = productionDeliverable.artifactRole === 'planning_foundation' ? '✨ Regenerate Planning Foundation' : productionDeliverable.source.mode === 'recovered_fallback' ? '✨ Retry AI Generation' : productionDeliverable.source.mode === 'ai' ? '✨ Regenerate AI Version' : '✨ Create Improved AI Version'; %><button class="btn btn-primary" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" data-default-label="<%= productionActionLabel %>" onclick="regenerateProductionWithAi()"><%= productionActionLabel %></button><% } %>
-                <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>" class="btn btn-primary">← Back to Production Plan</a><% } %>
+                <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { var productionActionLabel = productionDeliverable.artifactRole === 'planning_foundation' ? 'Improve this planning document with AI' : 'Improve this asset with AI'; %><button class="btn btn-outline" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" data-default-label="<%= productionActionLabel %>" onclick="regenerateProductionWithAi()"><%= productionActionLabel %></button><% } %>
                 <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
                 <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
                 <% if (!productionDeliverable || productionDeliverable.customerReady) { %><button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button><% } %>
@@ -110,9 +115,6 @@
                     <div class="meta-row"><span class="meta-label">Tone</span><span class="meta-value"><%= gen.tone %></span></div>
                     <div class="meta-row"><span class="meta-label">Words</span><span class="meta-value"><%= gen.word_count || 0 %></span></div>
                     <% if (productionDeliverable) { %>
-                    <div class="meta-row"><span class="meta-label">Output Source</span><span class="meta-value"><%= productionDeliverable.source.label %></span></div>
-                    <div class="meta-row"><span class="meta-label">Model</span><span class="meta-value"><%= productionDeliverable.source.model %></span></div>
-                    <div class="meta-row"><span class="meta-label">Generation Method</span><span class="meta-value"><%= productionDeliverable.generationMethod %></span></div>
                     <% } else { %>
                     <div class="meta-row"><span class="meta-label">AI Model</span><span class="meta-value"><%= gen.ai_model || 'CopyQuick AI' %></span></div>
                     <% } %>
@@ -120,6 +122,8 @@
                     <div class="meta-row"><span class="meta-label">Updated</span><span class="meta-value"><%= new Date(gen.updated_at || gen.created_at).toLocaleDateString() %></span></div>
                 </div>
             </div>
+
+            <% if (productionDeliverable && productionDeliverable.relatedSupportingWork && productionDeliverable.relatedSupportingWork.length) { %><div class="sidebar-card"><h3 class="h4">Supporting work</h3><ul class="supporting-work-list"><% productionDeliverable.relatedSupportingWork.forEach(function(item) { %><li><a href="/generation/<%= item.id %>"><%= item.title %></a></li><% }); %></ul></div><% } %>
 
             <div class="sidebar-card">
                 <h3 class="h4">Tags</h3>
@@ -178,7 +182,7 @@ function regenerateProductionWithAi() {
     var planningDeliverable = button && button.dataset.artifactRole === 'planning_foundation';
     var confirmation = planningDeliverable
         ? 'Regenerate this planning foundation? This optional regeneration uses 1 generation credit and replaces the current planning document. It will not create customer-facing sales copy.'
-        : 'Create a new AI version of this deliverable? One generation credit is used only when the AI version passes validation. A recovered deterministic fallback is not charged. The accepted content replaces what is shown on this page.';
+        : 'Improve this asset with AI? The displayed version will be replaced. One generation credit is used only when the improved asset passes validation.';
     if (!confirm(confirmation)) return;
     if (button) { button.disabled = true; button.textContent = 'Creating AI version…'; }
     fetch('/generation/' + genId + '/regenerate-production', {
@@ -196,7 +200,7 @@ function regenerateProductionWithAi() {
             }
             throw new Error(result.body.error || 'The AI version could not be created.');
         }
-        showToast('Improved AI version created.');
+        showToast('Asset improved with AI.');
         location.reload();
     }).catch(function(error) {
         showToast(error.message);
@@ -216,7 +220,7 @@ function copyAll() {
     var texts = [];
     document.querySelectorAll('.result-text').forEach(function(el) { texts.push(el.innerText); });
     navigator.clipboard.writeText(texts.join('\n\n---\n\n')).then(function() {
-        showToast('All copies copied to clipboard 📋');
+        showToast('Asset copied to clipboard');
     });
 }
 
@@ -238,6 +242,8 @@ function showToast(msg) {
     if (existing) existing.remove();
     var toast = document.createElement('div');
     toast.className = 'toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
     toast.textContent = msg;
     document.body.appendChild(toast);
     setTimeout(function() { toast.classList.add('show'); }, 10);

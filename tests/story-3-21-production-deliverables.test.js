@@ -309,16 +309,20 @@ async function run() {
   assert.throws(() => loadDependencyOutputs(db, { ...downstream, dependencies: JSON.parse(downstream.dependencies) }), error => error.code === 'DEPENDENCY_QUALITY_INVALID');
 
   const studioHtml = await render('production-studio.ejs', {
-    production: { id: 1, status: 'running', jobs: [], production_cost_units: 2, started_at: 'now' },
+    production: { id: 1, objective: 'launch_product', status: 'running', jobs: [], production_cost_units: 2, started_at: 'now' },
     phases: [{ title: 'Foundation', jobs: [
       { sequence_order: 0, title: 'Done', strategic_direction: 'Direction', dependencies: ['one'], status: 'completed', generation_id: 7, error_message: null },
       { sequence_order: 1, title: 'Waiting', strategic_direction: 'Direction', dependencies: ['one', 'two'], status: 'waiting_dependency', generation_id: null, error_message: null }
-    ] }], completedCount: 1, executionNotice: null, hasExpiredLease: false, csrfToken: 'test'
+    ] }], delivery: {
+      terminal: false, supportingCount: 1, needsAttention: [], researchSources: [],
+      recommended: { title: 'Done', generation_id: 7, readiness: 'READY_FOR_REVIEW' },
+      readyForReview: [{ sequence_order: 0, title: 'Done', display_description: 'Finished work.', readiness: 'READY_FOR_REVIEW', customer_status: 'Ready for review', status: 'completed', generation_id: 7 }],
+      strategyPlanning: [{ sequence_order: 1, title: 'Waiting', display_description: 'Supporting work.', readiness: 'CREATING', customer_status: 'Waiting for earlier work', status: 'waiting_dependency', generation_id: null }]
+    }, completedCount: 1, executionNotice: null, hasExpiredLease: false, csrfToken: 'test'
   });
-  assert.match(studioHtml, /View Deliverable →/);
+  assert.match(studioHtml, /Open →/);
   assert.strictEqual((studioHtml.match(/class="production-result-link"/g) || []).length, 1);
-  assert.strictEqual((studioHtml.match(/Waiting for 2 prerequisites\./g) || []).length, 1);
-  assert.doesNotMatch(studioHtml, /Waiting for 1 prerequisite/);
+  assert.match(studioHtml, /supporting work is ready/);
   assert.match(studioHtml, /if \(!resultLink\)/);
   assert.doesNotMatch(studioHtml, /production-job-statusstatus-/);
 
@@ -327,12 +331,11 @@ async function run() {
     results: [], productionDeliverable: { runId: 1, customerReady: true, canRegenerateWithAi: true, generationMethod: 'Structured Production Engine', source: { label: 'OpenAI production AI', model: 'gpt-test' }, sections: [{ label: 'Positioning Statement', value: 'A clear position for retailers.', isList: false }] }
   });
   assert.doesNotMatch(productionHtml, /SECRET INTERNAL PROMPT|<h3>Prompt<\/h3>/);
-  assert.match(productionHtml, /Back to Production Plan|Production Plan/);
+  assert.match(productionHtml, /Back to results|Production Plan/);
   assert.match(productionHtml, /Positioning Statement/);
-  assert.match(productionHtml, /Generation Method|Structured Production Engine/);
-  assert.match(productionHtml, /Output Source|OpenAI production AI|gpt-test/);
-  assert.match(productionHtml, /Create Improved AI Version/);
-  assert.match(productionHtml, /uses 1 generation credit/);
+  assert.doesNotMatch(productionHtml, /Generation Method|Structured Production Engine|Output Source|gpt-test/);
+  assert.match(productionHtml, /Improve this asset with AI/);
+  assert.match(productionHtml, /One generation credit/);
   assert.doesNotMatch(productionHtml, /AI Model|CopyQuick AI/);
 
   const legacyOutreachHtml = await render('generation.ejs', {
@@ -349,7 +352,7 @@ async function run() {
   });
   assert.match(legacyOutreachHtml, /legacy planning outline, not a copy-ready deliverable/i);
   assert.match(legacyOutreachHtml, /Legacy Outreach Outline/);
-  assert.match(legacyOutreachHtml, /Create Improved AI Version/);
+  assert.match(legacyOutreachHtml, /Improve this asset with AI/);
 
   const invalidReadyAssetHtml = await render('generation.ejs', {
     gen: { id: 11, title: 'Amazon A+ Content', input_text: 'INTERNAL', content_type: 'product_description', tone: 'professional', favorite: 0, word_count: 30, created_at: new Date().toISOString() },
@@ -434,7 +437,7 @@ async function run() {
   assert.match(campaignBriefHtml, /href="\/generation\/11"/);
   assert.match(campaignBriefHtml, /Open the ready-to-use email campaign/);
   assert.match(campaignBriefHtml, /<span class="meta-value">Campaign Brief<\/span>/);
-  assert.match(campaignBriefHtml, /Regenerate Planning Foundation/);
+  assert.match(campaignBriefHtml, /Improve this planning document with AI/);
   assert.match(campaignBriefHtml, /It will not create customer-facing sales copy/);
 
   const ordinaryHtml = await render('generation.ejs', {

@@ -280,9 +280,9 @@ async function run() {
 
     const studio = await request(sufficient, 'GET', runLocation);
     assert.strictEqual(studio.res.statusCode, 200);
-    assert.match(studio.body, new RegExp(`0 of ${deliverableCount} completed`));
+    assert.match(studio.body, new RegExp(`Creating your assets · 0 of ${deliverableCount} complete`));
     assert.match(studio.body, /queued/);
-    assert.match(studio.body, /waiting dependency/);
+    assert.match(studio.body, /supporting work is ready/);
     assert.doesNotMatch(studio.body, /\d+%|almost done|AI is working/i);
 
     await request(other, 'GET', `/test/authenticate/${otherUserId}/no_session`);

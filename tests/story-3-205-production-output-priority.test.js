@@ -34,17 +34,17 @@ ejs.renderFile(path.join(root, 'views', 'production-studio.ejs'), {
   synthesis: null
 }, {}, function(error, html) {
   if (error) throw error;
-  assert.match(html, /id="ready-assets-title">Ready-to-use assets/);
-  assert.match(html, /Open these deliverables to copy, export, or put them to work/);
+  assert.match(html, /id="ready-assets-title">Ready for review/);
+  assert.match(html, /Open finished assets to review, copy, or download them/);
   assert.match(html, /<details class="production-foundation-disclosure">/);
-  assert.match(html, /<span>Free planning foundation deliverables<\/span>/);
+  assert.match(html, /<span>Strategy &amp; Planning<\/span>/);
   assert.doesNotMatch(html, /<details class="production-foundation-disclosure" open/);
-  assert(html.indexOf('Paid Ad Copy Set') < html.indexOf('Free planning foundation deliverables'));
-  assert(html.indexOf('Lead Capture Page') < html.indexOf('Free planning foundation deliverables'));
-  assert(html.indexOf('Free planning foundation deliverables') < html.indexOf('Customer Acquisition Snapshot'));
+  assert(html.indexOf('Paid Ad Copy Set') < html.indexOf('Strategy &amp; Planning'));
+  assert(html.indexOf('Lead Capture Page') < html.indexOf('Strategy &amp; Planning'));
+  assert(html.indexOf('Strategy &amp; Planning') < html.indexOf('Customer Acquisition Snapshot'));
   assert.match(html, /<span class="production-job-order">1<\/span>[\s\S]*Paid Ad Copy Set/);
   assert.match(html, /<span class="production-job-order">2<\/span>[\s\S]*Lead Capture Page/);
-  assert.match(html, /Free planning foundation deliverables[\s\S]*<span class="production-job-order">1<\/span>[\s\S]*Customer Acquisition Snapshot/);
+  assert.match(html, /Strategy &amp; Planning[\s\S]*<span class="production-job-order">1<\/span>[\s\S]*Customer Acquisition Snapshot/);
   assert.strictEqual((html.match(/<li data-production-sequence=/g) || []).length, 3);
   console.log('Story 3.205 Production Output Priority tests passed');
 });

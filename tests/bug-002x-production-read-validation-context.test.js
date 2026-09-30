@@ -77,7 +77,7 @@ assert.ok(context.compositionBrief, 'organic read validation must reconstruct th
 assert.strictEqual(loadProductionValidationContext(db, { userId: 7, generation: { id: 133 } }), null);
 
 const generationView = fs.readFileSync(path.join(__dirname, '..', 'views', 'generation.ejs'), 'utf8');
-assert.match(generationView, /source\.mode === 'ai' \? '✨ Regenerate AI Version'/,
-  'an existing OpenAI result must offer regeneration rather than claiming no AI version exists');
+assert.match(generationView, /Improve this asset with AI/,
+  'an existing result must honestly offer in-place improvement without implying version history');
 
 console.log('production read validation context regression test passed');

@@ -9,6 +9,7 @@ const generator = require('../lib/generator');
 const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
+const { customerPurpose, customerReadiness, customerStatusLabel } = require('../lib/productionArtifactPolicy');
 const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { loadProductionValidationContext } = require('../lib/productionValidationContext');
@@ -75,6 +76,28 @@ function logGenerationFailure(req, event, code, statusCode) {
     route: req.route?.path || 'unmatched',
     statusCode,
     code
+  });
+}
+
+function safeExportSlug(value, fallback) {
+  const slug = String(value || '').normalize('NFKD').replace(/[^a-zA-Z0-9\s-]/g, '').trim().toLowerCase().replace(/[\s-]+/g, '-').slice(0, 72).replace(/-+$/g, '');
+  return slug || fallback;
+}
+
+function hasPresentationValue(section) {
+  if (section.isList) return Array.isArray(section.value) && section.value.length > 0;
+  return section.value !== null && section.value !== undefined
+    && (typeof section.value !== 'string' || section.value.trim().length > 0);
+}
+
+function customerResearchSections(sections, output) {
+  if (!output || Number(output.questionsNeedingEvidence) < 1 || output.researchStatus !== 'No research needed') return sections;
+  return sections.map(section => {
+    if (section.key === 'researchStatus') return { ...section, value: 'Research limited' };
+    if (section.key === 'researchSummary' && /no external evidence required/i.test(String(section.value))) {
+      return { ...section, value: 'No external sources were used; one or more requested claims remain outside the available evidence boundary.' };
+    }
+    return section;
   });
 }
 
@@ -633,6 +656,22 @@ router.get('/generation/:id', requireAuth, (req, res) => {
           LIMIT 1
         `).get(production.production_run_id, userId)
       : null;
+    const relatedSupportingWork = production?.production_run_id ? db.prepare(`
+      SELECT generations.id, production_jobs.title, production_jobs.deliverable_id
+      FROM production_jobs JOIN generations ON generations.id = production_jobs.generation_id
+      WHERE production_jobs.production_run_id = ? AND production_jobs.status = 'completed'
+        AND generations.user_id = ? AND generations.is_deleted = 0 AND generations.id <> ?
+      ORDER BY CASE production_jobs.deliverable_id WHEN 'research_evidence_pack' THEN 0 WHEN 'search_strategy' THEN 1 WHEN 'priority_content_brief' THEN 2 ELSE 3 END,
+        production_jobs.sequence_order LIMIT 3
+    `).all(production.production_run_id, userId, gen.id) : [];
+    const readiness = customerReadiness({ deliverableId: gen.deliverable_id, status: 'completed', valid: quality.valid, essentialEvidenceMissing: Boolean(output?.essentialEvidenceMissing) });
+    const presentedSections = quality.valid ? contract.presentationSections(output) : legacySections;
+    const nonemptySections = customerResearchSections(presentedSections, gen.deliverable_id === 'research_evidence_pack' ? output : null)
+      .filter(hasPresentationValue)
+      .map(section => section.key === 'lastCheckedAt' && section.value
+        ? { ...section, value: new Date(section.value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC' }
+        : section);
+    const topic = output?.specificTopic || output?.contentTopic || output?.title || gen.title;
     productionDeliverable = {
       runId: production?.run_id || null,
       title: production?.job_title || gen.title,
@@ -647,6 +686,11 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       canRegenerateWithAi: providerStatus.live,
       providerStatus,
       displayType: contract?.displayType || gen.content_type.replace(/_/g, ' '),
+      purpose: customerPurpose(gen.deliverable_id, production?.job_title || gen.title),
+      readiness,
+      readinessLabel: customerStatusLabel(readiness, 'completed'),
+      primaryAction: ['blog_intro', 'product_description'].includes(gen.content_type) ? 'markdown' : 'copy',
+      exportBaseName: `${safeExportSlug(contract?.title || gen.title, 'copyquick-deliverable')}-${safeExportSlug(topic, String(gen.id))}`,
       artifactRole: contract?.artifactRole || 'ready_to_use_asset',
       purposeNotice: contract?.artifactRole === 'planning_foundation'
         ? readyAssetBilling
@@ -656,7 +700,15 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       nextDeliverable: nextDeliverable
         ? { id: nextDeliverable.id, title: nextDeliverable.title }
         : null,
-      sections: quality.valid ? contract.presentationSections(output) : legacySections
+      relatedSupportingWork,
+      researchSummary: gen.deliverable_id === 'research_evidence_pack' ? {
+        status: Number(output?.questionsNeedingEvidence) > 0 && output?.researchStatus === 'No research needed' ? 'Research limited' : output?.researchStatus || '', questionsChecked: Number(output?.questionsChecked) || 0,
+        supportedQuestions: Number(output?.supportedQuestionCount) || 0,
+        questionsNeedingEvidence: Number(output?.questionsNeedingEvidence) || 0,
+        sourcesUsed: Number(output?.sourcesUsedCount) || 0, lastCheckedAt: output?.lastCheckedAt || '',
+        limitation: output?.limitationNote || ''
+      } : null,
+      sections: nonemptySections
     };
   }
 
@@ -986,7 +1038,10 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
     else if (format === 'md') content = `# ${gen.title}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
     else return res.status(400).send('Unsupported format');
     res.setHeader('Content-Type', format === 'md' ? 'text/markdown' : 'text/plain');
-    res.setHeader('Content-Disposition', `attachment; filename="copyquick-deliverable-${gen.id}.${format}"`);
+    let outputTitle = gen.title;
+    try { outputTitle = JSON.parse(gen.structured_result || '{}').specificTopic || gen.title; } catch (_) { /* safe fallback */ }
+    const filename = `${safeExportSlug(gen.title, 'copyquick-deliverable')}-${safeExportSlug(outputTitle, String(gen.id))}.${format}`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(content);
   }
 
