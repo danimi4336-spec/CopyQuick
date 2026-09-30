@@ -21,7 +21,7 @@ const context = {
 };
 
 const readyContracts = getProductionContractIds().map(getProductionContract).filter(contract => contract.readyToUse);
-assert.strictEqual(readyContracts.length, 23);
+assert.strictEqual(readyContracts.length, 24);
 readyContracts.forEach(contract => {
   assert.strictEqual(contract.validationProfile.policy, 'ready_asset_quality_v1', `${contract.id} needs the shared profile`);
   assert(contract.validationProfile.family, `${contract.id} needs a family profile`);

@@ -6,6 +6,7 @@ const { getProductionContract, getProductionContractIds } = require('../lib/prod
 for (const id of getProductionContractIds()) {
   const contract = getProductionContract(id);
   const versionNumber = ({
+    consultation_conversion_brief: 1, consultation_conversion_page_copy: 1,
     campaign_brief: 4, product_positioning: 4, value_proposition: 4,
     outreach_sequence: 5, lead_capture_page: 5, paid_ad_copy_set: 4,
     search_evidence_snapshot: 4, search_strategy: 4, priority_content_brief: 4,
