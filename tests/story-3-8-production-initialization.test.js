@@ -237,9 +237,10 @@ async function run() {
     assert.match(review.body, new RegExp(`${units} production credit`));
     assert.match(review.body, /Starting this run will use/);
     assert.match(review.body, /Start Production/);
-    assert.match(review.body, /Ready-to-use output deliverables/);
+    assert.match(review.body, /What you'll receive/);
     assert.match(review.body, /<details class="planning-foundation-disclosure">/);
-    assert(review.body.indexOf('Ready-to-use output deliverables') < review.body.indexOf('Free planning foundation deliverables'));
+    assert(review.body.indexOf("What you'll receive") < review.body.indexOf('Supporting work'));
+    assert.doesNotMatch(review.body, /Acceptance-isolated|external AI provider|<dt>Provider<\/dt>|<dt>Model<\/dt>|CopyQuick Deterministic/);
     assert.deepStrictEqual(usageState(db, sufficientUserId), reviewBefore);
     const token = review.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     const csrfDenied = await request(sufficient, 'POST', '/production/start');

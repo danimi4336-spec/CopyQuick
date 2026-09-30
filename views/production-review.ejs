@@ -2,21 +2,21 @@
     <div class="container production-review-container">
         <header class="production-review-header">
             <span class="build-plan-eyebrow">Final Production Review</span>
-            <h1>Review before starting production</h1>
-            <p>Confirm what CopyQuick will produce and the exact usage cost before production begins.</p>
+            <h1>Review what CopyQuick will create</h1>
+            <p>Confirm your finished work, included supporting documents, and exact cost before Production begins.</p>
         </header>
 
         <% if (error) { %><div class="alert alert-error production-review-alert" role="alert"><%= error %></div><% } %>
 
-        <section class="production-source-card production-source-<%= productionSource.mode %>" aria-labelledby="production-source-title">
+        <section class="production-readiness-card" aria-labelledby="production-readiness-title">
             <div>
-                <span>Output source for this batch</span>
-                <h2 id="production-source-title"><%= productionSource.label %></h2>
-                <p><%= productionSource.description %></p>
+                <span>Plan readiness</span>
+                <h2 id="production-readiness-title"><%= cost.canAfford ? (readyToUseAssets.length ? 'Ready to start' : 'Planning work ready to start') : 'Action needed before Production' %></h2>
+                <p><% if (cost.canAfford) { %>CopyQuick will create the selected work shown below when you start Production.<% } else { %><%= cost.blockingReason %><% } %></p>
             </div>
             <dl>
-                <div><dt>Provider</dt><dd><%= productionSource.provider %></dd></div>
-                <div><dt>Model</dt><dd><%= productionSource.model %></dd></div>
+                <div><dt>Finished assets</dt><dd><%= readyToUseAssets.length %></dd></div>
+                <div><dt>Supporting documents</dt><dd><%= planningFoundation.length %></dd></div>
             </dl>
         </section>
 
@@ -24,7 +24,7 @@
             <div>
                 <span>Authoritative production cost</span>
                 <h2 id="production-cost-title"><%= cost.productionUnitCount %> production credit<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
-                <p>Only ready-to-use assets use credits. <%= cost.planningFoundationCount %> planning prerequisite<%= cost.planningFoundationCount === 1 ? '' : 's' %> will be prepared at no charge.</p>
+                <p>Only ready-to-use assets use Production credits. <%= cost.planningFoundationCount %> supporting document<%= cost.planningFoundationCount === 1 ? '' : 's' %> will be prepared at no additional Production-credit cost.</p>
             </div>
             <dl>
                 <div><dt>Current usage</dt><dd><%= cost.currentUsage %></dd></div>
@@ -35,23 +35,23 @@
         </section>
 
         <section class="deliverable-display-section deliverable-output-section" aria-labelledby="production-review-plan-title">
-            <header><div><span class="build-plan-eyebrow">Your outputs</span><h2 id="production-review-plan-title">Ready-to-use output deliverables</h2></div><strong><%= readyToUseAssets.length %> output<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
-            <p>These are the customer-ready deliverables CopyQuick will produce in this run. <%= batch.completed.length %> completed step<%= batch.completed.length === 1 ? '' : 's' %> will not be repeated.</p>
+            <header><div><span class="build-plan-eyebrow">Your finished work</span><h2 id="production-review-plan-title">What you'll receive</h2></div><strong><%= readyToUseAssets.length %> ready asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
+            <% if (readyToUseAssets.length) { %><p>These assets will be ready for your review after Production completes. <%= batch.completed.length %> completed step<%= batch.completed.length === 1 ? '' : 's' %> will not be repeated.</p><% } else { %><p>This plan contains supporting work only; no ready-to-use asset is included.</p><% } %>
             <ol class="deliverable-display-list">
                 <% readyToUseAssets.forEach(function(item, index) { %>
-                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready-to-use asset · 1 production credit</small><p><%= item.reason %></p></div></li>
+                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready for review after Production completes · 1 Production credit</small><p><%= item.reason %></p></div></li>
                 <% }); %>
             </ol>
         </section>
 
         <% if (planningFoundation.length) { %>
             <details class="planning-foundation-disclosure">
-                <summary><span>Free planning foundation deliverables</span><small><%= planningFoundation.length %> internal prerequisite<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                <summary><span>Supporting work</span><small><%= planningFoundation.length %> supporting document<%= planningFoundation.length === 1 ? '' : 's' %> · included free</small></summary>
                 <div class="planning-foundation-content">
-                    <p>CopyQuick prepares these internal planning documents first so the ready-to-use outputs stay aligned. They are not customer-facing copy.</p>
+                    <p>CopyQuick prepares these documents to guide and validate the finished work. They are included at no additional Production-credit cost.</p>
                     <ol class="deliverable-display-list">
                         <% planningFoundation.forEach(function(item, index) { %>
-                            <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Free planning foundation · internal use</small><p><%= item.reason %></p></div></li>
+                            <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small><% if (item.id === 'research_evidence_pack') { %>Research &amp; Sources<% } else { %>Supporting document<% } %> · included free</small><p><%= item.reason %></p></div></li>
                         <% }); %>
                     </ol>
                 </div>
@@ -67,7 +67,7 @@
 
         <% if (cost.canAfford) { %>
             <div class="production-confirmation">
-                <p>Starting this run will use <strong><%= cost.productionUnitCount %></strong> production credit<%= cost.productionUnitCount === 1 ? '' : 's' %> for <%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %>. The planning foundation is included free. Usage begins only when you select Start Production.</p>
+                <p>Starting this run will use <strong><%= cost.productionUnitCount %></strong> Production credit<%= cost.productionUnitCount === 1 ? '' : 's' %> for <%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %>. Supporting work is included at no additional Production-credit cost. Usage begins when you select Start Production.</p>
                 <div class="production-confirmation-actions">
                     <a href="/discovery/production-ready" class="btn btn-outline">← Back</a>
                     <form action="/production/start" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn-primary">Start Production</button></form>

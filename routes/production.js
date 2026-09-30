@@ -8,7 +8,6 @@ const { requireGenerationAvailable } = require('../lib/generationControls');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
 const { writeOperationalEvent } = require('../lib/operationalLogger');
 const { buildProductionSynthesis } = require('../lib/productionSynthesis');
-const { productionProviderStatus } = require('../lib/openaiProductionProvider');
 const {
   buildProductionPlanProgress,
   resolveProductionProgressSet,
@@ -82,7 +81,6 @@ function renderReview(res, review, options = {}) {
     batch: review.batch,
     planningFoundation: review.batch.productionNow.filter(isPlanningFoundation),
     readyToUseAssets: review.batch.productionNow.filter(isReadyToUseAsset),
-    productionSource: productionProviderStatus(process.env),
     error: options.error || null
   });
 }

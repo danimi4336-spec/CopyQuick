@@ -7,13 +7,19 @@ const root = path.join(__dirname, '..');
 const readyPolicy = { role: 'ready_to_use_asset' };
 const foundationPolicy = { role: 'planning_foundation' };
 
-['build-plan.ejs', 'production-ready.ejs', 'production-review.ejs'].forEach(function(viewName) {
+['build-plan.ejs', 'production-ready.ejs'].forEach(function(viewName) {
   const source = fs.readFileSync(path.join(root, 'views', viewName), 'utf8');
   assert.match(source, /Ready-to-use output deliverables/);
   assert.match(source, /Free planning foundation deliverables/);
   assert.match(source, /<details class="planning-foundation-disclosure">/);
   assert(source.indexOf('Ready-to-use output deliverables') < source.indexOf('Free planning foundation deliverables'));
 });
+
+const reviewSource = fs.readFileSync(path.join(root, 'views', 'production-review.ejs'), 'utf8');
+assert.match(reviewSource, /What you'll receive/);
+assert.match(reviewSource, /<span>Supporting work<\/span>/);
+assert.match(reviewSource, /<details class="planning-foundation-disclosure">/);
+assert(reviewSource.indexOf("What you'll receive") < reviewSource.indexOf('<span>Supporting work</span>'));
 
 ejs.renderFile(path.join(root, 'views', 'production-studio.ejs'), {
   production: { id: 12, status: 'completed', jobs: [], production_cost_units: 3, started_at: 'now', costingModel: 'ready_to_use_asset_unit' },

@@ -298,16 +298,14 @@ body {
 .production-review-header h1, .production-studio-header h1 { margin-bottom: .7rem; color: #172033; font-size: clamp(2.1rem, 5vw, 3.2rem); }
 .production-review-header p, .production-studio-header p { max-width: none; margin: 0; }
 .production-review-alert { margin-bottom: 1rem; }
-.production-source-card { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; margin-bottom: 1.25rem; padding: 1.25rem 1.5rem; border: 1px solid #cbd5e1; border-radius: 1rem; background: #fff; }
-.production-source-card > div > span { color: #475569; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.production-source-card h2 { margin: .3rem 0; color: #1e293b; font-size: 1.25rem; }
-.production-source-card p { max-width: none; margin: 0; font-size: .8rem; }
-.production-source-card dl { display: grid; align-content: center; gap: .45rem; margin: 0; }
-.production-source-card dl div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .4rem; border-bottom: 1px solid #e2e8f0; }
-.production-source-card dt { color: #64748b; font-size: .75rem; }
-.production-source-card dd { margin: 0; color: #1e293b; font-size: .8rem; font-weight: 700; text-align: right; }
-.production-source-ai { border-color: #86efac; background: #f0fdf4; }
-.production-source-deterministic { border-color: #fcd34d; background: #fffbeb; }
+.production-readiness-card { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; margin-bottom: 1.25rem; padding: 1.25rem 1.5rem; border: 1px solid #cbd5e1; border-radius: 1rem; background: #fff; }
+.production-readiness-card > div > span { color: #475569; font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.production-readiness-card h2 { margin: .3rem 0; color: #1e293b; font-size: 1.25rem; }
+.production-readiness-card p { max-width: none; margin: 0; font-size: .8rem; }
+.production-readiness-card dl { display: grid; align-content: center; gap: .45rem; margin: 0; }
+.production-readiness-card dl div { display: flex; justify-content: space-between; gap: 1rem; padding-bottom: .4rem; border-bottom: 1px solid #e2e8f0; }
+.production-readiness-card dt { color: #64748b; font-size: .75rem; }
+.production-readiness-card dd { margin: 0; color: #1e293b; font-size: .8rem; font-weight: 700; text-align: right; }
 .production-cost-card { display: grid; grid-template-columns: 1.15fr .85fr; gap: 2rem; margin-bottom: 1.25rem; padding: 1.5rem; border: 1px solid #c7d2fe; border-radius: 1rem; background: #eef2ff; }
 .production-cost-card > div > span { color: #4338ca; font-size: .72rem; font-weight: 700; text-transform: uppercase; }
 .production-cost-card h2 { margin: .3rem 0; color: #312e81; font-size: 1.65rem; }
@@ -402,7 +400,7 @@ body {
 .production-run-next small { color: var(--secondary); font-size: .72rem; }
 @media (max-width: 700px) { .build-plan-page, .production-ready-page { padding: 2.5rem 0 4rem; } .build-plan-page .container, .production-ready-page .container { padding: 0 1rem; } .build-plan-phase-header, .production-ready-phases > section { grid-template-columns: 1fr; gap: .4rem; } .build-plan-deliverables { grid-template-columns: 1fr; } .build-plan-deliverable:nth-child(odd) { border-right: 0; } .build-plan-selection-summary, .build-plan-actions, .production-ready-actions { align-items: stretch; flex-direction: column; } .build-plan-actions .btn, .build-plan-actions form, .build-plan-actions button, .production-ready-actions .btn { width: 100%; text-align: center; } }
 @media (max-width: 700px) { .build-plan-affordability, .production-review-status { flex-direction: column; } .build-plan-affordability dl { flex-wrap: wrap; } .build-plan-affordability-message, .build-plan-affordability-actions { flex-direction: column; align-items: stretch; } .build-plan-affordability-actions .btn, .build-plan-affordability-actions form { width: 100%; text-align: center; } }
-@media (max-width: 700px) { .production-review-page, .production-studio-page { padding: 2.5rem 0 4rem; } .production-review-page .container, .production-studio-page .container { padding: 0 1rem; } .production-source-card, .production-cost-card, .production-run-summary { grid-template-columns: 1fr; } .production-review-phase { grid-template-columns: 1fr; gap: .4rem; } .production-confirmation, .production-run-next { align-items: stretch; flex-direction: column; } .production-confirmation-actions { align-items: stretch; flex-direction: column-reverse; } .production-confirmation .btn, .production-confirmation form, .production-confirmation-actions, .production-run-next .btn { width: 100%; } .production-studio-phase li, .production-foundation-content li { grid-template-columns: 32px 1fr; } .production-job-status { grid-column: 2; justify-self: start; } .production-output-section-header, .production-foundation-disclosure summary, .deliverable-display-section > header, .planning-foundation-disclosure summary { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 700px) { .production-review-page, .production-studio-page { padding: 2.5rem 0 4rem; } .production-review-page .container, .production-studio-page .container { padding: 0 1rem; } .production-readiness-card, .production-cost-card, .production-run-summary { grid-template-columns: 1fr; } .production-review-phase { grid-template-columns: 1fr; gap: .4rem; } .production-confirmation, .production-run-next { align-items: stretch; flex-direction: column; } .production-confirmation-actions { align-items: stretch; flex-direction: column-reverse; } .production-confirmation .btn, .production-confirmation form, .production-confirmation-actions, .production-run-next .btn { width: 100%; } .production-studio-phase li, .production-foundation-content li { grid-template-columns: 32px 1fr; } .production-job-status { grid-column: 2; justify-self: start; } .production-output-section-header, .production-foundation-disclosure summary, .deliverable-display-section > header, .planning-foundation-disclosure summary { align-items: flex-start; flex-direction: column; } }
 
 .container {
     max-width: 1100px;
