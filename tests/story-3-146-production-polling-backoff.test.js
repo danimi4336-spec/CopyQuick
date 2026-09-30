@@ -11,6 +11,7 @@ assert.match(view, /latestRunStatus = state\.runStatus;\s*retryDelayMs = 5000/);
 assert.match(view, /function scheduleRefresh\(delay\)[\s\S]*if \(pollTimer\) window\.clearTimeout\(pollTimer\)/);
 assert.match(view, /window\.addEventListener\('pagehide'[\s\S]*activeController\.abort\(\)/);
 assert.match(view, /window\.addEventListener\('pageshow'[\s\S]*event\.persisted[\s\S]*scheduleRefresh\(0\)/);
-assert.match(view, /if \(pollingStopped \|\| terminal\.includes\(latestRunStatus\)\) return/);
+assert.match(view, /if \(pollingStopped \|\| completionTransition\.isTerminalRunStatus\(latestRunStatus\)\) return/);
+assert.match(view, /if \(transitionToCompletedResults\(state\.runStatus\)\) return/);
 
 console.log('Story 3.146 production polling backoff tests passed');

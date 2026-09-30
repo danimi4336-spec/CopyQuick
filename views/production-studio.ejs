@@ -73,10 +73,11 @@
         </noscript>
     </div>
 </div>
+<script src="/js/productionCompletionTransition.js"></script>
 <script>
 (function () {
     var runId = <%- JSON.stringify(production.id) %>;
-    var terminal = ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'];
+    var completionTransition = window.CopyQuickProductionCompletionTransition;
     var latestRunStatus = <%- JSON.stringify(production.status) %>;
     var statusRequestTimeoutMs = 10000;
     var retryDelayMs = 5000;
@@ -84,6 +85,16 @@
     var pollTimer = null;
     var activeController = null;
     var pollingStopped = false;
+    function stopPolling() {
+        pollingStopped = true;
+        if (pollTimer) window.clearTimeout(pollTimer);
+        pollTimer = null;
+    }
+    var transitionToCompletedResults = completionTransition.createCompletionTransition({
+        targetUrl: '/production/' + runId,
+        stopPolling: stopPolling,
+        navigate: function (url) { window.location.replace(url); }
+    });
     function label(value) { return String(value || '').replace(/_/g, ' '); }
     function liveStatus(message) {
         var element = document.getElementById('production-live-status');
@@ -109,7 +120,7 @@
             + countLabel(progress.remainingEstimatedCost, 'generation', 'generations') + ').';
     }
     function scheduleRefresh(delay) {
-        if (pollingStopped || terminal.includes(latestRunStatus)) return;
+        if (pollingStopped || completionTransition.isTerminalRunStatus(latestRunStatus)) return;
         if (pollTimer) window.clearTimeout(pollTimer);
         pollTimer = window.setTimeout(function () {
             pollTimer = null;
@@ -135,6 +146,7 @@
             latestRunStatus = state.runStatus;
             retryDelayMs = 5000;
             liveStatus('');
+            if (transitionToCompletedResults(state.runStatus)) return;
             document.getElementById('production-progress').textContent = state.completedCount + ' of ' + state.totalCount + ' completed.';
             document.getElementById('production-run-status').textContent = label(state.runStatus);
             updatePlanProgress(state.planProgress);
@@ -170,9 +182,7 @@
         }
     }
     window.addEventListener('pagehide', function () {
-        pollingStopped = true;
-        if (pollTimer) window.clearTimeout(pollTimer);
-        pollTimer = null;
+        stopPolling();
         if (activeController) activeController.abort();
     });
     window.addEventListener('pageshow', function (event) {
