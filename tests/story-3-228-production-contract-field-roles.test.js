@@ -1,6 +1,6 @@
 const assert = require('assert');
 
-const { getProductionArtifactPolicy } = require('../lib/productionArtifactPolicy');
+const { getProductionArtifactPolicy, isCustomerReadablePlanningDocument } = require('../lib/productionArtifactPolicy');
 const { createProductionStrategySnapshot } = require('../lib/buildPlanApproval');
 const { getProductionContract, getProductionContractIds } = require('../lib/productionContracts');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
@@ -17,7 +17,7 @@ for (const id of getProductionContractIds()) {
     `${id} public and internal fields must be exhaustive`
   );
   assert.strictEqual(new Set([...contract.publicFieldKeys, ...contract.internalFieldKeys]).size, schemaKeys.length, `${id} roles must not overlap`);
-  if (getProductionArtifactPolicy(id).readyToUse) assert(contract.publicFieldKeys.length > 0, `${id} must expose public copy`);
+  if (getProductionArtifactPolicy(id).readyToUse || isCustomerReadablePlanningDocument(id)) assert(contract.publicFieldKeys.length > 0, `${id} must expose customer-readable content`);
   else if (id === 'research_evidence_pack') {
     assert.deepStrictEqual(contract.publicFieldKeys, ['researchSummary', 'researchQuestions', 'sourcesUsed', 'supportedFindings', 'unsupportedQuestions', 'conflicts', 'freshnessNotes', 'researchStatus', 'questionsChecked', 'supportedQuestionCount', 'questionsNeedingEvidence', 'sourcesUsedCount', 'lastCheckedAt', 'limitationNote']);
     assert(contract.internalFieldKeys.includes('researchTrace') && contract.internalFieldKeys.includes('evidenceItems'));

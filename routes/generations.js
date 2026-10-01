@@ -9,7 +9,7 @@ const generator = require('../lib/generator');
 const { generateCopy, getContentTypes, getTones } = generator;
 const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
-const { customerPurpose, customerReadiness, customerStatusLabel } = require('../lib/productionArtifactPolicy');
+const { customerPurpose, customerReadiness, customerStatusLabel, isCustomerReadablePlanningDocument } = require('../lib/productionArtifactPolicy');
 const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
 const { validateCustomerReadyOutput } = require('../lib/productionQuality');
 const { loadProductionValidationContext } = require('../lib/productionValidationContext');
@@ -693,9 +693,13 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       exportBaseName: `${safeExportSlug(contract?.title || gen.title, 'copyquick-deliverable')}-${safeExportSlug(topic, String(gen.id))}`,
       artifactRole: contract?.artifactRole || 'ready_to_use_asset',
       purposeNotice: contract?.artifactRole === 'planning_foundation'
-        ? readyAssetBilling
-          ? 'This is internal foundation work that guides later execution. It is not customer-facing or publishable copy, and it did not consume a production credit.'
-          : 'This is internal foundation work, not customer-facing or publishable copy. This historical run used the earlier per-step billing model; future runs include planning foundation at no credit cost.'
+        ? isCustomerReadablePlanningDocument(gen.deliverable_id)
+          ? readyAssetBilling
+            ? 'This customer-readable planning document guides the finished work and did not consume a production credit.'
+            : 'This customer-readable planning document guides the finished work. This historical run used the earlier per-step billing model; future planning foundation is included at no credit cost.'
+          : readyAssetBilling
+            ? 'This is internal foundation work that guides later execution. It is not customer-facing or publishable copy, and it did not consume a production credit.'
+            : 'This is internal foundation work, not customer-facing or publishable copy. This historical run used the earlier per-step billing model; future runs include planning foundation at no credit cost.'
         : null,
       nextDeliverable: nextDeliverable
         ? { id: nextDeliverable.id, title: nextDeliverable.title }
