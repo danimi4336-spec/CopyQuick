@@ -308,7 +308,7 @@ async function run() {
     assert.match(page.body, /Total steps:/);
     assert.match(page.body, /Ready-to-use output deliverables/);
     assert.match(page.body, /<details class="planning-foundation-disclosure">/);
-    assert(page.body.indexOf('Ready-to-use output deliverables') < page.body.indexOf('Free planning foundation deliverables'));
+    assert(page.body.indexOf('Ready-to-use output deliverables') < page.body.indexOf('Free planning foundation documents'));
     assert.doesNotMatch(page.body, /Strategic direction|Builder-provided offer description|Treat this as unverified context/);
     assert.match(page.body, /Amazon is the confirmed sales channel/);
     assert.doesNotMatch(page.body, /priority|estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
@@ -359,7 +359,7 @@ async function run() {
     assert.match(handoff.body, /No usage is consumed until/);
     assert.match(handoff.body, /Ready-to-use output deliverables/);
     assert.match(handoff.body, /<details class="planning-foundation-disclosure">/);
-    assert(handoff.body.indexOf('Ready-to-use output deliverables') < handoff.body.indexOf('Free planning foundation deliverables'));
+    assert(handoff.body.indexOf('Ready-to-use output deliverables') < handoff.body.indexOf('Free planning foundation documents'));
     assert.doesNotMatch(handoff.body, /Builder-provided offer description|Treat this as unverified context|Inferred primary customer/);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);

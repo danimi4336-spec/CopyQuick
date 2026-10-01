@@ -4,7 +4,7 @@
             <span class="production-ready-icon" aria-hidden="true">✓</span>
             <span class="build-plan-eyebrow">Production Handoff</span>
             <h1>Your production plan is ready.</h1>
-            <p>You approved <strong><%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong> with <strong><%= planningFoundation.length %> free planning prerequisite<%= planningFoundation.length === 1 ? '' : 's' %></strong> in this batch. Nothing has been generated yet.</p>
+            <p>You approved <strong><%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong> with <strong><%= planningFoundation.length %> free supporting document<%= planningFoundation.length === 1 ? '' : 's' %></strong> in this selection. Nothing has been generated yet.</p>
         </header>
 
         <section class="deliverable-display-section deliverable-output-section" aria-labelledby="handoff-output-title">
@@ -19,7 +19,7 @@
 
         <% if (planningFoundation.length) { %>
             <details class="planning-foundation-disclosure">
-                <summary><span>Free planning foundation deliverables</span><small><%= planningFoundation.length %> internal prerequisite<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                <summary><span>Free planning foundation documents</span><small><%= planningFoundation.length %> supporting document<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
                 <div class="planning-foundation-content">
                     <p>CopyQuick uses these internal briefs and decisions to guide the ready-to-use outputs. They are planning documents, not customer-facing copy.</p>
                     <ol class="deliverable-display-list">

@@ -10,9 +10,9 @@ const foundationPolicy = { role: 'planning_foundation' };
 ['build-plan.ejs', 'production-ready.ejs'].forEach(function(viewName) {
   const source = fs.readFileSync(path.join(root, 'views', viewName), 'utf8');
   assert.match(source, /Ready-to-use output deliverables/);
-  assert.match(source, /Free planning foundation deliverables/);
+  assert.match(source, /Free planning foundation documents/);
   assert.match(source, /<details class="planning-foundation-disclosure">/);
-  assert(source.indexOf('Ready-to-use output deliverables') < source.indexOf('Free planning foundation deliverables'));
+  assert(source.indexOf('Ready-to-use output deliverables') < source.indexOf('Free planning foundation documents'));
 });
 
 const reviewSource = fs.readFileSync(path.join(root, 'views', 'production-review.ejs'), 'utf8');

@@ -16,15 +16,15 @@
         <p id="production-live-status" class="production-live-status" role="status" aria-live="polite"></p>
 
         <section class="production-run-summary production-run-summary-secondary">
-            <div><span>Run status</span><strong id="production-run-status"><%= production.status.replace(/_/g, ' ') %></strong></div>
+            <div><span>Status</span><strong id="production-run-status"><%= production.status.replace(/_/g, ' ') %></strong></div>
             <div><span>Assets in this run</span><strong><%= production.jobs.length %></strong></div>
             <div><span>Started</span><strong><%= production.started_at %></strong></div>
         </section>
 
         <% if (typeof planProgress !== 'undefined' && planProgress) { %>
             <section class="production-review-status" aria-label="Overall production plan progress">
-                <div><h2>Overall plan progress</h2><p id="plan-progress-overall"><strong><%= planProgress.completed.length %> of <%= planProgress.total %></strong> steps completed across production batches. The plan contains <%= planProgress.readyToUseAssetCount %> ready-to-use asset<%= planProgress.readyToUseAssetCount === 1 ? '' : 's' %> and <%= planProgress.planningFoundationCount %> free planning prerequisite<%= planProgress.planningFoundationCount === 1 ? '' : 's' %>.</p></div>
-                <div><h2>Current batch</h2><p id="plan-progress-current"><%= planProgress.batchNew.length %> new deliverable<%= planProgress.batchNew.length === 1 ? '' : 's' %> in this run; <%= planProgress.batchIncomplete.length %> remain incomplete. <%= planProgress.reused.length %> prerequisite<%= planProgress.reused.length === 1 ? '' : 's' %> reused.</p></div>
+                <div><h2>Overall plan progress</h2><p id="plan-progress-overall"><strong><%= planProgress.completed.length %> of <%= planProgress.total %></strong> steps completed across Production work. The plan contains <%= planProgress.readyToUseAssetCount %> ready-to-use asset<%= planProgress.readyToUseAssetCount === 1 ? '' : 's' %> and <%= planProgress.planningFoundationCount %> free supporting document<%= planProgress.planningFoundationCount === 1 ? '' : 's' %>.</p></div>
+                <div><h2>Current work</h2><p id="plan-progress-current"><%= planProgress.batchNew.length %> new item<%= planProgress.batchNew.length === 1 ? '' : 's' %> in this run; <%= planProgress.batchIncomplete.length %> remain incomplete. <%= planProgress.reused.length %> completed supporting item<%= planProgress.reused.length === 1 ? '' : 's' %> reused.</p></div>
                 <div><h2>Saved for later</h2><p id="plan-progress-deferred"><%= planProgress.deferred.length %> deliverable<%= planProgress.deferred.length === 1 ? '' : 's' %> <%= planProgress.deferred.length === 1 ? 'remains' : 'remain' %> deferred (estimated <%= planProgress.remainingEstimatedCost %> generation<%= planProgress.remainingEstimatedCost === 1 ? '' : 's' %>).</p></div>
             </section>
         <% } %>
@@ -109,15 +109,15 @@
         var current = document.getElementById('plan-progress-current');
         var deferred = document.getElementById('plan-progress-deferred');
         if (overall) overall.textContent = progress.completedCount + ' of ' + progress.totalCount
-            + ' steps completed across production batches. The plan contains '
+            + ' steps completed across Production work. The plan contains '
             + countLabel(progress.readyToUseAssetCount, 'ready-to-use asset', 'ready-to-use assets') + ' and '
-            + countLabel(progress.planningFoundationCount, 'free planning prerequisite', 'free planning prerequisites') + '.';
-        if (current) current.textContent = countLabel(progress.batchNewCount, 'new deliverable', 'new deliverables')
+            + countLabel(progress.planningFoundationCount, 'free supporting document', 'free supporting documents') + '.';
+        if (current) current.textContent = countLabel(progress.batchNewCount, 'new item', 'new items')
             + ' in this run; ' + progress.batchIncompleteCount + ' remain incomplete. '
-            + countLabel(progress.reusedCount, 'prerequisite', 'prerequisites') + ' reused.';
-        if (deferred) deferred.textContent = countLabel(progress.deferredCount, 'deliverable', 'deliverables')
+            + countLabel(progress.reusedCount, 'completed supporting item', 'completed supporting items') + ' reused.';
+        if (deferred) deferred.textContent = countLabel(progress.deferredCount, 'item', 'items')
             + (progress.deferredCount === 1 ? ' remains' : ' remain') + ' deferred (estimated '
-            + countLabel(progress.remainingEstimatedCost, 'generation', 'generations') + ').';
+            + countLabel(progress.remainingEstimatedCost, 'work item', 'work items') + ').';
     }
     function scheduleRefresh(delay) {
         if (pollingStopped || completionTransition.isTerminalRunStatus(latestRunStatus)) return;

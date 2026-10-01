@@ -33,7 +33,7 @@
                 <div>
                     <span class="build-plan-eyebrow">Production estimate</span>
                     <h2 id="plan-affordability-title"><%= affordability.cost.productionUnitCount %> production credit<%= affordability.cost.productionUnitCount === 1 ? '' : 's' %> remaining in this plan</h2>
-                    <p><%= affordability.cost.readyToUseAssetCount %> ready-to-use asset<%= affordability.cost.readyToUseAssetCount === 1 ? '' : 's' %> · <%= affordability.cost.planningFoundationCount %> planning prerequisite<%= affordability.cost.planningFoundationCount === 1 ? '' : 's' %> included free · <%= affordability.completed.length %> already completed</p>
+                    <p><%= affordability.cost.readyToUseAssetCount %> ready-to-use asset<%= affordability.cost.readyToUseAssetCount === 1 ? '' : 's' %> · <%= affordability.cost.planningFoundationCount %> supporting document<%= affordability.cost.planningFoundationCount === 1 ? '' : 's' %> included free · <%= affordability.completed.length %> already completed</p>
                 </div>
                 <dl>
                     <div><dt>Available now</dt><dd data-available-balance="<%= affordability.cost.remainingAllowance %>"><%= affordability.cost.remainingAllowance %></dd></div>
@@ -47,9 +47,9 @@
                     <p><%= affordability.cost.blockingReason %> Your choices remain saved.</p>
                     <div class="build-plan-affordability-message">
                         <% if (affordability.affordableRecommendation.length) { %>
-                            <span>A dependency-safe batch of <strong><%= affordability.affordableRecommendation.length %></strong> step<%= affordability.affordableRecommendation.length === 1 ? '' : 's' %> can be prepared now, including free planning prerequisites.</span>
+                            <span>A dependency-safe selection of <strong><%= affordability.affordableRecommendation.length %></strong> step<%= affordability.affordableRecommendation.length === 1 ? '' : 's' %> can be prepared now, including free supporting documents.</span>
                         <% } else { %>
-                            <span>No valid production batch fits the current balance.</span>
+                            <span>No valid Production selection fits the current balance.</span>
                         <% } %>
                     </div>
                     <div class="build-plan-affordability-actions">
@@ -96,7 +96,7 @@
 
             <% if (foundationPlanItems.length) { %>
                 <details class="planning-foundation-disclosure">
-                    <summary><span>Free planning foundation deliverables</span><small><b data-plan-count="planningFoundation"><%= selectedFoundationCount %></b> internal prerequisite<%= selectedFoundationCount === 1 ? '' : 's' %> · no production credits</small></summary>
+                    <summary><span>Free planning foundation documents</span><small><b data-plan-count="planningFoundation"><%= selectedFoundationCount %></b> supporting document<%= selectedFoundationCount === 1 ? '' : 's' %> · no production credits</small></summary>
                     <div class="planning-foundation-content">
                         <p>CopyQuick uses these internal planning documents to guide the ready-to-use outputs. They are included automatically and are not customer-facing copy.</p>
                         <div class="build-plan-deliverables">
@@ -106,7 +106,7 @@
                                         <label class="build-plan-select-control">
                                             <% if (item.locked) { %><input type="hidden" name="selectedDeliverableIds" value="<%= item.id %>"><% } %>
                                             <input type="checkbox" name="selectedDeliverableIds" value="<%= item.id %>" data-level="<%= item.recommendationLevel %>" data-artifact-role="planning_foundation" data-billing-units="<%= item.billingUnits == null ? 0 : item.billingUnits %>" data-completed="<%= affordability && affordability.completed && affordability.completed.some(function(done) { return done.id === item.id; }) ? 'true' : 'false' %>" <%= item.selected ? 'checked' : '' %> <%= item.locked ? 'disabled' : '' %>>
-                                            <span><%= item.locked ? 'Included as a free planning prerequisite' : 'Include free planning foundation' %></span>
+                                            <span><%= item.locked ? 'Included as a free supporting document' : 'Include free planning foundation' %></span>
                                         </label>
                                         <span class="build-plan-level build-plan-level-<%= item.recommendationLevel %>">Free planning</span>
                                     </div>
