@@ -160,7 +160,7 @@ function runServerStartupSmoke() {
       STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited',
       RESEND_API_KEY: 're_bug_002o_not_real'
     };
-    const migration = spawnSync(process.execPath, ['scripts/migrate-database.js'], {
+    const migration = spawnSync(process.execPath, ['scripts/migrate-database.js', '--confirm-production-migration'], {
       cwd: path.join(__dirname, '..'),
       env: productionEnv,
       encoding: 'utf8'

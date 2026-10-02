@@ -1,92 +1,158 @@
-# CopyQuick Deployment Readiness Audit
+# CopyQuick Controlled-Beta Release Runbook
 
-## Decision
+This is the authoritative procedure for the schema-v8 controlled-beta release.
+It does not authorize a deployment, migration, restore, provider call, or
+production-data change. Record every operator assertion in the release record;
+never record credentials, database contents, or recovery keys.
 
-The repository is prepared for a controlled staging release, but this document
-does not authorize deployment or production-data access. A production release
-remains gated on operator-supplied configuration, the migration/rollback
-procedure, and external-provider verification in staging.
+## Compatibility and ownership
 
-## Automated release gate
+The current application supports schema v8. Production may begin at v2 and
+therefore has six ordered, individually transactional migrations: generation
+request idempotency (v3), checkout intents (v4), saved build plans (v5),
+20-character saved-plan state (v6), production-plan progress snapshots (v7),
+and structured business memory (v8). Each migration commits separately. A
+failure rolls back the failing migration but can leave earlier migrations
+recorded as a valid intermediate schema.
 
-Run `npm run release:check` inside the intended deployment environment. The
-command reports only stable finding codes and descriptions; it never prints
-configuration values or secrets. A non-zero exit means a release blocker is
-present.
+Record before the maintenance window:
 
-The gate verifies the exact Node runtime, production mode, a strong session
-secret, durable database placement, canonical HTTPS origin, billing and email
-configuration, complete-or-disabled OAuth configuration, AI provider selection,
-and recommended backup, alerting, and billing-reconciliation controls.
+- `PRE_RELEASE_COMMIT`
+- `PRE_MIGRATION_SCHEMA`
+- `PRE_MIGRATION_BACKUP_ID`
+- deployment owner
+- migration owner
+- rollback owner
+- backup/restore owner and recovery-key custodian
+- go/no-go authority
 
-## Configuration and security findings
+| Application | Database | Decision |
+|---|---|---|
+| Recorded pre-release application | v2 | Supported before release |
+| Approved v8 application | v2 | Fail closed with `MIGRATION_REQUIRED` |
+| Approved v8 application | v8 | Supported |
+| Recorded pre-release application | v8 | Prohibited; restore its paired backup first |
 
-- Sessions are stored in SQLite, use `HttpOnly`, `Secure` in production,
-  `SameSite=Lax`, and a 24-hour expiry. Production fails closed without a
-  session secret; the release gate additionally requires at least 32 characters.
-- Browser responses disable framework disclosure and set CSP, frame, MIME,
-  referrer, permissions, and HSTS protections. TLS termination must preserve the
-  trusted proxy protocol so secure cookies and HSTS are applied correctly.
-- State-changing browser routes use session-bound CSRF tokens. Stripe webhooks
-  are deliberately outside browser CSRF and instead require the raw signed body.
-- Authentication, contact, generation, billing-provider, and production-worker
-  work have bounded abuse/concurrency controls covered by regression tests.
-- Operational logs use stable event and failure codes. Prompts, provider
-  responses, credentials, and raw customer payloads are excluded.
+## Hard preflight gates
 
-## Database, migration, backup, and rollback
+Do not migrate or deploy unless every item passes:
 
-- Production requires `DATABASE_PATH` beneath `PERSISTENT_DATA_DIR`; startup
-  acquires one runtime ownership lock and refuses unsafe concurrent access.
-- Startup never applies pending migrations implicitly. Check status, take and
-  verify a backup, then run the explicit migration command while HTTP admission
-  is stopped.
-- Migration v7 is additive but rollback-incompatible. Rollback requires stopping
-  all application instances and restoring the verified pre-migration backup;
-  an older binary must never open the v7 database.
-- Local and encrypted off-site backup creation, bounded retention, restore
-  verification, health alerts, and scheduler shutdown are automated and tested.
-  Production bucket access and alert delivery still require staging credentials.
+1. Freeze the approved commit and confirm Node v24.20.0.
+2. Confirm one Render web instance and no worker sharing the SQLite disk.
+3. Establish a quiet window: no active paid Production job, no ambiguous
+   provider operation, and all application/database writers can be excluded.
+4. Assign every owner listed above.
+5. Inspect the **ACTUAL Render start command**. An existing service can retain a
+   dashboard override even when `render.yaml` is safe. It must be exactly
+   `node server.js`; automatic migration in web start must be `NO`.
+6. If it contains `migrate`, correct the dashboard override and perform a
+   second read-only verification **before deploying anything**.
+7. Require valid HTTPS `PUBLIC_APP_ORIGIN`. For the observed production domain
+   the intended value is `https://www.copyquick.co`; application configuration
+   remains environment-driven.
+8. Verify durable database placement, sessions, Stripe live keys and distinct
+   prices, live webhook registration, Resend domain/delivery, and support inbox.
+9. Billing reconciliation should be enabled and healthy. A temporary controlled-
+   beta waiver must record risk, owner, expiry, and the latest zero-drift result.
+10. Select generation mode explicitly: `DETERMINISTIC` or `OPENAI`. Select
+    research independently as `ENABLED` or `DISABLED`. OpenAI requires
+    provider readiness; enabled research also requires OpenAI research and Exa.
+    The observed deterministic/no-research state is a current configuration,
+    not a permanent product default.
 
-## Billing, OAuth, email, and AI providers
+Repository `render.yaml` already has the safe `node server.js` command.
+Repository configuration cannot prove that an external dashboard override is
+safe.
 
-- Stripe startup validates the live key, signed-webhook secret, distinct price
-  identifiers, canonical return origin, bounded client retries, customer
-  ownership, checkout intent binding, webhook idempotency, and reconciliation.
-- Google OAuth is optional. If enabled, all three client ID, client secret, and
-  HTTPS callback settings must be supplied and the deployed callback must match
-  the provider console exactly.
-- Transactional email is mandatory in production and uses bounded attempts,
-  total timeouts, idempotency, privacy-safe password reset behavior, and graceful
-  shutdown draining.
-- Live OpenAI generation is explicit, uses strict structured output, `store:
-  false`, bounded time/concurrency/payload limits, sanitized errors, contract and
-  quality validation, and a pseudonymous safety identifier when configured.
-  Acceptance mode always forces the deterministic provider.
+## Read-only preflight
 
-## Health, startup, restart, and recovery
+```sh
+npm run release:check
+npm run migrations:status
+npm run migrations:check
+npm run operations:status
+npm run health:storage
+```
 
-- `/livez` is process liveness and does not touch storage.
-- `/readyz` verifies a database query and returns only `ok` or `unavailable`.
-- `/healthz` remains a backward-compatible database readiness alias.
-- Startup is migration-gated and failure-atomic. Shutdown closes HTTP admission,
-  drains bounded background work, and releases the database lock.
-- Saved-plan state, production snapshots, job dependencies, and eligible waiting
-  work survive restart and are reconciled idempotently.
+`release:check`, `migrations:status`, and `migrations:check` are read-only.
+Release readiness requires schema v8 with zero pending migrations. Before the
+explicit migration, `MIGRATION_REQUIRED` is the expected blocker, not
+permission to start traffic. Future or invalid schema also blocks.
 
-## Required operator gates before production
+## Backup gate
 
-1. Run `npm run release:check` in the protected staging/production environment.
-2. Confirm `/livez` and `/readyz` behind the real TLS proxy and health monitor.
-3. Exercise Google callback, email delivery, Stripe test-mode checkout/portal,
-   signed webhook replay/idempotency, and reconciliation with staging credentials.
-4. Rehearse backup, v7 migration, application restart, and restore using a
-   disposable copy of the intended production topology.
-5. Approve provider/model, privacy terms, concurrency, and spend limits; run a
-   bounded fabricated-input live-AI qualification.
-6. Record rollback owner, backup identifier, maintenance window, and go/no-go
-   authority before deployment.
+Before migration, create a fresh verified local snapshot with
+`npm run backup:database`. Record its identifier, timestamp, schema v2 status,
+and integrity result. Verify a fresh encrypted off-site backup, identify the
+recovery-key custodian and backup/restore owner, and confirm the restore
+procedure. Stop if an artifact is missing, stale, invalid, or lacks custody.
 
-These remaining gates require deployment credentials or an authorized staging
-environment. They are operational prerequisites, not unresolved repository
-defects.
+## Exact Gate 2B sequence
+
+1. Freeze the approved commit and record all owners.
+2. Verify quiet window, single-instance topology, and zero ambiguous work.
+3. Verify local and off-site recovery readiness.
+4. Change the actual Render web start command to `node server.js` if needed.
+5. Reverify that it contains no migration. Do not deploy yet.
+6. Run read-only preflight and record sanitized results.
+7. Create and verify the fresh pre-migration backup.
+8. Verify the fresh encrypted off-site copy and record custody.
+9. Stop/exclude HTTP traffic, web process, Production Worker, schedulers, and
+   every database writer. Do not infer provider completion from termination.
+10. Explicitly authorize and run migration exactly once:
+
+    ```sh
+    npm run migrate:database -- --confirm-production-migration
+    ```
+
+    Never put this flag in `render.yaml` or a web start command.
+11. Run `migrations:status`, `migrations:check`, and SQLite integrity
+    verification. Require v8 and zero pending migrations.
+12. Deploy/start the exact approved application commit.
+13. Verify Node v24.20.0 and `/livez`, `/readyz`, and `/healthz`.
+14. Run the bounded smoke journey and observe operations.
+15. The go/no-go authority records GO or invokes rollback.
+
+Stop before migration if backup fails, active jobs remain, an owner is missing,
+the Render override is unsafe, `PUBLIC_APP_ORIGIN` is invalid, recovery-key
+custody is unknown, live Stripe webhook registration is unverified, or
+mandatory email delivery is unverified.
+
+## Bounded smoke test and observation
+
+Use one authorized disposable beta account. Verify signup/login, one objective,
+Discovery, Reflection, Build Plan, Production Review, one bounded Production
+run, credit use, automatic Results transition, finished asset, and session
+persistence. Stripe behavior follows the approved billing procedure.
+Deterministic mode costs $0 in provider calls. OpenAI mode is limited to one
+normal Production provider path unless separately authorized; research makes
+zero calls unless explicitly enabled and budgeted.
+
+Observe before widening access: 5xx errors, readiness, sessions, Production jobs,
+`recovery_required`, billing reconciliation, duplicate billing, backups,
+storage, provider failures, and research health when enabled.
+
+GO requires the approved commit, Node v24.20.0, schema v8, zero pending
+migrations, database integrity, all health endpoints, persistent storage,
+sessions, canonical origin, verified live billing/webhook and required email,
+explicit provider mode, a clean smoke result, tenant/security integrity, and a
+recorded rollback artifact.
+
+## Rollback
+
+Database restore and application rollback are a pair:
+
+1. Stop traffic and all writers.
+2. Select `PRE_MIGRATION_BACKUP_ID` and confirm rollback authorization.
+3. Run the offline confirmation-gated restore from the backup runbook.
+4. Verify integrity and restored `PRE_MIGRATION_SCHEMA` (v2 for this release).
+5. Deploy `PRE_RELEASE_COMMIT` only after its matching database is restored.
+6. Verify runtime, health, login, sessions, billing, persistence, and queued work.
+7. Restore traffic only after go/no-go approval.
+
+Rollback triggers include migration/integrity failure, readiness or persistent-
+storage failure, login/session failure, billing corruption or duplicate
+charging, tenant/security failure, failure of core Production, provider
+configuration failure that prevents the selected mode, or persistent severe
+5xx errors. Copy polish and other noncritical beta issues are not by themselves
+rollback triggers.

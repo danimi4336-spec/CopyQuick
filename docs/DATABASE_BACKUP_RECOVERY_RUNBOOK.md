@@ -13,6 +13,17 @@ triggers automatic restoration. Application rollback is not necessarily
 database rollback. See the durable-storage runbook for baseline adoption, lock
 ordering, explicit execution, and code/schema compatibility policy.
 
+Production execution additionally requires:
+
+```sh
+npm run migrate:database -- --confirm-production-migration
+```
+
+Supply this flag only for the deliberate offline migration; never place it in a
+web start command. For the controlled-beta v2-to-v8 release, record the verified
+pre-v8 backup identifier and pair any restore with the recorded pre-release
+application commit.
+
 ## Create and inspect backups
 
 From the Render Shell, with `DATABASE_PATH=/var/data/copyquick.db` and `PERSISTENT_DATA_DIR=/var/data` configured:

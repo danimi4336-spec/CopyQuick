@@ -55,7 +55,16 @@ only when the current application can safely start without changing schema.
 Normal `node server.js` startup performs the same compatibility gate and never
 executes pending migrations. `migrate:database` is the separate explicit
 execution path. It uses the versioned migration engine, requires exclusive
-runtime ownership, and must not be run while the web service is active.
+runtime ownership, and must not be run while the web service is active. In
+production it additionally requires explicit operator authorization:
+
+```sh
+npm run migrate:database -- --confirm-production-migration
+```
+
+Never place that flag or the migration command in the Render web-service start
+command. Existing Render services can retain a dashboard override even when
+`render.yaml` is safe; inspect the actual service command before every release.
 
 The V1 framework accepts only additive migration definitions. Automatic down
 migrations and destructive DDL are intentionally unsupported. A code rollback
@@ -112,6 +121,16 @@ the database, or automatically restore an older backup. Deploy compatible code
 or follow the deliberate disaster-recovery process only when an actual recovery
 decision has been made. Application rollback is not necessarily database
 rollback.
+
+### Controlled-beta schema-v8 release
+
+Schema v8 (`structured_business_memory`) is the current repository boundary.
+The v2-to-v8 chain applies migrations 3 through 8 in order. Each migration is
+transactional on its own; a later failure can leave earlier migrations committed
+as a valid intermediate schema. Follow `DEPLOYMENT_READINESS_AUDIT.md` for the
+authoritative controlled-beta procedure. Rollback to the pre-release v2
+application requires the recorded pre-v8 backup and matching pre-release commit;
+never start that older application directly against v8.
 
 ## Existing ephemeral data
 
