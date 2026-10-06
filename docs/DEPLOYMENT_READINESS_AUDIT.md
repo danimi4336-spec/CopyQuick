@@ -89,29 +89,47 @@ procedure. Stop if an artifact is missing, stale, invalid, or lacks custody.
 
 ## Exact Gate 2B sequence
 
-1. Freeze the approved commit and record all owners.
-2. Verify quiet window, single-instance topology, and zero ambiguous work.
-3. Verify local and off-site recovery readiness.
-4. Change the actual Render web start command to `node server.js` if needed.
-5. Reverify that it contains no migration. Do not deploy yet.
-6. Run read-only preflight and record sanitized results.
-7. Create and verify the fresh pre-migration backup.
-8. Verify the fresh encrypted off-site copy and record custody.
-9. Stop/exclude HTTP traffic, web process, Production Worker, schedulers, and
-   every database writer. Do not infer provider completion from termination.
-10. Explicitly authorize and run migration exactly once:
+Render one-off jobs and pre-deploy commands do not mount the base web service's
+persistent disk. For an offline migration of that disk, use the temporary
+persistent-disk maintenance runner. It serves only a bounded plain-text `503`
+response and does not import the application, open the database, start workers
+or schedulers, or contact providers. Maintenance mode remains the customer-
+facing traffic barrier; the runner is the disk-attached shell host.
 
-    ```sh
-    npm run migrate:database -- --confirm-production-migration
-    ```
+1. Freeze the approved commit, record all owners, and announce the maintenance
+   window.
+2. Verify the quiet window, single-instance topology, zero active or ambiguous
+   work, and complete local and off-site recovery readiness.
+3. Enable Render Maintenance Mode before changing or restarting the service.
+4. Change the actual Render web start command temporarily to exactly
+   `npm run start:maintenance`.
+5. Deploy the exact approved commit and verify the maintenance runner stays
+   alive while every HTTP path returns `503` with the maintenance message.
+6. Open a shell on that same disk-attached web service and reverify the commit,
+   Node v24.20.0, database path, schema v2, SQLite integrity, and fresh backup
+   identifiers. Do not use a one-off job or pre-deploy command.
+7. Reconfirm the irreversible-action authorization and rollback owners. Stop
+   here unless the migration is explicitly authorized.
+8. Run the offline migration exactly once from the disk-attached shell:
+   `npm run migrate:database -- --confirm-production-migration`.
+9. Run `migrations:status`, `migrations:check`, and SQLite integrity checks;
+   require schema v8 and zero pending migrations.
+10. If migration or verification fails, keep Maintenance Mode enabled and the
+    maintenance runner active, then execute the paired restore/rollback plan.
+11. Restore the actual Render start command to exactly `node server.js`.
+12. Deploy the same exact approved commit; do not substitute a newer commit.
+13. While Maintenance Mode remains enabled, verify Node v24.20.0, `/livez`,
+    `/readyz`, `/healthz`, database persistence, and the bounded smoke journey.
+14. The go/no-go authority records GO only after every release criterion passes;
+    otherwise keep traffic stopped and invoke rollback.
+15. Disable Render Maintenance Mode only after recorded GO, then observe health,
+    errors, jobs, billing, sessions, persistence, and provider behavior.
 
-    Never put this flag in `render.yaml` or a web start command.
-11. Run `migrations:status`, `migrations:check`, and SQLite integrity
-    verification. Require v8 and zero pending migrations.
-12. Deploy/start the exact approved application commit.
-13. Verify Node v24.20.0 and `/livez`, `/readyz`, and `/healthz`.
-14. Run the bounded smoke journey and observe operations.
-15. The go/no-go authority records GO or invokes rollback.
+If failure occurs before migration, keep Maintenance Mode enabled, retain the
+maintenance runner, and correct the precondition without touching the database.
+If failure occurs after migration, do not start the pre-release application
+against v8; either complete the approved release or restore the paired v2 backup
+before deploying `PRE_RELEASE_COMMIT`.
 
 Stop before migration if backup fails, active jobs remain, an owner is missing,
 the Render override is unsafe, `PUBLIC_APP_ORIGIN` is invalid, recovery-key

@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
+    "start:maintenance": "node scripts/maintenance-server.js",
     "test": "node scripts/run-tests.js",
     "migrate:sqlite-storage": "node scripts/migrate-sqlite-storage.js",
     "backup:database": "node scripts/backup-database.js",
