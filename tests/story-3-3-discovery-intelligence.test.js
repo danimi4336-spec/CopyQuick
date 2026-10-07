@@ -18,6 +18,7 @@ function completeUnderstanding() {
     customerMotivation: known('solve_problem'),
     salesChannel: known('amazon'),
     competitiveDifferentiation: known('partial'),
+    competitiveDifferentiationDetails: known('A modular format and repairable components'),
     launchStage: known('development'),
     brand: known('in_progress'),
     budget: known('1000_5000'),

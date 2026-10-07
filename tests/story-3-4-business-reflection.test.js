@@ -27,6 +27,7 @@ function requiredUnderstanding() {
     customerMotivation: confirmed('solve_problem', 'It solves a clear problem'),
     salesChannel: confirmed('amazon', 'Amazon'),
     competitiveDifferentiation: confirmed('partial', 'It is different in a few ways'),
+    competitiveDifferentiationDetails: confirmed('A builder-selected capsule formula and package format'),
     launchStage: confirmed('development', 'In development')
   };
 }
@@ -83,6 +84,7 @@ async function createReadySession() {
     customer_motivation: 'solve_problem',
     sales_channel: 'amazon',
     competitive_differentiation: 'partial',
+    competitive_differentiation_details: 'A builder-selected capsule formula and package format',
     launch_stage: 'development'
   };
   const intelligence = analyzeDiscovery({

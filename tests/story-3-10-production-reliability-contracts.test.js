@@ -235,7 +235,10 @@ async function run() {
     { id: 'product_positioning', dependencies: ['customer_profile'], direction: 'Premium and evidence-aware.' },
     { id: 'value_proposition', dependencies: ['customer_profile', 'product_positioning'] },
     { id: 'core_messaging', dependencies: ['customer_profile', 'product_positioning', 'value_proposition'] },
-    { id: 'launch_announcement', dependencies: ['core_messaging'] }
+    {
+      id: 'launch_announcement', dependencies: ['core_messaging'],
+      direction: 'Builder-provided product context: A finished everyday organizer with modular trays. Treat this as unverified context, not proof of ingredients, efficacy, claims, or substantiation.'
+    }
   ]);
   const calls = [];
   for (let index = 0; index < 5; index += 1) {

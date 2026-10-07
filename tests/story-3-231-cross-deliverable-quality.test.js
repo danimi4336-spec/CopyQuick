@@ -103,9 +103,10 @@ const safeSocial = {
   campaignObjective: 'Internal guidance for a careful launch.',
   posts: [
     'Considering a more organized space? Review the confirmed details for The Everyday Organizer and decide whether it fits your needs.',
-    'Compare the current dimensions, materials, delivery information, and policies before choosing your next step.'
+    'Compare the current dimensions, materials, delivery information, and policies before choosing your next step.',
+    'Explore The Everyday Organizer, review the available product details, and choose the setup that suits your space.'
   ],
-  hashtags: ['#EverydayOrganization'],
+  hashtags: ['#EverydayOrganization', '#ProductDetails'],
   visualDirections: ['Show only confirmed product details.'],
   postingSequence: ['Publish after availability is confirmed.']
 };
