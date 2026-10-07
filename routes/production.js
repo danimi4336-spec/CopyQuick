@@ -15,6 +15,7 @@ const {
 } = require('../lib/productionPlanProgress');
 const { productionPlanName } = require('../lib/productionPlanIdentity');
 const { listProductionHistoryPage } = require('../lib/productionResume');
+const { buildProductionDelivery } = require('../lib/productionResultsPresentation');
 const {
   customerPurpose,
   customerReadiness,
@@ -219,14 +220,10 @@ router.get('/production/:id', requireAuth, (req, res) => {
     phase.jobs.push(job);
   });
   const completedCount = production.jobs.filter(function(job) { return job.status === 'completed'; }).length;
-  const needsAttention = production.jobs.filter(job => ['NEEDS_INFORMATION', 'NEEDS_SAFE_REVIEW', 'COULD_NOT_COMPLETE'].includes(job.readiness));
-  const readyForReview = production.jobs.filter(job => job.readiness === 'READY_FOR_REVIEW');
-  const researchSources = production.jobs.filter(job => job.deliverable_id === 'research_evidence_pack' && !needsAttention.includes(job));
-  const strategyPlanning = production.jobs.filter(job => job.artifactPolicy?.role === 'planning_foundation' && job.deliverable_id !== 'research_evidence_pack' && !needsAttention.includes(job));
-  const recommended = readyForReview[0] || needsAttention[0] || researchSources[0] || strategyPlanning[0] || null;
-  const delivery = { readyForReview, needsAttention, researchSources, strategyPlanning, recommended,
-    supportingCount: researchSources.length + strategyPlanning.length,
-    terminal: ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'].includes(production.status) };
+  const delivery = {
+    ...buildProductionDelivery(production.jobs),
+    terminal: ['completed', 'partially_completed', 'failed', 'blocked', 'canceled'].includes(production.status)
+  };
   const executionNotice = req.session.productionExecutionNotice || null;
   req.session.productionExecutionNotice = null;
   const hasExpiredLease = production.jobs.some(function(job) {
