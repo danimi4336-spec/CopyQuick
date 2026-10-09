@@ -144,9 +144,18 @@
                 <button type="submit" class="btn <%= affordability && affordability.valid && affordability.cost.canAfford ? 'btn-primary' : 'btn-outline' %>">Approve &amp; Prepare for Production</button>
             </form>
             <% } else { %>
+            <% const planningOnlyGuidance = {
+                build_brand: 'Save this plan and use the brand foundation to confirm proof and final brand decisions before creating customer-ready brand copy.',
+                validate_idea: 'Save this plan and use the validation foundation to test the riskiest assumptions before creating customer-ready launch work.',
+                increase_conversion_rates: 'Save this plan and use the diagnostic and measurement foundation to establish observed friction before creating customer-ready conversion copy.',
+                improve_search_rankings: 'Save this plan and use the search foundation to confirm the priority reader question and evidence boundaries before creating customer-ready content.',
+                launch_product: 'Save this plan and resolve the product decisions identified in Strategy before preparing customer-ready launch work.',
+                promote_service: 'Save this plan and confirm the service, audience, proof, and appropriate next step before preparing customer-ready service copy.',
+                get_more_customers: 'Save this plan and confirm the offer, audience, conversion path, capacity, and acquisition context before preparing customer-ready acquisition work.'
+            }; %>
             <div class="build-plan-planning-only" role="status">
                 <strong><%= outputPlanItems.length ? 'No Production work is selected.' : 'This plan currently supports planning only.' %></strong>
-                <p><%= outputPlanItems.length ? 'Select at least one ready-to-use output before preparing Production.' : 'Save this plan or return to Strategy to establish the offer, audience, conversion action, capacity, or channel context needed for customer-ready work.' %></p>
+                <p><%= outputPlanItems.length ? 'Select at least one ready-to-use output before preparing Production.' : (planningOnlyGuidance[plan.objective] || 'Save this plan or return to Strategy to resolve the decisions needed for customer-ready work.') %></p>
             </div>
             <% } %>
             </div>

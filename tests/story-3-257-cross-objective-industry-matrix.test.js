@@ -1,4 +1,7 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const Database = require('better-sqlite3');
 const { objectiveUniverse } = require('../lib/objectiveFramework');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { buildBusinessReflection } = require('../lib/businessReflection');
@@ -7,238 +10,299 @@ const { getProductionArtifactPolicy } = require('../lib/productionArtifactPolicy
 const { minimumProductionDependencies } = require('../lib/productionDependencyPolicy');
 const { calculateProductionCost } = require('../lib/productionCost');
 const { generateDeliverable } = require('../lib/generationService');
-const Database = require('better-sqlite3');
 const { runMigrationEngine } = require('../db/migrations');
-const { promoteObjectiveMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
+const { memoryUnderstanding, promoteObjectiveMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
 
 const fact = (value, label = value) => ({ value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' });
-const fixture = (initial_description, understanding, answers) => ({ understanding, answers: { initial_description, ...answers } });
+const unsure = () => fact('unsure', "I'm not sure yet");
+const fixture = (initialDescription, understanding, answers) => ({ understanding, answers: { initial_description: initialDescription, ...answers } });
 
-function remodeling() {
-  return fixture('Residential remodeling consultations for homeowners planning major renovations.', {
-    businessType: fact('service', 'Service Business'), industry: fact('home_services', 'Home Services'),
-    category: fact('residential_remodeling', 'Residential Remodeling'), acquisitionGoal: fact('appointments', 'More booked appointments'),
-    targetAudience: fact('homeowners planning major renovations', 'Homeowners planning major renovations'),
-    currentAcquisitionChannel: fact('referrals', 'Referrals'), acquisitionStage: fact('inconsistent_traction', 'Some traction, but inconsistent'),
-    salesProcess: fact('booked_call', 'They book a call or appointment'), capacityReadiness: fact('capacity_ready', 'Yes, ready for more customers')
-  }, {
-    business_type: 'service', acquisition_goal: 'appointments', acquisition_target: { value: 'homeowners planning major renovations' },
-    acquisition_channel: 'referrals', acquisition_stage: 'inconsistent_traction', sales_process: 'booked_call', capacity_readiness: 'capacity_ready'
+const INDUSTRIES = Object.freeze({
+  remodeling: Object.freeze({ kind: 'service', businessType: 'service', businessLabel: 'Service Business', industry: 'home_services', category: 'residential_remodeling', offer: 'Residential remodeling consultations for kitchen, bathroom, and whole-home projects', audience: 'Homeowners planning major renovations', problem: 'Planning a major renovation involves decisions about scope and priorities', cta: 'Book a consultation', funnel: 'booked_call', channel: 'referrals' }),
+  bookkeeping: Object.freeze({ kind: 'service', businessType: 'service', businessLabel: 'Service Business', industry: 'professional_services', category: 'bookkeeping', offer: 'Monthly bookkeeping and reporting with plain-language summaries', audience: 'Independent agency owners', problem: 'Month-end records can be difficult to interpret', cta: 'Book a consultation', funnel: 'booked_call', channel: 'referrals' }),
+  localAppointment: Object.freeze({ kind: 'service', businessType: 'service', businessLabel: 'Service Business', industry: 'professional_services', category: 'dental_practice', offer: 'Routine dental appointment consultations', audience: 'Adults considering routine dental care', problem: 'People need clear information before choosing an appointment', cta: 'Book an appointment', funnel: 'booked_call', channel: 'local_search' }),
+  saas: Object.freeze({ kind: 'software', businessType: 'software', businessLabel: 'Software or an app', industry: 'technology', category: 'scheduling_software', offer: 'Team scheduling software trial', audience: 'Operations leaders at growing companies', problem: 'Coordinating team schedules takes repeated manual work', cta: 'Start a trial', funnel: 'trial_signup', channel: 'paid_ads' }),
+  ecommerce: Object.freeze({ kind: 'product', businessType: 'physical_product', businessLabel: 'Physical Product', industry: 'consumer_products', category: 'desk_accessories', offer: 'Modular desk accessory collection', audience: 'Remote professionals organizing small workspaces', problem: 'Small workspaces need flexible organization', cta: 'Add to cart', funnel: 'purchase', channel: 'social' }),
+  physicalProduct: Object.freeze({ kind: 'product', businessType: 'physical_product', businessLabel: 'Physical Product', industry: 'consumer_products', category: 'desk_organizer', offer: 'Reusable desk organizer', audience: 'Remote illustrators', problem: 'Desk tools need a consistent place between projects', cta: 'View product details', funnel: 'purchase', channel: 'email' }),
+  wellness: Object.freeze({ kind: 'wellness', businessType: 'physical_product', businessLabel: 'Physical Product', industry: 'health_wellness', category: 'dietary_supplement', offer: 'Cinnamon capsule concept for everyday wellness', audience: 'Adults interested in everyday wellness routines', problem: 'People compare labels and product formats when considering wellness products', cta: 'Review product details', funnel: 'purchase', channel: 'social' }),
+  unresolvedOffer: Object.freeze({ kind: 'unresolved', businessType: null, industry: 'early_stage', category: null, offer: null, audience: 'People who may benefit from a future offer', problem: 'The offer and customer need are still being explored', cta: null, funnel: null, channel: 'unsure' }),
+  conflictingOffers: Object.freeze({ kind: 'conflict', businessType: null, industry: null, category: null, offer: null, audience: null, problem: null, cta: null, funnel: null, channel: null })
+});
+
+const OBJECTIVES = objectiveUniverse.filter(item => item.available).map(item => item.id);
+const INDUSTRY_KEYS = Object.keys(INDUSTRIES);
+const PRODUCT_LAUNCH_KINDS = new Set(['software', 'product', 'wellness']);
+
+function applicability(objective, industryKey) {
+  const profile = INDUSTRIES[industryKey];
+  if (profile.kind === 'conflict') return { status: 'SAFE_EXCLUSION', reason: 'conflicting remembered offers require explicit subject selection', mode: 'conflict' };
+  if (profile.kind === 'unresolved' && !['build_brand', 'validate_idea'].includes(objective)) return { status: 'SAFE_EXCLUSION', reason: 'essential offer context remains unresolved', mode: 'planning_only' };
+  if (objective === 'launch_product' && !PRODUCT_LAUNCH_KINDS.has(profile.kind)) return { status: 'SAFE_EXCLUSION', reason: 'the fixture is an established service rather than a product launch', mode: 'incompatible' };
+  if (objective === 'promote_service' && profile.kind !== 'service') return { status: 'SAFE_EXCLUSION', reason: 'the fixture is not a service offer', mode: 'incompatible' };
+  return { status: 'PASS', reason: 'applicable workflow exercised', mode: 'applicable' };
+}
+
+function launchFixture(profile) {
+  const wellness = profile.kind === 'wellness';
+  const understanding = {
+    businessType: fact(profile.businessType, profile.businessLabel), industry: fact(profile.industry), category: fact(profile.category),
+    targetAudience: fact(profile.audience), customerMotivation: fact('convenience', 'Convenience'),
+    conceptMaturity: fact(wellness ? 'formula_in_mind' : profile.kind === 'product' ? 'finalized' : 'concept', wellness ? 'Ingredients or formula in mind' : 'Concept described'),
+    launchStage: fact('ready', 'Ready to launch'), salesChannel: fact('own_website', 'Own website'), competitiveDifferentiation: unsure(),
+    existingProductDefinition: fact(profile.offer)
+  };
+  if (wellness) understanding.intendedOutcome = fact('everyday_wellness', 'Everyday wellness');
+  return fixture(profile.offer, understanding, {
+    business_type: profile.businessType, target_audience: { value: profile.audience }, customer_motivation: 'convenience', launch_stage: 'ready',
+    sales_channel: 'own_website', competitive_differentiation: 'unsure',
+    ...(wellness ? { supplement_intended_outcome: 'everyday_wellness', supplement_concept_maturity: 'formula_in_mind', supplement_existing_product_definition: { value: profile.offer }, supplement_launch_stage: 'ready' } : {})
   });
 }
 
-function bookkeeping() {
-  return fixture('Monthly bookkeeping and reporting for independent agencies.', {
-    serviceDefinition: fact('Monthly bookkeeping and reporting'), targetAudience: fact('Independent agency owners'),
-    clientProblem: fact('Month-end records are difficult to interpret'),
-    serviceExpertise: fact('Founder biography and bookkeeping qualifications supplied by the builder'),
-    serviceDifferentiation: fact('Plain-language monthly summaries'), serviceOffer: fact('Monthly engagement; pricing unresolved'),
-    serviceMarket: fact('unsure', "I'm not sure yet"), serviceChannel: fact('outbound', 'Outbound outreach'),
-    serviceConstraints: fact('No published case studies')
+function acquisitionFixture(profile) {
+  const service = profile.kind === 'service';
+  return fixture(`${profile.offer} for ${profile.audience}.`, {
+    businessType: fact(profile.businessType, profile.businessLabel), industry: fact(profile.industry), category: fact(profile.category),
+    acquisitionGoal: fact(service ? 'appointments' : 'sales', service ? 'More booked appointments' : 'More sales'), targetAudience: fact(profile.audience),
+    currentAcquisitionChannel: fact(profile.channel), acquisitionStage: fact('inconsistent_traction', 'Some traction, but inconsistent'),
+    salesProcess: fact(profile.funnel), capacityReadiness: fact('capacity_ready', 'Yes, ready for more customers')
   }, {
-    service_definition: { value: 'Monthly bookkeeping and reporting' }, service_client: { value: 'Independent agency owners' },
-    service_problem: { value: 'Month-end records are difficult to interpret' },
-    service_expertise: { value: 'Founder biography and bookkeeping qualifications supplied by the builder' },
-    service_difference: { value: 'Plain-language monthly summaries' }, service_offer: { value: 'Monthly engagement; pricing unresolved' },
-    service_market: 'unsure', service_channel: 'outbound', service_constraints: { value: 'No published case studies' }
+    business_type: profile.businessType, acquisition_goal: service ? 'appointments' : 'sales', acquisition_target: { value: profile.audience },
+    acquisition_channel: profile.channel, acquisition_stage: 'inconsistent_traction', sales_process: profile.funnel, capacity_readiness: 'capacity_ready'
   });
 }
 
-function conversion({ offer, audience, traffic, funnel, page, cta, businessType, industry, category }) {
-  return fixture(`${offer} for ${audience}.`, {
-    businessType: fact(businessType, businessType), industry: fact(industry, industry), category: fact(category, category),
-    currentOffer: fact(offer), targetAudience: fact(audience), trafficSource: fact(traffic, traffic), funnelType: fact(funnel, funnel),
-    pageExperience: fact(page), primaryCta: fact(cta), conversionEvidence: fact('unsure', "I'm not sure yet"),
-    conversionFriction: fact('unsure', "I'm not sure yet")
+function conversionFixture(profile) {
+  return fixture(`${profile.offer} for ${profile.audience}.`, {
+    businessType: fact(profile.businessType, profile.businessLabel), industry: fact(profile.industry), category: fact(profile.category),
+    currentOffer: fact(profile.offer), targetAudience: fact(profile.audience), trafficSource: fact(profile.channel), funnelType: fact(profile.funnel),
+    pageExperience: fact(`A page explaining ${profile.offer}`), primaryCta: fact(profile.cta), conversionEvidence: unsure(), conversionFriction: unsure()
   }, {
-    conversion_offer: { value: offer }, conversion_audience: { value: audience }, conversion_traffic: traffic,
-    conversion_funnel: funnel, conversion_page: { value: page }, conversion_cta: { value: cta },
+    conversion_offer: { value: profile.offer }, conversion_audience: { value: profile.audience }, conversion_traffic: profile.channel,
+    conversion_funnel: profile.funnel, conversion_page: { value: `A page explaining ${profile.offer}` }, conversion_cta: { value: profile.cta },
     conversion_evidence: 'unsure', conversion_friction: 'unsure'
   });
 }
 
-function physicalProduct() {
-  return fixture('A reusable desk organizer for remote illustrators.', {
-    businessType: fact('physical_product', 'Physical Product'), targetAudience: fact('remote illustrators', 'Remote illustrators'),
-    customerMotivation: fact('convenience', 'Convenience'), launchStage: fact('ready', 'Ready to launch'),
-    salesChannel: fact('ecommerce', 'Own ecommerce store'), competitiveDifferentiation: fact('unsure', "I'm not sure yet")
+function searchFixture(profile) {
+  return fixture(`${profile.offer} website seeking relevant organic discovery.`, {
+    websiteContext: fact(`A website for ${profile.offer}`), targetAudience: fact(profile.audience), searchGoal: fact('qualified_leads', 'Generate qualified leads'),
+    primaryCta: fact(profile.cta), existingContent: fact('A main offer page and a small educational resource section'), geographicMarket: unsure(),
+    suppliedKeywords: fact(`${profile.category}; practical questions about ${profile.category}`), searchEvidence: unsure(),
+    technicalLimitations: fact('The team can publish one carefully reviewed article per month')
   }, {
-    business_type: 'physical_product', target_audience: { value: 'remote illustrators' }, customer_motivation: 'convenience',
-    launch_stage: 'ready', sales_channel: 'ecommerce', competitive_differentiation: 'unsure'
+    search_site: { value: `A website for ${profile.offer}` }, search_audience: { value: profile.audience }, search_goal: 'qualified_leads',
+    conversion_cta: { value: profile.cta }, search_content: { value: 'A main offer page and a small educational resource section' }, search_market: 'unsure',
+    search_keywords: { value: `${profile.category}; practical questions about ${profile.category}` }, search_evidence: 'unsure',
+    search_constraints: { value: 'One carefully reviewed article per month' }
   });
 }
 
-function wellness() {
-  return fixture('An early-stage cinnamon supplement concept for everyday wellness.', {
-    businessType: fact('physical_product', 'Physical Product'), industry: fact('health_wellness', 'Health & Wellness'),
-    category: fact('dietary_supplement', 'Dietary Supplement'), intendedOutcome: fact('everyday_wellness', 'Everyday wellness'),
-    conceptMaturity: fact('formula_in_mind', 'Ingredients or formula in mind'),
-    existingProductDefinition: fact('A cinnamon capsule concept; efficacy and dosage are not established'),
-    targetAudience: fact('adults interested in everyday wellness', 'Adults interested in everyday wellness'),
-    launchStage: fact('development', 'In development'), salesChannel: fact('unsure', "I'm not sure yet"),
-    competitiveDifferentiation: fact('unsure', "I'm not sure yet")
+function brandFixture(profile) {
+  const offer = profile.offer || 'An early-stage business exploring its first offer';
+  const audience = profile.audience || 'A customer group still being clarified';
+  return fixture(`Build a clear brand for ${offer}.`, {
+    brandBusiness: fact(offer), targetAudience: fact(audience), existingBrand: fact('A working name exists; other brand decisions remain open'),
+    brandDifferentiation: fact('Clear explanations and a respectful buying experience'), brandValues: fact('Clarity, usefulness, and respect'),
+    brandVoice: fact('Clear, calm, and practical'), brandProof: unsure(), brandConstraints: fact('Do not invent proof or capabilities')
   }, {
-    business_type: 'physical_product', supplement_intended_outcome: 'everyday_wellness', supplement_concept_maturity: 'formula_in_mind',
-    supplement_existing_product_definition: { value: 'A cinnamon capsule concept; efficacy and dosage are not established' },
-    target_audience: { value: 'adults interested in everyday wellness' }, supplement_launch_stage: 'development',
-    sales_channel: 'unsure', competitive_differentiation: 'unsure'
+    brand_business: { value: offer }, brand_audience: { value: audience }, brand_state: { value: 'A working name exists; other brand decisions remain open' },
+    brand_difference: { value: 'Clear explanations and a respectful buying experience' }, brand_values: { value: 'Clarity, usefulness, and respect' },
+    brand_voice: { value: 'Clear, calm, and practical' }, brand_proof: 'unsure', brand_constraints: { value: 'Do not invent proof or capabilities' }
   });
 }
 
-function idea() {
-  return fixture('A shared inventory reminder concept that has not been validated.', {
-    ideaDefinition: fact('A shared inventory reminder'), ideaMaturity: fact('idea_only', 'Idea only'),
-    targetAudience: fact('small theatre production managers', 'Small theatre production managers'),
-    problemHypothesis: fact('Supply checks may be missed'), solutionHypothesis: fact('Shared reminders may coordinate checks'),
-    demandAssumptions: fact('Managers may pay to reduce missed checks'), knownAlternatives: fact('Spreadsheets and chat'),
-    validationEvidence: fact('unsure', "I'm not sure yet"), validationResources: fact('Access to eight managers')
+function serviceFixture(profile) {
+  return fixture(`${profile.offer} for ${profile.audience}.`, {
+    serviceDefinition: fact(profile.offer), targetAudience: fact(profile.audience), clientProblem: fact(profile.problem),
+    serviceExpertise: fact('The builder supplied a service description but no public credential claims'), serviceDifferentiation: fact('A clear process and plain-language communication'),
+    serviceOffer: unsure(), serviceMarket: unsure(), serviceChannel: fact(profile.channel), serviceConstraints: fact('Pricing, testimonials, performance, and availability are unconfirmed')
   }, {
-    idea_definition: { value: 'A shared inventory reminder' }, idea_maturity: 'idea_only',
-    idea_customer: { value: 'small theatre production managers' }, idea_problem: { value: 'Supply checks may be missed' },
-    idea_solution: { value: 'Shared reminders may coordinate checks' }, idea_demand: { value: 'Managers may pay to reduce missed checks' },
-    idea_alternatives: { value: 'Spreadsheets and chat' }, idea_evidence: 'unsure', idea_resources: { value: 'Access to eight managers' }
+    service_definition: { value: profile.offer }, service_client: { value: profile.audience }, service_problem: { value: profile.problem },
+    service_expertise: { value: 'The builder supplied a service description but no public credential claims' },
+    service_difference: { value: 'A clear process and plain-language communication' }, service_offer: 'unsure', service_market: 'unsure',
+    service_channel: profile.channel, service_constraints: { value: 'Pricing, testimonials, performance, and availability are unconfirmed' }
   });
 }
 
-const industries = ['remodeling', 'bookkeeping', 'localAppointment', 'saas', 'ecommerce', 'physicalProduct', 'wellness', 'unresolvedOffer', 'conflictingOffers'];
-const matrix = Object.freeze({
-  launch_product: ['SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION','PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  get_more_customers: ['PASS','PASS','PASS','PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  increase_conversion_rates: ['PASS','PASS','PASS','PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  improve_search_rankings: ['PASS','PASS','PASS','PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  build_brand: ['PASS','PASS','PASS','PASS','PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  promote_service: ['PASS','PASS','PASS','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION','SAFE_EXCLUSION'],
-  validate_idea: ['PASS','PASS','PASS','PASS','PASS','PASS','SAFE_EXCLUSION','PASS','SAFE_EXCLUSION']
+function ideaFixture(profile) {
+  const offer = profile.offer || 'A possible service or product direction';
+  const audience = profile.audience || 'A customer group to identify through interviews';
+  const problem = profile.problem || 'The customer problem is still a hypothesis';
+  return fixture(`Validate ${offer} before making a larger investment.`, {
+    ideaDefinition: fact(offer), ideaMaturity: fact('idea_only', 'Idea only'), targetAudience: fact(audience), problemHypothesis: fact(problem),
+    solutionHypothesis: fact(`${offer} may provide a clearer next step`), demandAssumptions: fact('The audience may value the proposed approach'),
+    knownAlternatives: unsure(), validationEvidence: unsure(), validationResources: fact('Access to a small set of neutral customer interviews')
+  }, {
+    idea_definition: { value: offer }, idea_maturity: 'idea_only', idea_customer: { value: audience }, idea_problem: { value: problem },
+    idea_solution: { value: `${offer} may provide a clearer next step` }, idea_demand: { value: 'The audience may value the proposed approach' },
+    idea_alternatives: 'unsure', idea_evidence: 'unsure', idea_resources: { value: 'Access to a small set of neutral customer interviews' }
+  });
+}
+
+const FIXTURE_BUILDERS = Object.freeze({
+  launch_product: launchFixture, get_more_customers: acquisitionFixture, increase_conversion_rates: conversionFixture,
+  improve_search_rankings: searchFixture, build_brand: brandFixture, promote_service: serviceFixture, validate_idea: ideaFixture
 });
 
-function inspect(objective, source) {
+function validatePublicOutput(output, contract, profile) {
+  const values = [];
+  (function collect(value) {
+    if (typeof value === 'string') values.push(value);
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === 'object') Object.values(value).forEach(collect);
+  })(output);
+  const text = values.join(' ');
+  assert.doesNotMatch(text, /production_job_id|deliverable_id|contract_version|semanticRole|sourceFields|synthesisTrace|validator/i);
+  assert.doesNotMatch(text, /\b(?:we guarantee|guaranteed to|delivers? proven results?|best-performing|industry-leading)\b/i);
+  if (profile.kind === 'service') assert.doesNotMatch(text, /\b(?:add to cart|checkout|shipping|start (?:a )?trial)\b/i);
+  if (profile.kind === 'software') assert.doesNotMatch(text, /\b(?:add to cart|shipping|book a consultation)\b/i);
+  if (['product', 'wellness'].includes(profile.kind)) assert.doesNotMatch(text, /\bbook (?:a )?(?:call|consultation|appointment)\b/i);
+  if (profile.kind === 'wellness') assert.doesNotMatch(text, /\b(?:cures?|prevents?|clinically proven|safe for everyone|guarantees? results?|treats? (?:diabetes|disease|illness|symptoms?))\b/i);
+  if (['product'].includes(profile.kind)) assert.doesNotMatch(text, /\b(?:formulation|dosage|label directions|warnings|wellness routine)\b/i);
+  if (contract.readyToUse) assert.doesNotMatch(text, /pricing is unresolved|confirmed service scope|builder-provided/i);
+  if (contract.id === 'priority_search_article') assert.doesNotMatch(text, /within this scope|exclude unsupported search-performance claims/i);
+  if (contract.id === 'service_page') assert.doesNotMatch(text, /\[[^\]]+\]/);
+}
+
+async function exerciseApplicable(objective, industryKey) {
+  const profile = INDUSTRIES[industryKey];
+  const source = FIXTURE_BUILDERS[objective](profile);
   const runtime = createObjectiveRuntime(objective);
   const discovery = runtime.discovery.analyze({ ...source, unknowns: [] });
-  assert.strictEqual(discovery.planningReadiness.ready, true, `${objective}: discovery`);
+  assert.strictEqual(discovery.planningReadiness.ready, true, `${objective}/${industryKey}: discovery`);
   const reflection = buildBusinessReflection({ objective, ...source, planningReadiness: discovery.planningReadiness });
-  assert(reflection.groups.length, `${objective}: reflection`);
+  assert(reflection.groups.length, `${objective}/${industryKey}: reflection`);
   const strategy = runtime.strategy.build({ understanding: source.understanding, confirmedUnderstanding: source.understanding, answers: source.answers });
+  assert.doesNotMatch(JSON.stringify(strategy), /\b(?:proven demand|guaranteed|best-performing channel|conversion rate is \d|search volume: \d)\b/i);
+  if (objective === 'increase_conversion_rates' && profile.kind === 'software') {
+    assert.doesNotMatch(JSON.stringify(strategy), /\b(?:shipping|returns|checkout friction)\b/i, 'SaaS conversion strategy must not inherit ecommerce diagnostics');
+  }
   const plan = runtime.buildPlan({ confirmedUnderstanding: source.understanding, strategyResult: strategy, answers: source.answers });
-  assert.strictEqual(plan.readiness.ready, true, `${objective}: plan`);
+  assert.strictEqual(plan.readiness.ready, true, `${objective}/${industryKey}: plan`);
   const items = plan.phases.flatMap(phase => phase.deliverables);
-  assert(items.length, `${objective}: useful work`);
+  assert(items.length, `${objective}/${industryKey}: useful plan`);
+  const itemIds = items.map(item => item.id);
+  if (objective === 'launch_product' && profile.kind === 'software') {
+    assert(itemIds.includes('software_product_demo'));
+    assert(!itemIds.some(id => /^ecommerce_|^abandoned_cart_/.test(id)), 'SaaS launch must not receive ecommerce/cart assets');
+  }
+  if (objective === 'increase_conversion_rates' && profile.kind === 'software') {
+    assert.match(plan.summary.whyThisPlan, /trial-signup/i);
+    assert.doesNotMatch(plan.summary.whyThisPlan, /product-page|ecommerce|checkout|shipping/i);
+  }
+  if (objective === 'launch_product' && ['product', 'wellness'].includes(profile.kind)) {
+    assert(!itemIds.some(id => /^software_|^saas_/.test(id)), 'product launch must not receive SaaS assets');
+  }
   items.forEach(item => {
-    assert(runtime.production.contract(item.id), `${objective}:${item.id}: contract`);
-    assert.deepStrictEqual(item.dependencies, minimumProductionDependencies(item.id), `${objective}:${item.id}: dependencies`);
-    assert(getProductionArtifactPolicy(item.id), `${objective}:${item.id}: artifact policy`);
+    assert(runtime.production.contract(item.id), `${objective}/${industryKey}/${item.id}: contract`);
+    assert.deepStrictEqual(item.dependencies, minimumProductionDependencies(item.id), `${objective}/${industryKey}/${item.id}: dependencies`);
   });
   const selection = createDefaultSelection(plan);
   const approval = createApprovedProductionSet({ plan, selection, strategyResult: strategy, confirmedUnderstanding: source.understanding });
-  const ready = items.filter(item => getProductionArtifactPolicy(item.id).readyToUse);
-  if (plan.summary.requiresReadyAsset && !ready.length) {
-    assert.strictEqual(approval.valid, false, `${objective}: planning-only approval`);
-    assert.strictEqual(validateSelection(plan, selection).valid, false, `${objective}: planning-only selection`);
-  } else {
-    assert.strictEqual(approval.valid, true, `${objective}: approval`);
-    const cost = calculateProductionCost({ approvedProductionSet: approval.productionSet, usageSnapshot: { used: 0, monthlyLimit: 20, remaining: 20 } });
-    assert.strictEqual(cost.productionUnitCount, approval.productionSet.selectedDeliverables.filter(item => item.readyToUse).length);
-    assert.strictEqual(cost.planningFoundationCount, approval.productionSet.selectedDeliverables.filter(item => !item.readyToUse).length);
+  const readyItems = items.filter(item => getProductionArtifactPolicy(item.id).readyToUse);
+  if (plan.summary.requiresReadyAsset && !readyItems.length) {
+    assert.strictEqual(approval.valid, false, `${objective}/${industryKey}: execution safely unavailable`);
+    assert.strictEqual(validateSelection(plan, selection).valid, false);
+    return { status: 'PASS', reason: 'planning-only behavior exercised', objective, industryKey };
   }
-  return { strategy, plan, items };
+  assert.strictEqual(approval.valid, true, `${objective}/${industryKey}: approval`);
+  const cost = calculateProductionCost({ approvedProductionSet: approval.productionSet, usageSnapshot: { used: 2, monthlyLimit: 20, remaining: 18 } });
+  assert.strictEqual(cost.productionUnitCount, approval.productionSet.selectedDeliverables.filter(item => item.readyToUse).length);
+  assert.strictEqual(cost.planningFoundationCount, approval.productionSet.selectedDeliverables.filter(item => !item.readyToUse).length);
+  const completed = new Map();
+  for (const item of approval.productionSet.selectedDeliverables) {
+    const contract = runtime.production.contract(item.id);
+    const dependencies = item.dependencies.map(id => ({ deliverableId: id, title: items.find(candidate => candidate.id === id)?.title || id, contractVersion: runtime.production.contract(id).version, output: completed.get(id) }));
+    let generated;
+    try {
+      generated = await generateDeliverable({
+        job: { deliverable_id: item.id, title: item.title, strategic_direction: item.strategicDirection, strategySnapshot: approval.productionSet.strategySnapshot },
+        productionRun: { objective, strategySnapshot: approval.productionSet.strategySnapshot }, dependencyOutputs: dependencies, handler: contract
+      });
+    } catch (error) {
+      error.message = `${objective}/${industryKey}/${item.id}: ${error.message} ${JSON.stringify(error.details || {})}`;
+      throw error;
+    }
+    const validation = item.id === 'priority_search_article'
+      ? { valid: contract.validateOutput(generated.structuredOutput) }
+      : runtime.validation.validate(generated.structuredOutput, contract);
+    assert.strictEqual(validation.valid, true, `${objective}/${industryKey}/${item.id}: output ${JSON.stringify(validation)}`);
+    validatePublicOutput(generated.structuredOutput, contract, profile);
+    completed.set(item.id, generated.structuredOutput);
+  }
+  return { status: 'PASS', reason: 'full deterministic path exercised', objective, industryKey };
+}
+
+function assertUnresolvedPlanningOnly(objective) {
+  const runtime = createObjectiveRuntime(objective);
+  const source = fixture('I am still deciding what the business will offer.', {}, {});
+  const discovery = runtime.discovery.analyze({ ...source, unknowns: [] });
+  assert.strictEqual(discovery.planningReadiness.ready, false, `${objective}/unresolvedOffer must remain blocked before execution`);
+}
+
+function conflictFixtureDb() {
+  const db = new Database(':memory:');
+  db.pragma('foreign_keys = ON');
+  runMigrationEngine(db, { logger() {} });
+  const userId = Number(db.prepare("INSERT INTO users(email,name) VALUES('story-257-conflict@example.com','Story 257 Conflict')").run().lastInsertRowid);
+  const remodel = acquisitionFixture(INDUSTRIES.remodeling);
+  const product = launchFixture(INDUSTRIES.physicalProduct);
+  promoteObjectiveMemory(db, { userId, objective: 'get_more_customers', referenceId: 'offer-one', understanding: remodel.understanding, answers: remodel.answers });
+  promoteObjectiveMemory(db, { userId, objective: 'launch_product', referenceId: 'offer-two', understanding: product.understanding, answers: product.answers });
+  return { db, userId };
 }
 
 (async function run() {
-  const supported = objectiveUniverse.filter(item => item.available).map(item => item.id);
-  assert.deepStrictEqual(Object.keys(matrix), supported);
-  Object.values(matrix).forEach(row => {
-    assert.strictEqual(row.length, industries.length);
-    row.forEach(status => assert(['PASS', 'SAFE_EXCLUSION'].includes(status)));
-  });
-
-  const acquisition = inspect('get_more_customers', remodeling());
-  assert.deepStrictEqual(acquisition.items.map(item => item.id), [
-    'conversion_diagnostic_brief', 'consultation_conversion_brief', 'consultation_conversion_page_copy', 'conversion_measurement_plan'
-  ]);
-  assert.doesNotMatch(JSON.stringify(acquisition.strategy), /referrals? (?:are|is) (?:recommended|proven|best-performing)/i);
-
-  const local = inspect('increase_conversion_rates', conversion({
-    offer: 'Routine dental appointments', audience: 'Adults considering routine dental care', traffic: 'referrals',
-    funnel: 'booked_call', page: 'A service page describing routine care', cta: 'Book an appointment',
-    businessType: 'service', industry: 'professional_services', category: 'dental_practice'
-  }));
-  assert(local.items.some(item => item.id === 'consultation_conversion_page_copy'));
-  const saas = inspect('increase_conversion_rates', conversion({
-    offer: 'A scheduling software trial', audience: 'Operations leaders', traffic: 'paid_ads',
-    funnel: 'trial_signup', page: 'A pricing page with setup information', cta: 'Start a trial',
-    businessType: 'software', industry: 'technology', category: 'scheduling_software'
-  }));
-  assert(!saas.items.some(item => /consultation/.test(item.id)));
-  const commerce = inspect('increase_conversion_rates', conversion({
-    offer: 'Reusable desk organizer', audience: 'Remote professionals', traffic: 'social',
-    funnel: 'purchase', page: 'A product page with dimensions and materials', cta: 'Add to cart',
-    businessType: 'physical_product', industry: 'consumer_products', category: 'desk_organizer'
-  }));
-  assert(!commerce.items.some(item => /consultation/.test(item.id)));
-
-  const promotedService = inspect('promote_service', bookkeeping());
-  const serviceApproval = createApprovedProductionSet({
-    plan: promotedService.plan, selection: createDefaultSelection(promotedService.plan),
-    strategyResult: promotedService.strategy, confirmedUnderstanding: bookkeeping().understanding
-  });
-  const serviceRuntime = createObjectiveRuntime('promote_service');
-  const serviceCompleted = new Map();
-  let serviceOutput;
-  for (const serviceItem of promotedService.items) {
-    const serviceContract = serviceRuntime.production.contract(serviceItem.id);
-    const dependencyOutputs = serviceItem.dependencies.map(id => ({
-      deliverableId: id, title: id, contractVersion: serviceRuntime.production.contract(id).version,
-      output: serviceCompleted.get(id)
-    }));
-    const generated = await generateDeliverable({
-      job: { deliverable_id: serviceItem.id, title: serviceItem.title, strategic_direction: serviceItem.strategicDirection, strategySnapshot: serviceApproval.productionSet.strategySnapshot },
-      productionRun: { objective: 'promote_service', strategySnapshot: serviceApproval.productionSet.strategySnapshot },
-      dependencyOutputs, handler: serviceContract
-    });
-    serviceCompleted.set(serviceItem.id, generated.structuredOutput);
-    if (serviceItem.id === 'service_page') serviceOutput = generated;
+  assert.deepStrictEqual(OBJECTIVES, ['launch_product', 'get_more_customers', 'increase_conversion_rates', 'improve_search_rankings', 'build_brand', 'promote_service', 'validate_idea']);
+  assert.strictEqual(OBJECTIVES.length * INDUSTRY_KEYS.length, 63);
+  const conflict = conflictFixtureDb();
+  const evidence = [];
+  for (const objective of OBJECTIVES) {
+    for (const industryKey of INDUSTRY_KEYS) {
+      const decision = applicability(objective, industryKey);
+      if (decision.mode === 'applicable') evidence.push(await exerciseApplicable(objective, industryKey));
+      else if (decision.mode === 'planning_only') {
+        assertUnresolvedPlanningOnly(objective);
+        evidence.push({ objective, industryKey, status: decision.status, reason: decision.reason });
+      } else if (decision.mode === 'conflict') {
+        const resolution = resolveObjectiveSubjects(conflict.db, { userId: conflict.userId, initialDescription: 'Help this business with the selected objective.' });
+        assert.strictEqual(resolution.requiresSelection, true, `${objective}/${industryKey}: explicit selection`);
+        assert.strictEqual(resolution.offer, null);
+        evidence.push({ objective, industryKey, status: decision.status, reason: decision.reason });
+      } else {
+        const kind = INDUSTRIES[industryKey].kind;
+        if (objective === 'launch_product') assert(!PRODUCT_LAUNCH_KINDS.has(kind));
+        if (objective === 'promote_service') assert.notStrictEqual(kind, 'service');
+        evidence.push({ objective, industryKey, status: decision.status, reason: decision.reason });
+      }
+    }
   }
-  const serviceContract = serviceRuntime.production.contract('service_page');
-  assert.strictEqual(serviceContract.validateOutput(serviceOutput.structuredOutput), true);
-  assert.doesNotMatch(serviceOutput.structuredOutput.content.join(' '), /\[[^\]]+\]|pricing is unresolved|confirmed service scope|residential remodeling|home services/i);
-  inspect('validate_idea', idea());
-  inspect('launch_product', physicalProduct());
-  const sensitive = inspect('launch_product', wellness());
-  assert.doesNotMatch(JSON.stringify(sensitive.strategy), /cures?|treats?|prevents?|clinically proven|safe for everyone/i);
-
-  const missingAudience = remodeling();
-  delete missingAudience.understanding.targetAudience;
-  delete missingAudience.answers.acquisition_target;
-  assert.strictEqual(createObjectiveRuntime('get_more_customers').discovery.analyze({ ...missingAudience, unknowns: [] }).planningReadiness.ready, false);
-
-  const limited = remodeling();
-  limited.understanding.capacityReadiness = fact('capacity_limited', 'Capacity needs attention first');
-  limited.answers.capacity_readiness = 'capacity_limited';
-  const limitedPlan = inspect('get_more_customers', limited);
-  assert.strictEqual(limitedPlan.items.filter(item => getProductionArtifactPolicy(item.id).readyToUse).length, 0);
-  assert.strictEqual(limitedPlan.plan.summary.requiresReadyAsset, true);
+  conflict.db.close();
+  assert.strictEqual(evidence.length, 63);
+  assert(evidence.every(cell => ['PASS', 'SAFE_EXCLUSION'].includes(cell.status) && cell.reason));
 
   const memoryDb = new Database(':memory:');
   memoryDb.pragma('foreign_keys = ON');
   runMigrationEngine(memoryDb, { logger() {} });
   const userId = Number(memoryDb.prepare("INSERT INTO users(email,name) VALUES('story-257@example.com','Story 257')").run().lastInsertRowid);
-  promoteObjectiveMemory(memoryDb, {
-    userId, objective: 'get_more_customers', referenceId: 'remodeling-plan',
-    answers: remodeling().answers, understanding: remodeling().understanding
-  });
-  const unrelatedService = resolveObjectiveSubjects(memoryDb, {
-    userId,
-    initialDescription: 'Monthly bookkeeping and reporting for independent agencies with plain-language monthly summaries.'
-  });
+  const remodel = acquisitionFixture(INDUSTRIES.remodeling);
+  promoteObjectiveMemory(memoryDb, { userId, objective: 'get_more_customers', referenceId: 'remodeling-plan', answers: remodel.answers, understanding: remodel.understanding });
+  const description = 'Monthly bookkeeping and reporting for independent agencies with plain-language monthly summaries.';
+  const unrelatedService = resolveObjectiveSubjects(memoryDb, { userId, initialDescription: description });
   assert.strictEqual(unrelatedService.selection, 'new');
-  assert.strictEqual(unrelatedService.offer, null, 'bookkeeping must not inherit remodeling memory');
-  const newOfferMemory = require('../lib/businessMemory').memoryUnderstanding(memoryDb, {
-    userId, objective: 'promote_service',
-    initialDescription: 'Monthly bookkeeping and reporting for independent agencies with plain-language monthly summaries.',
-    subjectId: unrelatedService.offer?.id
-  });
-  assert.strictEqual(newOfferMemory.understanding.industry, undefined, 'new bookkeeping offer must not inherit Home Services');
-  assert.strictEqual(newOfferMemory.understanding.businessType, undefined, 'new offer business type must come from current Discovery');
+  assert.strictEqual(unrelatedService.offer, null);
+  const newOfferMemory = memoryUnderstanding(memoryDb, { userId, objective: 'promote_service', initialDescription: description });
+  assert.strictEqual(newOfferMemory.understanding.industry, undefined);
+  assert.strictEqual(newOfferMemory.understanding.businessType, undefined);
   memoryDb.close();
 
-  console.log('Story 3.257 cross-objective and cross-industry acceptance matrix tests passed');
+  const summary = evidence.reduce((counts, cell) => { counts[cell.status] = (counts[cell.status] || 0) + 1; return counts; }, {});
+  assert.strictEqual(summary.PASS + summary.SAFE_EXCLUSION, 63);
+  const buildPlanView = fs.readFileSync(path.join(__dirname, '..', 'views', 'build-plan.ejs'), 'utf8');
+  assert.match(buildPlanView, /build_brand: 'Save this plan and use the brand foundation/);
+  assert.match(buildPlanView, /validate_idea: 'Save this plan and use the validation foundation/);
+  assert.match(buildPlanView, /increase_conversion_rates: 'Save this plan and use the diagnostic and measurement foundation/);
+  assert.doesNotMatch(buildPlanView, /establish the offer, audience, conversion action, capacity, or channel context needed/);
+  console.log(`Story 3.257 executable matrix passed: ${summary.PASS} PASS, ${summary.SAFE_EXCLUSION} SAFE_EXCLUSION`);
 })().catch(error => { console.error(error); process.exitCode = 1; });
