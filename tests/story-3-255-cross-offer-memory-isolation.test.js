@@ -52,6 +52,7 @@ const projectedBeforePromotion = Object.values(arcMemoryBeforePromotion.understa
 assert.doesNotMatch(projectedBeforePromotion, /Ceylon|Cinnamomum|liposomal|120 softgels|metabolic/i);
 assert.strictEqual(arcMemoryBeforePromotion.records.filter(record => record.scope_type === 'offer').length, 0, 'no prior offer records enter a new-offer objective');
 assert.strictEqual(arcMemoryBeforePromotion.understanding.brand.label, 'Northstar Goods', 'legitimate business-level memory remains reusable');
+assert.strictEqual(arcMemoryBeforePromotion.understanding.industry, undefined, 'a new offer does not inherit an unconfirmed remembered industry');
 
 resolution = resolveObjectiveSubjects(db, {
   userId,
@@ -273,6 +274,13 @@ const singleOfferAmbiguity = resolveObjectiveSubjects(isolatedDb, {
 });
 assert.strictEqual(singleOfferAmbiguity.selection, 'automatic', 'single-offer shorthand preserves continuity');
 assert.strictEqual(singleOfferAmbiguity.offer.id, onlyOffer.subjects.offer.id);
+
+const distinctServiceAfterSingleOffer = resolveObjectiveSubjects(isolatedDb, {
+  userId: isolatedUser,
+  initialDescription: 'Monthly bookkeeping and reporting for independent agencies with plain-language summaries.'
+});
+assert.strictEqual(distinctServiceAfterSingleOffer.selection, 'new', 'a detailed unrelated service does not inherit the only remembered product');
+assert.strictEqual(distinctServiceAfterSingleOffer.offer, null);
 
 isolatedDb.close();
 
