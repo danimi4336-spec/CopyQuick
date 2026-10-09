@@ -245,6 +245,19 @@ async function runRouteTests() {
     assert.strictEqual(sent.length, 2);
   });
 
+  await withAgent({ max: 1 }, async ({ agent, sent }) => {
+    const token = await getToken(agent);
+    let response = await postContact(agent, validBody({ subject: 'Forwarded chain' }), token, {
+      'X-Forwarded-For': '203.0.113.9, 198.51.100.80'
+    });
+    assert.strictEqual(response.res.statusCode, 200);
+    response = await postContact(agent, validBody({ subject: 'Malformed left hop' }), token, {
+      'X-Forwarded-For': 'not-an-ip, 198.51.100.80'
+    });
+    assert.strictEqual(response.res.statusCode, 429, 'contact limits must use the right-most client address behind one Render proxy hop');
+    assert.strictEqual(sent.length, 1);
+  });
+
   await withAgent({
     sendContactFormEmails: async () => {
       throw new Error('provider exploded with api-key-like internal details');

@@ -266,6 +266,25 @@ async function run() {
     assert.strictEqual(otherAccount.res.statusCode, 401);
     emailLimited.close();
 
+    const forwardedLogin = await createTestAgent({ maxIpFailures: 1, maxEmailFailures: 10 });
+    const forwardedLoginToken = await getToken(forwardedLogin.agent);
+    const forwardedLoginFailure = await postLogin(
+      forwardedLogin.agent,
+      forwardedLoginToken,
+      { password: 'bad-one' },
+      { 'X-Forwarded-For': '203.0.113.9, 198.51.100.60' }
+    );
+    assert.strictEqual(forwardedLoginFailure.res.statusCode, 401);
+    const malformedLeftLogin = await postLogin(
+      forwardedLogin.agent,
+      forwardedLoginToken,
+      { email: 'other@example.com', password: 'bad-two' },
+      { 'X-Forwarded-For': 'not-an-ip, 198.51.100.60' }
+    );
+    assert.strictEqual(malformedLeftLogin.res.statusCode, 429, 'login limits must use the right-most client address behind one Render proxy hop');
+    assert.strictEqual(forwardedLogin.calls.compare, 1);
+    forwardedLogin.close();
+
     const concurrentIp = await createTestAgent({ maxIpFailures: 2, maxEmailFailures: 10, compareDelayMs: 60 });
     const concurrentIpToken = await getToken(concurrentIp.agent);
     const concurrentIpResponses = await Promise.all([
@@ -379,6 +398,25 @@ async function run() {
     const otherIpSignup = await postSignup(signupIps.agent, rotatedSignupIpToken, { email: 'ip-two@example.com' }, { 'X-Forwarded-For': '198.51.100.2' });
     assert.strictEqual(otherIpSignup.res.statusCode, 302);
     signupIps.close();
+
+    const forwardedChain = await createTestAgent({ maxSignupAttempts: 1 });
+    const forwardedChainToken = await getToken(forwardedChain.agent);
+    const forwardedChainAccepted = await postSignup(
+      forwardedChain.agent,
+      forwardedChainToken,
+      { email: 'forwarded-chain-one@example.com' },
+      { 'X-Forwarded-For': '203.0.113.9, 198.51.100.50' }
+    );
+    assert.strictEqual(forwardedChainAccepted.res.statusCode, 302);
+    const rotatedForwardedChainToken = await getToken(forwardedChain.agent);
+    const malformedLeftHopBlocked = await postSignup(
+      forwardedChain.agent,
+      rotatedForwardedChainToken,
+      { email: 'forwarded-chain-two@example.com' },
+      { 'X-Forwarded-For': 'not-an-ip, 198.51.100.50' }
+    );
+    assert.strictEqual(malformedLeftHopBlocked.res.statusCode, 429, 'auth limits must use the right-most client address behind one Render proxy hop');
+    forwardedChain.close();
 
     let now = 1000;
     const expiry = await createTestAgent({ maxSignupAttempts: 1, windowMs: 100, now: () => now });

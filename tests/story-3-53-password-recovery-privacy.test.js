@@ -43,7 +43,7 @@ async function run() {
   const waits = [];
   const deliveries = [];
   const app = express();
-  app.set('trust proxy', true);
+  app.set('trust proxy', 1);
   app.set('view engine', 'ejs');
   app.set('views', require('path').join(__dirname, '..', 'views'));
   app.use(express.urlencoded({ extended: false }));
@@ -93,6 +93,36 @@ async function run() {
     assert(unknownLimited.body.includes(GENERIC_REQUEST_MESSAGE));
   } finally {
     await new Promise(resolve => server.close(resolve));
+  }
+
+  const ipApp = express();
+  ipApp.set('trust proxy', 1);
+  ipApp.set('view engine', 'ejs');
+  ipApp.set('views', require('path').join(__dirname, '..', 'views'));
+  ipApp.use(express.urlencoded({ extended: false }));
+  ipApp.use((req, res, next) => {
+    res.locals.csrfToken = 'story-3-53-test-token';
+    next();
+  });
+  ipApp.use(createPasswordRecoveryRouter({
+    getDb: () => db,
+    env: { NODE_ENV: 'test', SESSION_SECRET: 'story-3-53-secret' },
+    publicOrigin: 'https://copyquick.example',
+    responseDelayMs: 0,
+    maxRequests: 1,
+    maxEmailRequests: 10,
+    sleep: async () => {},
+    sendPasswordResetEmail: async () => {}
+  }));
+
+  const ipServer = await listen(ipApp);
+  try {
+    const accepted = await request(ipServer, 'first-missing@example.com', '203.0.113.9, 198.51.100.90');
+    assert.strictEqual(accepted.res.statusCode, 200);
+    const blocked = await request(ipServer, 'second-missing@example.com', 'not-an-ip, 198.51.100.90');
+    assert.strictEqual(blocked.res.statusCode, 429, 'password recovery limits must use the right-most client address behind one Render proxy hop');
+  } finally {
+    await new Promise(resolve => ipServer.close(resolve));
     db.close();
   }
 
