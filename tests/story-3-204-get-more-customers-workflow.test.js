@@ -3,7 +3,7 @@ const { understandBusiness } = require('../lib/businessUnderstanding');
 const { evaluateRequirements } = require('../lib/discoveryRequirements');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
-const { buildApprovalView, createDefaultSelection } = require('../lib/buildPlanApproval');
+const { buildApprovalView, createDefaultSelection, createProductionStrategySnapshot } = require('../lib/buildPlanApproval');
 const { getProductionContract, getProductionContractIds } = require('../lib/productionContracts');
 const { getProductionArtifactPolicy } = require('../lib/productionArtifactPolicy');
 const { calculateProductionCost } = require('../lib/productionCost');
@@ -15,7 +15,7 @@ const { generateDeliverable } = require('../lib/generationService');
   const result = await understandBusiness({ objective, answer: description });
   const understanding = { ...result.understanding };
   const values = {
-    businessType: ['service', 'Service Business'], acquisitionGoal: ['qualified_leads', 'More qualified leads'],
+    businessType: ['service', 'Service Business'], category: ['bookkeeping_services', 'Bookkeeping Services'], acquisitionGoal: ['qualified_leads', 'More qualified leads'],
     targetAudience: ['small businesses', 'Small businesses'], currentAcquisitionChannel: ['referrals', 'Referrals'],
     acquisitionStage: ['inconsistent_traction', 'Some traction, but inconsistent'], salesProcess: ['booked_call', 'Booked call or appointment'],
     capacityReadiness: ['capacity_ready', 'Ready to serve more customers now']
@@ -29,46 +29,43 @@ const { generateDeliverable } = require('../lib/generationService');
   assert.strictEqual(evaluateRequirements({ objective, understanding, answers }).ready, true);
   const strategyResult = buildStrategy({ objective, understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategyResult.status, /Strategy Ready/);
-  assert.match(strategyResult.strategy.launchApproach.value, /Evaluate acquisition channels/);
+  assert.match(strategyResult.strategy.launchApproach.value, /Prepare consultation conversion now/i);
+  assert.match(strategyResult.strategy.launchApproach.value, /evaluate acquisition channels separately/i);
   assert.strictEqual(strategyResult.strategy.customerMotivation.value, 'Unknown');
   const plan = buildPlan({ objective, confirmedUnderstanding: understanding, strategyResult, answers });
   assert.strictEqual(plan.readiness.ready, true);
   assert.deepStrictEqual(plan.phases.map(phase => phase.title), ['Diagnose & Focus', 'Build the Acquisition System', 'Measure & Improve']);
   const deliverables = plan.phases.flatMap(phase => phase.deliverables);
   getProductionContractIds().forEach(id => assert(getProductionArtifactPolicy(id), `${id} must have an explicit artifact and billing policy`));
-  assert.strictEqual(deliverables.length, 6);
+  assert.strictEqual(deliverables.length, 4);
   assert.deepStrictEqual(
     deliverables.filter(item => getProductionArtifactPolicy(item.id)?.readyToUse).map(item => item.id),
-    []
+    ['consultation_conversion_page_copy']
   );
   const defaultSelection = createDefaultSelection(plan);
   const approvalView = buildApprovalView(plan, defaultSelection);
   assert.deepStrictEqual(
     defaultSelection.selectedDeliverableIds.filter(id => getProductionArtifactPolicy(id)?.readyToUse),
-    [],
-    'a current referral source must not silently become the recommended execution channel'
+    ['consultation_conversion_page_copy'],
+    'a current referral source must not become the recommended channel, while channel-neutral consultation work remains available'
   );
-  assert.strictEqual(approvalView.counts.planningFoundation, 5);
-  assert.strictEqual(approvalView.counts.readyToUseAssets, 0);
-  assert.strictEqual(approvalView.counts.productionUnits, 0);
+  assert.strictEqual(approvalView.counts.planningFoundation, 3);
+  assert.strictEqual(approvalView.counts.readyToUseAssets, 1);
+  assert.strictEqual(approvalView.counts.productionUnits, 1);
   deliverables.forEach(item => {
     const contract = getProductionContract(item.id);
     assert(contract, `production contract exists for ${item.id}`);
     assert.deepStrictEqual(contract.requiredDependencies, item.dependencies);
-    assert.strictEqual(
-      contract.artifactRole,
-      'planning_foundation',
-      `${item.id} must have an explicit user-facing artifact role`
-    );
+    assert.strictEqual(contract.artifactRole, item.id === 'consultation_conversion_page_copy' ? 'ready_to_use_asset' : 'planning_foundation', `${item.id} must have the correct explicit artifact role`);
   });
   const productionCost = calculateProductionCost({
     approvedProductionSet: { selectedDeliverables: deliverables },
     usageSnapshot: { used: 0, monthlyLimit: 10, remaining: 10 }
   });
   assert.strictEqual(productionCost.valid, true);
-  assert.strictEqual(productionCost.productionUnitCount, 0);
-  assert.strictEqual(productionCost.planningFoundationCount, 6);
-  assert.strictEqual(productionCost.readyToUseAssetCount, 0);
+  assert.strictEqual(productionCost.productionUnitCount, 1);
+  assert.strictEqual(productionCost.planningFoundationCount, 3);
+  assert.strictEqual(productionCost.readyToUseAssetCount, 1);
   const freeFoundationCost = calculateProductionCost({
     approvedProductionSet: { selectedDeliverables: deliverables.filter(item => !getProductionArtifactPolicy(item.id)?.readyToUse) },
     usageSnapshot: { used: 10, monthlyLimit: 10, remaining: 0 }
@@ -76,7 +73,7 @@ const { generateDeliverable } = require('../lib/generationService');
   assert.strictEqual(freeFoundationCost.productionUnitCount, 0);
   assert.strictEqual(freeFoundationCost.canAfford, true, 'free planning foundation remains available with no production credits left');
 
-  const expectedAssetsByChannel = Object.fromEntries(['referrals','organic_search','social','paid_ads','outbound','mixed_channels','no_reliable_channel'].map(channel => [channel, []]));
+  const expectedAssetsByChannel = Object.fromEntries(['referrals','organic_search','social','paid_ads','outbound','mixed_channels','no_reliable_channel'].map(channel => [channel, ['consultation_conversion_page_copy']]));
   Object.entries(expectedAssetsByChannel).forEach(([channel, expectedIds]) => {
     const channelUnderstanding = {
       ...understanding,
@@ -92,6 +89,7 @@ const { generateDeliverable } = require('../lib/generationService');
   });
 
   const completedOutputs = new Map();
+  const strategySnapshot = createProductionStrategySnapshot({ objective, strategyResult, confirmedUnderstanding: understanding });
   for (const item of deliverables) {
     const contract = getProductionContract(item.id);
     const dependencyOutputs = item.dependencies.map(id => ({
@@ -106,9 +104,9 @@ const { generateDeliverable } = require('../lib/generationService');
         deliverable_id: item.id,
         title: item.title,
         strategic_direction: item.strategicDirection,
-        strategySnapshot: strategyResult.strategy
+        strategySnapshot
       },
-      productionRun: { objective, strategySnapshot: strategyResult.strategy },
+      productionRun: { objective, strategySnapshot },
       dependencyOutputs,
       handler: contract
     });

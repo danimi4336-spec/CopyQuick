@@ -103,6 +103,31 @@ function request(agent, method, url, body) {
 }
 
 function discoveryState(mode = 'valid') {
+  if (mode === 'planning_only') {
+    const understanding = {
+      businessType: confirmed('service', 'Service Business'),
+      industry: confirmed('home_services', 'Home Services'),
+      category: confirmed('residential_remodeling', 'Residential Remodeling'),
+      acquisitionGoal: confirmed('appointments', 'More booked appointments'),
+      targetAudience: confirmed('homeowners', 'Homeowners'),
+      currentAcquisitionChannel: confirmed('referrals', 'Referrals'),
+      acquisitionStage: confirmed('inconsistent_traction', 'Some traction, but inconsistent'),
+      salesProcess: confirmed('booked_call', 'They book a call or appointment'),
+      capacityReadiness: confirmed('capacity_limited', 'Capacity needs attention first')
+    };
+    const answers = { initial_description: 'Residential remodeling for homeowners', business_type: 'service', acquisition_goal: 'appointments', acquisition_target: { value: 'homeowners' }, acquisition_channel: 'referrals', acquisition_stage: 'inconsistent_traction', sales_process: 'booked_call', capacity_readiness: 'capacity_limited' };
+    const strategyResult = buildStrategy({ objective: 'get_more_customers', understanding, confirmedUnderstanding: understanding, answers });
+    const plan = buildPlan({ objective: 'get_more_customers', confirmedUnderstanding: understanding, strategyResult, answers });
+    const now = new Date().toISOString();
+    return {
+      objective: 'get_more_customers', answers, understanding, confirmedUnderstanding: understanding,
+      planningReadiness: { ready: true }, reflectionStartedAt: now, planningConfirmedAt: now,
+      strategyResult, strategyUpdatedAt: now, buildPlan: plan, buildPlanUpdatedAt: now,
+      buildPlanSource: { planningConfirmedAt: now, strategyUpdatedAt: now },
+      buildPlanFingerprint: planFingerprint(plan), buildPlanSelection: createDefaultSelection(plan),
+      startedAt: now, updatedAt: now
+    };
+  }
   const understanding = facts();
   const strategyResult = strategyFor(understanding);
   const plan = planFor(understanding, strategyResult);
@@ -271,12 +296,23 @@ async function run() {
   const missingPlan = { server, cookie: '' };
   const stalePlan = { server, cookie: '' };
   const valid = { server, cookie: '' };
+  const planningOnly = { server, cookie: '' };
   try {
     const denied = await request(anonymous, 'POST', '/discovery/build-plan/approve');
     assert.strictEqual(denied.res.statusCode, 403, 'CSRF runs before authentication for unsafe anonymous requests');
     const deniedPage = await request(anonymous, 'GET', '/discovery/production-ready');
     assert.strictEqual(deniedPage.res.statusCode, 302);
     assert.strictEqual(deniedPage.res.headers.location, '/login');
+
+    await request(planningOnly, 'GET', '/test/authenticate/planning_only');
+    const planningOnlyPage = await request(planningOnly, 'GET', '/discovery/build-plan');
+    assert.strictEqual(planningOnlyPage.res.statusCode, 200);
+    assert.match(planningOnlyPage.body, /This plan currently supports planning only/);
+    assert.doesNotMatch(planningOnlyPage.body, /Approve &amp; Prepare for Production/);
+    const planningOnlyToken = planningOnlyPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const planningOnlyApproval = await request(planningOnly, 'POST', '/discovery/build-plan/approve', { _csrf: planningOnlyToken, batchMode: 'full' });
+    assert.strictEqual(planningOnlyApproval.res.statusCode, 409);
+    assert.match(planningOnlyApproval.body, /ready-for-review asset/);
 
     await request(missingReflection, 'GET', '/test/authenticate/missing_reflection');
     assert.strictEqual((await request(missingReflection, 'POST', '/discovery/build-plan/approve', { _csrf: 'invalid' })).res.statusCode, 403);

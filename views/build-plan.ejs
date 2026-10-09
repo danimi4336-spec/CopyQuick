@@ -32,7 +32,7 @@
             <section class="build-plan-affordability <%= affordability.cost.canAfford ? 'affordable' : 'blocked' %>" aria-labelledby="plan-affordability-title">
                 <div>
                     <span class="build-plan-eyebrow">Production estimate</span>
-                    <h2 id="plan-affordability-title"><%= affordability.cost.productionUnitCount %> production credit<%= affordability.cost.productionUnitCount === 1 ? '' : 's' %> remaining in this plan</h2>
+                    <h2 id="plan-affordability-title"><%= affordability.cost.productionUnitCount %> production credit<%= affordability.cost.productionUnitCount === 1 ? '' : 's' %> selected</h2>
                     <p><%= affordability.cost.readyToUseAssetCount %> ready-to-use asset<%= affordability.cost.readyToUseAssetCount === 1 ? '' : 's' %> · <%= affordability.cost.planningFoundationCount %> supporting document<%= affordability.cost.planningFoundationCount === 1 ? '' : 's' %> included free · <%= affordability.completed.length %> already completed</p>
                 </div>
                 <dl>
@@ -129,17 +129,26 @@
             <a href="/discovery/strategy" class="btn btn-outline">← Back</a>
             <div class="build-plan-approval-actions">
             <% if (affordability && affordability.valid && !affordability.cost.canAfford && affordability.affordableRecommendation.length) { %>
+            <% if (outputPlanItems.length && approval.counts.readyToUseAssets > 0) { %>
             <form action="/discovery/build-plan/approve" method="POST">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="batchMode" value="affordable">
                 <button type="submit" class="btn btn-primary">Produce Affordable Batch Now</button>
             </form>
             <% } %>
+            <% } %>
+            <% if (outputPlanItems.length && approval.counts.readyToUseAssets > 0) { %>
             <form action="/discovery/build-plan/approve" method="POST">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <input type="hidden" name="batchMode" value="full">
                 <button type="submit" class="btn <%= affordability && affordability.valid && affordability.cost.canAfford ? 'btn-primary' : 'btn-outline' %>">Approve &amp; Prepare for Production</button>
             </form>
+            <% } else { %>
+            <div class="build-plan-planning-only" role="status">
+                <strong><%= outputPlanItems.length ? 'No Production work is selected.' : 'This plan currently supports planning only.' %></strong>
+                <p><%= outputPlanItems.length ? 'Select at least one ready-to-use output before preparing Production.' : 'Save this plan or return to Strategy to establish the offer, audience, conversion action, capacity, or channel context needed for customer-ready work.' %></p>
+            </div>
+            <% } %>
             </div>
         </div>
     </div>
