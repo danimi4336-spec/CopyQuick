@@ -109,6 +109,12 @@ assert.strictEqual(cleanEditorialText('Bookkeeping questions rarely begin with o
   'Bookkeeping questions may involve more than one account.');
 assert.strictEqual(cleanEditorialText('A review is usually more manageable because that often determines scope. The most useful question is often simple: what comes next?'),
   'A review can be more manageable because that can help indicate scope. A useful question is: what comes next?');
+assert.strictEqual(cleanEditorialText('What happens afterward? You will leave with a clearer understanding of whether to continue and what the next conversation or planning step should cover.'),
+  'What happens afterward? The consultation is intended to clarify whether it makes sense to continue and what a possible next conversation or planning step could cover.');
+assert.strictEqual(cleanEditorialText('Residential Remodeling for Homeowners planning a renovation. This service is for Homeowners who want clarity.'),
+  'Residential remodeling for homeowners planning a renovation. This service is for homeowners who want clarity.');
+assert(inspectEditorialOutput({ ...valid, introduction: 'You will leave with a clearer understanding of the next step.' }, handler)
+  .some(item => item.rule === 'absolute_guarantee'));
 assert(inspectEditorialOutput({ ...valid, distributionPosts: ['Some restaurants often need a cleanup.'] }, handler)
   .some(item => item.rule === 'audience_generalization'));
 const malformedEditorial = {

@@ -19,7 +19,7 @@ for (const deadDashboardState of [
 
 assert.match(routeSource, /quickCount:[\s\S]*generation_type = 'quick'/);
 assert.match(routeSource, /bundleCount:[\s\S]*generation_type = 'bundle'/);
-assert.match(routeSource, /brainPct: Math\.round/);
+assert.match(routeSource, /brainPct: usesConfirmedMemory \? memoryProjection\.confirmedCoverage : Math\.round/);
 assert.match(routeSource, /aiCredits: Object\.hasOwn/);
 
 console.log('Story 3.116 legacy dashboard state removal tests passed');

@@ -78,6 +78,9 @@ const projection = brandBrainProjection(db, { userId: userA });
 assert(projection.current.some(row => row.concept === 'brand_name'));
 assert(projection.history.some(row => row.status === 'superseded'));
 assert(projection.confirmedCoverage > 0 && projection.confirmedCoverage <= 100);
+assert.strictEqual(projection.confirmedCount,
+  Math.min(8, new Set(projection.current.filter(row => row.provenance === 'confirmed_fact').map(row => row.concept)).size));
+assert.strictEqual(projection.confirmedCoverage, Math.round((projection.confirmedCount / 8) * 100));
 assert.deepStrictEqual(activeMemory(db, { userId: userB }), [], 'tenant memory is isolated');
 assert.deepStrictEqual(productionMemoryContext(db, { userId: userB }), [], 'tenant memory cannot enter Production');
 assert(productionMemoryContext(db, { userId: userA }).every(item => !('id' in item) && !('source_reference_id' in item)), 'provider context is bounded and omits internal IDs');

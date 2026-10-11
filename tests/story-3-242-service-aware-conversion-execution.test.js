@@ -112,7 +112,7 @@ function fact(value, label = value) {
   assert.strictEqual(validateCustomerReadyOutput(page, articleContract, context).valid, true);
   assert.strictEqual(page.primaryCallToAction, 'Book a consultation');
   assert.strictEqual(page.finalCallToAction, 'Book a consultation');
-  assert.match(page.heroSupportingCopy, /Residential remodeling consultations.*Homeowners planning major renovations/i);
+  assert.match(page.heroSupportingCopy, /^Residential remodeling for homeowners planning major renovations\./);
   assert.doesNotMatch(JSON.stringify(page), /shopper|shipping|returns|checkout|add to cart|product comprehension/i);
   assert.doesNotMatch(JSON.stringify(page), /\d+ years|\d+ projects|award-winning|licensed and insured|guaranteed|financing available/i);
   assert(articleContract.presentationSections(page).some(section => section.key === 'heroHeadline' && !section.internal));

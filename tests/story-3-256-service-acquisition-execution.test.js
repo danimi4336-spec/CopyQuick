@@ -127,7 +127,10 @@ function fixture(overrides = {}) {
   const pageContext = { strategySnapshot, dependencyOutputs: [{ deliverableId: 'consultation_conversion_brief', output: completed.get('consultation_conversion_brief') }] };
   assert.strictEqual(validateCustomerReadyOutput(page, pageContract, pageContext).valid, true);
   assert.match(page.heroHeadline, /remodeling/i);
-  assert.match(page.heroSupportingCopy, /homeowners/i);
+  assert.match(page.heroSupportingCopy, /^Residential remodeling for homeowners /);
+  assert.match(page.serviceFit, /^This service is for homeowners /);
+  assert.doesNotMatch(JSON.stringify(page.faq), /You will leave with/i);
+  assert.match(JSON.stringify(page.faq), /consultation is intended to clarify/i);
   assert.strictEqual(page.primaryCallToAction, 'Book a consultation');
   assert.strictEqual(page.finalCallToAction, 'Book a consultation');
   const { editorialReviewNotes: _internalReview, ...publicPage } = page;

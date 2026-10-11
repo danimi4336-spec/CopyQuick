@@ -194,8 +194,10 @@ const DASHBOARD_BRAIN_FIELDS = ['business_name', 'industry', 'target_audience', 
 function loadDashboardSnapshot(db, user, options = {}) {
   const userId = user.id;
   const brain = db.prepare('SELECT * FROM brand_brain WHERE user_id = ?').get(userId) || {};
-  const brainFilled = DASHBOARD_BRAIN_FIELDS.filter((field) => brain[field] && brain[field].trim()).length;
   const memoryProjection = brandBrainProjection(db, { userId });
+  const legacyBrainFilled = DASHBOARD_BRAIN_FIELDS.filter((field) => brain[field] && brain[field].trim()).length;
+  const usesConfirmedMemory = memoryProjection.current.length > 0;
+  const brainFilled = usesConfirmedMemory ? memoryProjection.confirmedCount : legacyBrainFilled;
 
   return {
     history: db.prepare('SELECT * FROM generations WHERE user_id = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 5').all(userId),
@@ -212,7 +214,7 @@ function loadDashboardSnapshot(db, user, options = {}) {
     audiencePresets,
     brain,
     brainFilled,
-    brainPct: Math.round(memoryProjection.current.length ? memoryProjection.confirmedCoverage : (brainFilled / DASHBOARD_BRAIN_FIELDS.length) * 100),
+    brainPct: usesConfirmedMemory ? memoryProjection.confirmedCoverage : Math.round((brainFilled / DASHBOARD_BRAIN_FIELDS.length) * 100),
     aiCredits: Object.hasOwn(options, 'aiCredits') ? options.aiCredits : getAiCredits(db, user)
   };
 }
