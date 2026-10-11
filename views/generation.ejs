@@ -22,9 +22,11 @@
             </div>
 
             <% if (productionDeliverable) { %><div class="detail-actions-card delivery-actions-top" aria-label="Deliverable actions">
-                <% if (productionDeliverable.primaryAction === 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-primary">Download Markdown</a><% } else if (productionDeliverable.customerReady) { %><button class="btn btn-primary" onclick="copyAll()">Copy asset</button><% } %>
-                <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">Download TXT</a>
-                <% if (productionDeliverable.primaryAction !== 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">Download Markdown</a><% } %>
+                <% if (productionDeliverable.publicActionsAvailable) { %>
+                    <% if (productionDeliverable.primaryAction === 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-primary">Download Markdown</a><% } else { %><button class="btn btn-primary" onclick="copyAll()">Copy asset</button><% } %>
+                    <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">Download TXT</a>
+                    <% if (productionDeliverable.primaryAction !== 'markdown') { %><a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">Download Markdown</a><% } %>
+                <% } %>
                 <a href="/production/<%= productionDeliverable.runId %>" class="btn btn-outline">← Back to results</a>
             </div><% } %>
 
@@ -40,7 +42,9 @@
                 <% if (!productionDeliverable) { %><h3>Generated Content</h3><% } %>
                 <div class="detail-results">
                     <% if (productionDeliverable && !productionDeliverable.customerReady) { %>
-                        <% if (productionDeliverable.legacyPlanningOutline) { %>
+                        <% if (productionDeliverable.historicalReadOnly) { %>
+                            <div class="alert alert-info" role="status">This historical record is preserved, but its saved content cannot be safely displayed, copied, or exported.</div>
+                        <% } else if (productionDeliverable.legacyPlanningOutline) { %>
                             <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready deliverable. Create an improved AI version below to replace it with complete content.</div>
                         <% } else { %>
                             <div class="alert alert-info" role="status">This deliverable needs review before it can be used or exported. Correct or regenerate it to create customer-ready content.</div>
@@ -107,9 +111,11 @@
             <div class="detail-actions-card">
                 <% if (!productionDeliverable) { %><button class="btn btn-primary" onclick="regenerate()">🔄 Regenerate</button><% } %>
                 <% if (productionDeliverable && productionDeliverable.canRegenerateWithAi) { var productionActionLabel = productionDeliverable.artifactRole === 'planning_foundation' ? 'Improve this planning document with AI' : 'Improve this asset with AI'; %><button class="btn btn-outline" id="productionRegenerateBtn" data-artifact-role="<%= productionDeliverable.artifactRole || 'ready_to_use_asset' %>" data-default-label="<%= productionActionLabel %>" onclick="regenerateProductionWithAi()"><%= productionActionLabel %></button><% } %>
-                <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
-                <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
-                <% if (!productionDeliverable || productionDeliverable.customerReady) { %><button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button><% } %>
+                <% if (!productionDeliverable || productionDeliverable.publicActionsAvailable) { %>
+                    <a href="/generation/<%= gen.id %>/export?format=txt" class="btn btn-outline">📄 Export TXT</a>
+                    <a href="/generation/<%= gen.id %>/export?format=md" class="btn btn-outline">📝 Export MD</a>
+                    <button class="btn btn-outline" onclick="copyAll()">📋 Copy All</button>
+                <% } %>
             </div>
         </div>
 

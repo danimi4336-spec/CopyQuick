@@ -20,6 +20,7 @@ const { generateDeliverable } = require('../lib/generationService');
 const { executeNextProductionJob } = require('../lib/productionExecution');
 const { getProductionContract } = require('../lib/productionContracts');
 const {
+  getHistoricalProductionReadContract,
   resolveProductionReadArtifact,
   supportedHistoricalProductionPairs
 } = require('../lib/productionHistoricalReadCompatibility');
@@ -119,6 +120,67 @@ function safeOutput(id) {
   return outputs[id];
 }
 
+function sizedInternalContext(length, label) {
+  const prefix = `Create the approved ${label} deliverable. Use known facts as facts. Treat strategic guidance as direction, not evidence. Approved strategy: sanitized fixture context. Completed prerequisite outputs (structured): sanitized fixture data. `;
+  let value = prefix;
+  let index = 0;
+  while (value.length < length) {
+    value += `sanitized-${label.replace(/[^a-z]/gi, '-').toLowerCase()}-${index} `;
+    index += 1;
+  }
+  return value.slice(0, length);
+}
+
+function productionFaithfulUnsafeOutput(id) {
+  const launchLengths = [26022, 25995, 25982, 26006, 25987];
+  const contentLengths = {
+    product_image_guidance: [13043, 13029, 13019, 13028, 13009],
+    launch_announcement: launchLengths,
+    educational_content: [13055, 13097, 13066, 13073, 13079],
+    social_launch_campaign: [12999, 13021, 13002, 12969, 12992]
+  };
+  if (contentLengths[id]) {
+    const content = contentLengths[id].map((length, index) => sizedInternalContext(length, `${id}-${index}`));
+    return { summary: content[0], content };
+  }
+  const outputs = {
+    customer_profile: {
+      summary: sizedInternalContext(959, 'customer-profile-summary'),
+      primaryCustomer: 'Sanitized historical customer description',
+      needs: [sizedInternalContext(925, 'customer-profile-needs')],
+      motivations: [sizedInternalContext(935, 'customer-profile-motivations')],
+      objections: [sizedInternalContext(944, 'customer-profile-objections')],
+      buyingTriggers: [sizedInternalContext(921, 'customer-profile-triggers')],
+      languageStyle: 'Sanitized historical language direction'
+    },
+    product_positioning: {
+      positioningStatement: sizedInternalContext(6031, 'positioning-statement'),
+      marketPosition: 'Sanitized historical market position',
+      differentiation: 'Sanitized historical differentiation',
+      proofPoints: ['Sanitized historical proof direction'],
+      positioningPillars: [sizedInternalContext(6016, 'positioning-pillars')],
+      messagingImplications: [sizedInternalContext(5998, 'positioning-implications')]
+    },
+    value_proposition: {
+      primaryValueProposition: sizedInternalContext(12973, 'value-proposition'),
+      customerProblemOrDesire: 'Sanitized historical customer context',
+      promisedOutcome: 'Sanitized historical outcome direction',
+      reasonsToBelieve: ['Sanitized historical evidence direction'],
+      differentiators: ['Sanitized historical differentiation'],
+      supportingMessages: [sizedInternalContext(12944, 'supporting-messages')]
+    },
+    core_messaging: {
+      coreMessage: sizedInternalContext(12981, 'core-message'),
+      messagePillars: [sizedInternalContext(12958, 'message-pillars')],
+      supportingPoints: ['Sanitized historical supporting direction'],
+      toneGuidance: 'Sanitized historical tone direction',
+      proofThemes: ['Sanitized historical proof direction'],
+      callsToAction: ['Sanitized historical action direction']
+    }
+  };
+  return outputs[id];
+}
+
 function request(server, url, options = {}) {
   return new Promise((resolve, reject) => {
     const req = http.request({
@@ -180,10 +242,10 @@ function insertArtifact(db, { userId, runId, id, output = safeOutput(id), versio
   return { jobId, generationId };
 }
 
-function createGraph(db, userId, suffix = 'complete') {
+function createGraph(db, userId, suffix = 'complete', outputFactory = safeOutput) {
   const runId = createRun(db, userId, suffix);
   const artifacts = {};
-  for (const id of ORDER) artifacts[id] = insertArtifact(db, { userId, runId, id });
+  for (const id of ORDER) artifacts[id] = insertArtifact(db, { userId, runId, id, output: outputFactory(id) });
   return { runId, artifacts };
 }
 
@@ -204,7 +266,16 @@ function createApp(userId) {
 
 function assertPublicOnly(text) {
   assert.doesNotMatch(text, /PRIVATE_PROMPT_SENTINEL|PRIVATE_RESULT_SENTINEL|PRIVATE_TITLE_SENTINEL/);
-  assert.doesNotMatch(text, /production_job_id|contract_version|strategy_snapshot|dependency payload/i);
+  assert.doesNotMatch(text, /production_job_id|contract_version|strategy_snapshot|dependency payload|approved strategy|completed prerequisite outputs|create the approved/i);
+}
+
+function assertUnavailableHistoricalDetail(body, generationId) {
+  assert.match(body, /Historical asset:/i);
+  assert.match(body, /historical record is preserved, but its saved content cannot be safely displayed, copied, or exported/i);
+  assert.doesNotMatch(body, /Correct or regenerate|needs review before it can be used or exported/i);
+  assert.doesNotMatch(body, /Copy All|Copy asset|public-deliverable-section/i);
+  assert.doesNotMatch(body, new RegExp(`/generation/${generationId}/export\\?format=(?:txt|md)`));
+  assertPublicOnly(body);
 }
 
 async function run() {
@@ -213,6 +284,7 @@ async function run() {
   const userId = createUser(db, 'Historical Owner');
   const otherUserId = createUser(db, 'Other Tenant');
   const graph = createGraph(db, userId);
+  const productionFaithfulGraph = createGraph(db, userId, 'production-faithful', productionFaithfulUnsafeOutput);
   const currentContract = getProductionContract('customer_profile');
   const compatibleRows = [];
   for (const version of ['customer_profile:v2', currentContract.version]) {
@@ -221,6 +293,18 @@ async function run() {
   }
 
   assert.deepStrictEqual(supportedHistoricalProductionPairs(), ORDER.map(id => `${id}:v1`));
+  const historicalLaunchContract = getHistoricalProductionReadContract('launch_announcement', 'launch_announcement:v1');
+  assert.strictEqual(historicalLaunchContract.validateOutput({
+    summary: 's'.repeat(20000), content: Array.from({ length: 5 }, () => 'c'.repeat(16000))
+  }), true, 'the exact 100000-character total boundary remains readable');
+  assert.strictEqual(historicalLaunchContract.validateOutput({
+    summary: 's'.repeat(20001), content: ['Substantive safe historical content.']
+  }), false, 'a string above 20000 characters remains rejected');
+  assert.strictEqual(historicalLaunchContract.validateOutput({
+    summary: 's'.repeat(20000), content: [
+      'a'.repeat(16000), 'b'.repeat(16000), 'c'.repeat(16000), 'd'.repeat(16000), 'e'.repeat(16001)
+    ]
+  }), false, 'a total above 100000 characters remains rejected');
   for (const id of ORDER) {
     assert.strictEqual(getProductionContract(id).acceptsVersion(`${id}:v1`), false, `${id} execution must reject v1`);
     const generation = db.prepare('SELECT * FROM generations WHERE id = ?').get(graph.artifacts[id].generationId);
@@ -230,6 +314,25 @@ async function run() {
     assert.strictEqual(artifact.quality.valid, true, `${id}: ${artifact.quality.code} ${JSON.stringify(artifact.quality.details || {})}`);
     assert(artifact.sections.length >= 2, id);
     assert(artifact.sections.every(section => section.internal === false), id);
+  }
+  for (const id of ORDER) {
+    const generation = db.prepare('SELECT * FROM generations WHERE id = ?')
+      .get(productionFaithfulGraph.artifacts[id].generationId);
+    const output = JSON.parse(generation.structured_result);
+    const artifact = resolveProductionReadArtifact(db, { userId, generation, output });
+    assert.strictEqual(artifact.supported, true, `${id} should be a recognized historical pair`);
+    assert.strictEqual(artifact.historical, true, id);
+    assert.strictEqual(artifact.integrity.valid, true, `${id} ownership and dependency graph`);
+    assert.strictEqual(artifact.quality.valid, false, `${id} unsafe saved content must fail closed`);
+    assert.strictEqual(artifact.sections.length, 0, `${id} must construct no public sections`);
+    if (id === 'launch_announcement') {
+      assert.strictEqual(output.content.length, 5);
+      assert.strictEqual(output.summary, output.content[0]);
+      assert.strictEqual(output.summary.length, 26022);
+      assert.strictEqual(artifact.quality.code, 'PRODUCTION_QUALITY_REQUIRED_CONTENT_MISSING');
+    } else {
+      assert.strictEqual(artifact.quality.code, 'PRODUCTION_QUALITY_INTERNAL_CONTEXT_LEAK', id);
+    }
   }
   db.prepare('UPDATE generations SET title = ? WHERE id = ?')
     .run('production_job_id PRIVATE_TITLE_SENTINEL', graph.artifacts.launch_announcement.generationId);
@@ -244,6 +347,8 @@ async function run() {
       assert.strictEqual(detail.res.statusCode, 200, id);
       assert.match(detail.body, /Historical asset:/i, id);
       assert.match(detail.body, /Copy All/i, id);
+      assert.match(detail.body, new RegExp(`/generation/${generationId}/export\\?format=txt`), id);
+      assert.match(detail.body, new RegExp(`/generation/${generationId}/export\\?format=md`), id);
       assertPublicOnly(detail.body);
     }
 
@@ -267,10 +372,21 @@ async function run() {
     assertPublicOnly(markdown.body);
     assertPublicOnly(String(markdown.res.headers['content-disposition'] || ''));
 
+    for (const id of ORDER) {
+      const generationId = productionFaithfulGraph.artifacts[id].generationId;
+      const unsafeDetail = await request(server, `/generation/${generationId}`);
+      assert.strictEqual(unsafeDetail.res.statusCode, 200, id);
+      assertUnavailableHistoricalDetail(unsafeDetail.body, generationId);
+      assert.strictEqual((await request(server, `/generation/${generationId}/export?format=txt`)).res.statusCode, 409, id);
+      assert.strictEqual((await request(server, `/generation/${generationId}/export?format=md`)).res.statusCode, 409, id);
+    }
+
     for (const row of compatibleRows) {
       const compatibleDetail = await request(server, `/generation/${row.generationId}`);
       assert.strictEqual(compatibleDetail.res.statusCode, 200);
       assert.match(compatibleDetail.body, /Copy All/i);
+      assert.match(compatibleDetail.body, new RegExp(`/generation/${row.generationId}/export\\?format=txt`));
+      assert.match(compatibleDetail.body, new RegExp(`/generation/${row.generationId}/export\\?format=md`));
       assert.doesNotMatch(compatibleDetail.body, /Historical asset:/i);
       assert.strictEqual((await request(server, `/generation/${row.generationId}/export?format=txt`)).res.statusCode, 200);
       assert.strictEqual((await request(server, `/generation/${row.generationId}/export?format=md`)).res.statusCode, 200);
@@ -316,8 +432,7 @@ async function run() {
       const id = fixture.artifacts.launch_announcement.generationId;
       const fixtureDetail = await request(fixtureServer, `/generation/${id}`);
       assert.strictEqual(fixtureDetail.res.statusCode, 200);
-      assert.match(fixtureDetail.body, /needs review before it can be used or exported/i);
-      assert.doesNotMatch(fixtureDetail.body, /Copy All/i);
+      assertUnavailableHistoricalDetail(fixtureDetail.body, id);
       assert.strictEqual((await request(fixtureServer, `/generation/${id}/export?format=txt`)).res.statusCode, 409);
       assert.strictEqual((await request(fixtureServer, `/generation/${id}/export?format=md`)).res.statusCode, 409);
     } finally {

@@ -677,6 +677,7 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       runId: production?.run_id || null,
       title: readArtifact.historical ? contract.title : production?.job_title || gen.title,
       customerReady: quality.valid,
+      publicActionsAvailable: quality.valid,
       legacyPlanningOutline: legacySections.length > 0,
       source: readArtifact.historical
         ? { label: 'Historical CopyQuick asset', model: null, mode: 'historical' }
