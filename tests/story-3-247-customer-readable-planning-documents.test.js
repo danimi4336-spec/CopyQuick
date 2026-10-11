@@ -67,7 +67,8 @@ const detailTemplate = fs.readFileSync(path.join(__dirname, '..', 'views', 'gene
 assert.match(detailTemplate, /if \(internalSections\.length\)/, 'empty Editorial review disclosures remain suppressed');
 assert.match(detailTemplate, /sections\.filter\(function\(section\) \{ return !section\.internal; \}\)/);
 const routes = fs.readFileSync(path.join(__dirname, '..', 'routes', 'generations.js'), 'utf8');
-assert.match(routes, /presentationSections\(output\)\.filter\(section => !section\.internal\)/, 'TXT and Markdown export only public sections');
+assert.match(routes, /resolveProductionReadArtifact\(db, \{ userId, generation: gen, output \}\)/, 'exports use the validated read-compatibility boundary');
+assert.match(routes, /readArtifact\.sections\.filter\(section => !section\.internal\)/, 'TXT and Markdown export only validated public sections');
 assert.match(routes, /customer-readable planning document/);
 
 assert.strictEqual(getProductionContract('consultation_conversion_brief').version, 'consultation_conversion_brief:v1');

@@ -1,19 +1,20 @@
 <% var regenerateRequestKey = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys.regenerate : ''; %>
 <% var productionRegenerateRequestKey = typeof generationRequestKeys !== 'undefined' ? generationRequestKeys.productionRegenerate : ''; %>
+<% var generationDisplayTitle = productionDeliverable && productionDeliverable.historicalReadOnly ? productionDeliverable.title : (gen.title || gen.input_text.substring(0, 50)); %>
 <div class="container workspace-page">
     <nav class="breadcrumb fade-in">
         <a href="/dashboard">Dashboard</a>
         <span>/</span>
         <% if (productionDeliverable && productionDeliverable.runId) { %><a href="/production/<%= productionDeliverable.runId %>">Production Plan</a><% } else { %><a href="/history">History</a><% } %>
         <span>/</span>
-        <span><%= gen.title || gen.input_text.substring(0, 30) %></span>
+        <span><%= generationDisplayTitle %></span>
     </nav>
 
     <div class="gen-detail-layout">
         <div class="gen-detail-main fade-in">
             <!-- Title -->
             <div class="gen-detail-header">
-                <div><span class="build-plan-eyebrow"><%= productionDeliverable ? productionDeliverable.readinessLabel : 'Generated content' %></span><h1 class="gen-detail-title" id="genTitle"><%= gen.title || gen.input_text.substring(0, 50) %></h1><% if (productionDeliverable) { %><p class="delivery-purpose"><%= productionDeliverable.purpose %></p><% } %></div>
+                <div><span class="build-plan-eyebrow"><%= productionDeliverable ? productionDeliverable.readinessLabel : 'Generated content' %></span><h1 class="gen-detail-title" id="genTitle"><%= generationDisplayTitle %></h1><% if (productionDeliverable) { %><p class="delivery-purpose"><%= productionDeliverable.purpose %></p><% } %></div>
                 <div class="gen-detail-actions-top">
                     <button class="icon-btn <%= gen.favorite ? 'active' : '' %>" id="favBtn" onclick="toggleFav()" title="Favorite">⭐</button>
                     <% if (!productionDeliverable) { %><button class="icon-btn" onclick="deleteGen()" title="Delete">🗑️</button><% } %>
@@ -51,6 +52,11 @@
                             <% if (productionDeliverable.nextDeliverable) { %>
                                 <a href="/generation/<%= productionDeliverable.nextDeliverable.id %>">Open the ready-to-use email campaign →</a>
                             <% } %>
+                        </div>
+                    <% } %>
+                    <% if (productionDeliverable && productionDeliverable.historicalReadOnly) { %>
+                        <div class="alert alert-info production-purpose-notice" role="status">
+                            <strong>Historical asset:</strong> This saved result is shown in the structure used when it was created. It has not been regenerated or rewritten.
                         </div>
                     <% } %>
                     <% if (productionDeliverable && productionDeliverable.source.mode === 'recovered_fallback') { %>

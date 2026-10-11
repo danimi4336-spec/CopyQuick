@@ -11,8 +11,7 @@ const { isValidContentType } = require('../lib/contentTypes');
 const { getProductionContract } = require('../lib/productionContracts');
 const { customerPurpose, customerReadiness, customerStatusLabel, isCustomerReadablePlanningDocument } = require('../lib/productionArtifactPolicy');
 const { generateDeliverable, productionRegenerationUsageUnits } = require('../lib/generationService');
-const { validateCustomerReadyOutput } = require('../lib/productionQuality');
-const { loadProductionValidationContext } = require('../lib/productionValidationContext');
+const { resolveProductionReadArtifact } = require('../lib/productionHistoricalReadCompatibility');
 const { loadDependencyOutputs } = require('../lib/productionExecution');
 const { renderSafeMarkdown } = require('../lib/safeMarkdown');
 const { parseJob, parseStrategySnapshot } = require('../lib/productionState');
@@ -628,11 +627,11 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       LEFT JOIN usage_events ON usage_events.id = production_runs.usage_event_id
       WHERE production_jobs.id = ? AND production_jobs.generation_id = ? AND production_runs.user_id = ?
     `).get(gen.production_job_id, gen.id, userId);
-    const contract = getProductionContract(gen.deliverable_id);
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
-    const validationContext = loadProductionValidationContext(db, { userId, generation: gen });
-    const quality = validateCustomerReadyOutput(output, contract, validationContext);
+    const readArtifact = resolveProductionReadArtifact(db, { userId, generation: gen, output });
+    const contract = readArtifact.contract;
+    const quality = readArtifact.quality;
     const legacySections = gen.deliverable_id === 'outreach_sequence'
       && output && typeof output.summary === 'string' && Array.isArray(output.content)
       ? [
@@ -667,33 +666,36 @@ router.get('/generation/:id', requireAuth, (req, res) => {
         production_jobs.sequence_order LIMIT 3
     `).all(production.production_run_id, userId, gen.id) : [];
     const readiness = customerReadiness({ deliverableId: gen.deliverable_id, status: 'completed', valid: quality.valid, essentialEvidenceMissing: Boolean(output?.essentialEvidenceMissing) });
-    const presentedSections = quality.valid ? contract.presentationSections(output) : legacySections;
+    const presentedSections = quality.valid ? readArtifact.sections : legacySections;
     const nonemptySections = customerResearchSections(presentedSections, gen.deliverable_id === 'research_evidence_pack' ? output : null)
       .filter(hasPresentationValue)
       .map(section => section.key === 'lastCheckedAt' && section.value
         ? { ...section, value: new Date(section.value).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC' }
         : section);
-    const topic = output?.specificTopic || output?.contentTopic || output?.title || gen.title;
+    const topic = readArtifact.historical ? contract.title : output?.specificTopic || output?.contentTopic || output?.title || gen.title;
     productionDeliverable = {
       runId: production?.run_id || null,
-      title: production?.job_title || gen.title,
+      title: readArtifact.historical ? contract.title : production?.job_title || gen.title,
       customerReady: quality.valid,
       legacyPlanningOutline: legacySections.length > 0,
-      source: storedProductionSource(gen.ai_model),
-      fallbackRecovery: production?.last_error_code ? {
+      source: readArtifact.historical
+        ? { label: 'Historical CopyQuick asset', model: null, mode: 'historical' }
+        : storedProductionSource(gen.ai_model),
+      fallbackRecovery: !readArtifact.historical && production?.last_error_code ? {
         code: production.last_error_code,
         message: production.error_message || 'The AI response did not pass production validation.'
       } : null,
       generationMethod: 'Structured Production Engine',
-      canRegenerateWithAi: providerStatus.live,
+      canRegenerateWithAi: providerStatus.live && !readArtifact.historical,
       providerStatus,
       displayType: contract?.displayType || gen.content_type.replace(/_/g, ' '),
-      purpose: customerPurpose(gen.deliverable_id, production?.job_title || gen.title),
+      purpose: customerPurpose(gen.deliverable_id, readArtifact.historical ? contract.title : production?.job_title || gen.title),
       readiness,
       readinessLabel: customerStatusLabel(readiness, 'completed'),
       primaryAction: ['blog_intro', 'product_description'].includes(gen.content_type) ? 'markdown' : 'copy',
       exportBaseName: `${safeExportSlug(contract?.title || gen.title, 'copyquick-deliverable')}-${safeExportSlug(topic, String(gen.id))}`,
       artifactRole: contract?.artifactRole || 'ready_to_use_asset',
+      historicalReadOnly: readArtifact.historical,
       purposeNotice: contract?.artifactRole === 'planning_foundation'
         ? isCustomerReadablePlanningDocument(gen.deliverable_id)
           ? readyAssetBilling
@@ -706,7 +708,7 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       nextDeliverable: nextDeliverable
         ? { id: nextDeliverable.id, title: nextDeliverable.title }
         : null,
-      relatedSupportingWork,
+      relatedSupportingWork: readArtifact.historical ? [] : relatedSupportingWork,
       researchSummary: gen.deliverable_id === 'research_evidence_pack' ? {
         status: Number(output?.questionsNeedingEvidence) > 0 && output?.researchStatus === 'No research needed' ? 'Research limited' : output?.researchStatus || '', questionsChecked: Number(output?.questionsChecked) || 0,
         supportedQuestions: Number(output?.supportedQuestionCount) || 0,
@@ -739,6 +741,12 @@ router.post('/generation/:id/regenerate-production', requireAuth, requireGenerat
     WHERE id = ? AND user_id = ? AND is_deleted = 0 AND generation_type = 'production'
   `).get(genId, userId);
   if (!gen?.production_job_id) return res.status(404).json({ error: 'Production deliverable not found.' });
+  const storedContract = getProductionContract(gen.deliverable_id);
+  if (!storedContract?.acceptsVersion(gen.contract_version)) {
+    return res.status(409).json({
+      error: 'This historical Production artifact cannot be regenerated. Create a new Production version instead.'
+    });
+  }
 
   const sourceStatus = productionProviderStatus();
   if (!sourceStatus.live) {
@@ -1034,19 +1042,21 @@ router.get('/generation/:id/export', requireAuth, (req, res) => {
 
   let content = '';
   if (gen.generation_type === 'production') {
-    const contract = getProductionContract(gen.deliverable_id);
     let output = null;
     try { output = JSON.parse(gen.structured_result || 'null'); } catch (err) { output = null; }
-    const validationContext = loadProductionValidationContext(db, { userId, generation: gen });
-    if (!validateCustomerReadyOutput(output, contract, validationContext).valid) return res.status(409).send('This deliverable needs review before export.');
-    const sections = contract.presentationSections(output).filter(section => !section.internal);
+    const readArtifact = resolveProductionReadArtifact(db, { userId, generation: gen, output });
+    if (!readArtifact.quality.valid) return res.status(409).send('This deliverable needs review before export.');
+    const sections = readArtifact.sections.filter(section => !section.internal);
+    const exportTitle = readArtifact.historical ? readArtifact.contract.title : gen.title;
     if (format === 'txt') content = sections.map(section => `${section.label}\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
-    else if (format === 'md') content = `# ${gen.title}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
+    else if (format === 'md') content = `# ${exportTitle}\n\n` + sections.map(section => `## ${section.label}\n\n${section.isList ? section.value.map(item => `- ${item}`).join('\n') : section.value}`).join('\n\n');
     else return res.status(400).send('Unsupported format');
     res.setHeader('Content-Type', format === 'md' ? 'text/markdown' : 'text/plain');
-    let outputTitle = gen.title;
-    try { outputTitle = JSON.parse(gen.structured_result || '{}').specificTopic || gen.title; } catch (_) { /* safe fallback */ }
-    const filename = `${safeExportSlug(gen.title, 'copyquick-deliverable')}-${safeExportSlug(outputTitle, String(gen.id))}.${format}`;
+    let outputTitle = exportTitle;
+    if (!readArtifact.historical) {
+      try { outputTitle = JSON.parse(gen.structured_result || '{}').specificTopic || gen.title; } catch (_) { /* safe fallback */ }
+    }
+    const filename = `${safeExportSlug(exportTitle, 'copyquick-deliverable')}-${safeExportSlug(outputTitle, String(gen.id))}.${format}`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     return res.send(content);
   }
