@@ -3,8 +3,9 @@ const express = require('express');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_URL = path.join('/tmp', 'copyquick-bug-002p-test.sqlite');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 process.env.STRIPE_KEY = 'sk_test_bug_002p';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_bug_002p';
 process.env.STRIPE_PRO_PRICE = 'price_test_pro';

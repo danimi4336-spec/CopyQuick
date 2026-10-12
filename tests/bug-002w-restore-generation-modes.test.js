@@ -4,8 +4,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_URL = path.join('/tmp', 'copyquick-bug-002w-test.sqlite');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 process.env.SESSION_SECRET = 'bug-002w-session-secret';
 process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'test-google-client';
 process.env.GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'test-google-secret';

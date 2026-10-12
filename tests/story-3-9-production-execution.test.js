@@ -4,8 +4,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_URL = path.join('/tmp', 'copyquick-story-3-9-test.sqlite');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 for (const suffix of ['', '-wal', '-shm']) {
   try { fs.unlinkSync(process.env.DATABASE_URL + suffix); } catch (err) { /* File does not exist. */ }
 }

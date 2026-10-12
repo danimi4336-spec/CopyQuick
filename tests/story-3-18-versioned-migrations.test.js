@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const {
   BASELINE_MIGRATION,
@@ -19,7 +19,7 @@ const {
 } = require('../db/migrations');
 
 function fixture() {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-migrations-'));
+  const directory = createIsolatedTestDirectory('migrations-');
   const databasePath = path.join(directory, 'fixture.db');
   const db = new Database(databasePath);
   db.pragma('foreign_keys = ON');
@@ -88,12 +88,12 @@ async function run() {
   }
 
   {
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-migrate-cli-'));
+    const directory = createIsolatedTestDirectory('migrate-cli-');
     const databasePath = path.join(directory, 'cli.db');
     try {
       const migrated = spawnSync(process.execPath, ['scripts/migrate-database.js'], {
         cwd: path.join(__dirname, '..'),
-        env: { ...process.env, NODE_ENV: 'test', DATABASE_PATH: databasePath },
+        env: isolatedTestEnvironment(databasePath),
         encoding: 'utf8'
       });
       assert.strictEqual(migrated.status, 0, migrated.stderr);
@@ -344,7 +344,7 @@ async function run() {
       const before = fs.statSync(value.databasePath);
       const status = spawnSync(process.execPath, ['scripts/migration-status.js'], {
         cwd: path.join(__dirname, '..'),
-        env: { ...process.env, NODE_ENV: 'test', DATABASE_PATH: value.databasePath },
+        env: isolatedTestEnvironment(value.databasePath),
         encoding: 'utf8'
       });
       assert.strictEqual(status.status, 0, status.stderr);

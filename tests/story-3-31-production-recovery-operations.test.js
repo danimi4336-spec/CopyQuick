@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const { initDb } = require('../db/init');
 const { acquireRuntimeLock } = require('../lib/databaseRuntimeLock');
@@ -152,14 +152,14 @@ function run() {
 
   db.close();
 
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-recovery-cli-'));
+  const root = createIsolatedTestDirectory('recovery-cli-');
   const databasePath = path.join(root, 'copyquick.db');
   const fileDb = new Database(databasePath);
   initDb({ db: fileDb, env: { NODE_ENV: 'test' }, logger: () => {} });
   fileDb.close();
   const release = acquireRuntimeLock(databasePath);
   const script = path.join(__dirname, '..', 'scripts', 'production-recovery.js');
-  const env = { ...process.env, NODE_ENV: 'test', DATABASE_PATH: databasePath };
+  const env = isolatedTestEnvironment(databasePath);
   let cli = spawnSync(process.execPath, [script, '--status'], { env, encoding: 'utf8' });
   assert.strictEqual(cli.status, 0, cli.stderr);
   assert(!cli.stdout.includes(databasePath));

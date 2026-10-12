@@ -1,10 +1,11 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_PATH = path.join('/tmp', `copyquick-story-3-24-${process.pid}.sqlite`);
+const isolatedDatabasePath = assertIsolatedTestDatabase();
 for (const suffix of ['', '-wal', '-shm']) {
-  try { fs.unlinkSync(process.env.DATABASE_PATH + suffix); } catch (_) {}
+  try { fs.unlinkSync(isolatedDatabasePath + suffix); } catch (_) {}
 }
 
 const { initDb } = require('../db/init');
@@ -92,6 +93,6 @@ try {
 } finally {
   try { getDb().close(); } catch (_) {}
   for (const suffix of ['', '-wal', '-shm']) {
-    try { fs.unlinkSync(process.env.DATABASE_PATH + suffix); } catch (_) {}
+    try { fs.unlinkSync(isolatedDatabasePath + suffix); } catch (_) {}
   }
 }

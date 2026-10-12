@@ -3,6 +3,8 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+assertIsolatedTestDatabase();
 const { createCsrfProtection } = require('../lib/csrf');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
@@ -14,6 +16,7 @@ const {
   validateSelection
 } = require('../lib/buildPlanApproval');
 const discoveryRoutes = require('../routes/discovery');
+const { initDb } = require('../db/init');
 const { getDb } = require('../db/database');
 
 function confirmed(value, label = value) {
@@ -269,6 +272,7 @@ async function run() {
   assert.strictEqual(validateSelection(changedPlan, defaults).valid, false);
 
   const app = express();
+  initDb();
   getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
     .run(37, 'story-3-7@example.com', 'Build Plan Tester');
   app.set('view engine', 'ejs');

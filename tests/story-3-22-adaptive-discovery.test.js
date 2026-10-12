@@ -3,6 +3,10 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+assertIsolatedTestDatabase();
+const { initDb } = require('../db/init');
+const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { buildBusinessReflection } = require('../lib/businessReflection');
@@ -87,6 +91,7 @@ async function begin(agent, description = 'an herbal supplement') {
 }
 
 async function run() {
+  initDb();
   const inferredOnly = analyzeDiscovery({
     objective: 'launch_product',
     understanding: {
@@ -551,6 +556,7 @@ async function run() {
     console.log('Story 3.22 Adaptive Product Discovery & Meaningful Readiness tests passed');
   } finally {
     server.close();
+    getDb().close();
   }
 }
 

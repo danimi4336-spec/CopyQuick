@@ -2,12 +2,11 @@ const assert = require('assert');
 const express = require('express');
 const fs = require('fs');
 const http = require('http');
-const os = require('os');
 const path = require('path');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-historical-v1-read-'));
-process.env.DATABASE_URL = path.join(root, 'copyquick.db');
-process.env.NODE_ENV = 'test';
+const isolatedDatabasePath = assertIsolatedTestDatabase();
+process.env.DATABASE_URL = isolatedDatabasePath;
 process.env.SESSION_SECRET = 'historical-v1-read-test';
 process.env.OPENAI_API_KEY = '';
 process.env.OPENAI_PRODUCTION_ENABLED = 'false';
@@ -40,6 +39,14 @@ const DEPENDENCIES = Object.freeze({
   educational_content: ['core_messaging'],
   social_launch_campaign: ['core_messaging', 'launch_announcement']
 });
+
+function removeIsolatedDatabaseFiles() {
+  for (const suffix of ['', '-wal', '-shm']) {
+    try { fs.unlinkSync(isolatedDatabasePath + suffix); } catch (error) {
+      if (!error || error.code !== 'ENOENT') throw error;
+    }
+  }
+}
 
 const TITLES = Object.freeze({
   customer_profile: 'Customer Profile',
@@ -546,13 +553,13 @@ async function run() {
   assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM usage_events WHERE user_id = ?').get(userId).count, usageBefore);
 
   db.close();
-  fs.rmSync(root, { recursive: true, force: true });
+  removeIsolatedDatabaseFiles();
   console.log('Story 3.258 historical v1 Production read compatibility tests passed.');
 }
 
 run().catch(error => {
   try { getDb().close(); } catch (_) {}
-  fs.rmSync(root, { recursive: true, force: true });
+  removeIsolatedDatabaseFiles();
   console.error(error);
   process.exitCode = 1;
 });

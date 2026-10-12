@@ -1,7 +1,7 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { resolveOperationalAlertConfig } = require('../lib/operationalAlertState');
 const { evaluateOperationalHealth } = require('../lib/operationalHealthPolicy');
 const { createOperationalHealthWatcher } = require('../lib/operationalHealthWatcher');
@@ -22,16 +22,15 @@ function health(overrides = {}) {
 function ids(value) { return evaluateOperationalHealth(value).map(item => item.id); }
 
 async function run() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-operational-alerts-'));
+  const root = createIsolatedTestDirectory('operational-alerts-');
   try {
     const databasePath = path.join(root, 'copyquick.db');
     fs.writeFileSync(databasePath, 'fixture');
-    const baseEnv = {
-      NODE_ENV: 'test', DATABASE_PATH: databasePath,
+    const baseEnv = isolatedTestEnvironment(databasePath, {
       OPERATIONAL_HEALTH_ALERTS_ENABLED: 'true', OPERATIONAL_ALERT_EMAIL: 'ops@example.com',
       OPERATIONAL_ALERT_REMINDER_HOURS: '24', OPERATIONAL_RECOVERY_NOTIFICATIONS_ENABLED: 'true'
-    };
-    assert.strictEqual(resolveOperationalAlertConfig({ NODE_ENV: 'test', DATABASE_PATH: databasePath }).requested, false);
+    });
+    assert.strictEqual(resolveOperationalAlertConfig(isolatedTestEnvironment(databasePath)).requested, false);
     const config = resolveOperationalAlertConfig(baseEnv);
     assert.strictEqual(config.recipient, 'ops@example.com');
     assert.match(config.statePath, /\.operational-health-alert-state\.json$/);
@@ -91,7 +90,7 @@ async function run() {
     let disabledCalls = 0;
     const disabledDb = path.join(root, 'disabled.db'); fs.writeFileSync(disabledDb, 'fixture');
     const disabled = createOperationalHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: disabledDb, OPERATIONAL_HEALTH_ALERTS_ENABLED: 'false' },
+      env: isolatedTestEnvironment(disabledDb, { ...baseEnv, OPERATIONAL_HEALTH_ALERTS_ENABLED: 'false' }),
       inspectHealth: () => health({ productionRecovery: { recoveryRequiredCount: 1, issues: [{ runId: 1, jobId: 2 }] } }),
       notifier: { send: async () => { disabledCalls += 1; return { sent: true }; } },
       logger: () => {}, config: { statePath: path.join(root, 'disabled-state.json') }

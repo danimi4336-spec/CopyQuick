@@ -4,6 +4,9 @@ const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+
+const isolatedDatabasePath = assertIsolatedTestDatabase();
 
 const DUMMY_CLIENT_ID = 'CID-UNMISTAKABLE-ALPHA-1234567890.apps.googleusercontent.com';
 const DUMMY_CLIENT_SECRET = 'GSECRET-UNMISTAKABLE-BRAVO-0987654321';
@@ -135,7 +138,7 @@ function request(server, method, url) {
 
 function runServerStartupSmoke() {
   return new Promise((resolve, reject) => {
-    const databasePath = path.join('/tmp', 'copyquick-bug-002o-startup.sqlite');
+    const databasePath = isolatedDatabasePath;
     for (const suffix of ['', '-wal', '-shm']) {
       try {
         fs.unlinkSync(databasePath + suffix);
@@ -148,7 +151,7 @@ function runServerStartupSmoke() {
       ...process.env,
       NODE_ENV: 'production',
       DATABASE_PATH: databasePath,
-      PERSISTENT_DATA_DIR: '/tmp',
+      PERSISTENT_DATA_DIR: path.dirname(databasePath),
       SESSION_SECRET: DUMMY_SESSION_SECRET,
       GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
       GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,

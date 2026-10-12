@@ -2,11 +2,11 @@ const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
 const express = require('express');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { BASELINE_SCHEMA_SQL } = require('../db/schema');
 const {
   LEDGER_TABLE,
@@ -20,7 +20,7 @@ const { createHealthRouter } = require('../routes/health');
 const projectRoot = path.join(__dirname, '..');
 
 function fixture() {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-gate-'));
+  const directory = createIsolatedTestDirectory('gate-');
   const databasePath = path.join(directory, 'fixture.db');
   const db = new Database(databasePath);
   db.pragma('foreign_keys = ON');
@@ -239,7 +239,7 @@ async function run() {
       const beforeHash = fileHash(safe.databasePath);
       const result = spawnSync(process.execPath, ['scripts/migration-check.js'], {
         cwd: projectRoot,
-        env: { ...process.env, NODE_ENV: 'test', DATABASE_PATH: safe.databasePath },
+        env: isolatedTestEnvironment(safe.databasePath),
         encoding: 'utf8'
       });
       assert.strictEqual(result.status, 0, result.stderr);
@@ -256,7 +256,7 @@ async function run() {
       const beforeHash = fileHash(unsafe.databasePath);
       const result = spawnSync(process.execPath, ['scripts/migration-check.js'], {
         cwd: projectRoot,
-        env: { ...process.env, NODE_ENV: 'test', DATABASE_PATH: unsafe.databasePath },
+        env: isolatedTestEnvironment(unsafe.databasePath),
         encoding: 'utf8'
       });
       assert.strictEqual(result.status, 2);

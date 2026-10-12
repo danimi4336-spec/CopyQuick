@@ -4,11 +4,16 @@ const http = require('http');
 const path = require('path');
 const session = require('express-session');
 const Database = require('better-sqlite3');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+
+assertIsolatedTestDatabase();
 
 process.env.AI_DISCOVERY_ENABLED = 'false';
 process.env.AI_STRATEGY_ENABLED = 'false';
 
 const { createCsrfProtection } = require('../lib/csrf');
+const { initDb } = require('../db/init');
+const { getDb } = require('../db/database');
 const { runMigrationEngine } = require('../db/migrations');
 const discoveryRoutes = require('../routes/discovery');
 const { hasPositiveMatch } = require('../lib/discoveryPolarity');
@@ -233,6 +238,10 @@ async function unitAcceptance() {
 
 async function renderedAcceptance() {
   const { db, userId } = fixtureDb();
+  initDb();
+  const routeDb = getDb();
+  routeDb.prepare('INSERT OR IGNORE INTO users(id, email, name, monthly_limit) VALUES (?, ?, ?, ?)')
+    .run(userId, 'polarity-route@example.com', 'Polarity Route', 5);
   const app = express();
   app.locals.copyquickDb = db;
   app.set('view engine', 'ejs');
@@ -391,6 +400,7 @@ async function renderedAcceptance() {
   } finally {
     await new Promise(resolve => server.close(resolve));
     db.close();
+    routeDb.close();
   }
 }
 

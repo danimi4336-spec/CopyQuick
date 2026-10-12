@@ -5,8 +5,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_URL = path.join('/tmp', 'copyquick-bug-002m-test.sqlite');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 process.env.SESSION_SECRET = 'bug-002m-session-secret';
 process.env.STRIPE_KEY = 'sk_test_bug_002m';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_bug_002m';

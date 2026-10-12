@@ -2,6 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
 const projectRoot = path.join(__dirname, '..');
 
@@ -71,7 +72,7 @@ function startDevelopmentServer(databasePath) {
 }
 
 async function run() {
-  const databasePath = path.join('/tmp', `copyquick-stripe-dev-${process.pid}.sqlite`);
+  const databasePath = assertIsolatedTestDatabase();
   for (const suffix of ['', '-wal', '-shm']) {
     try { fs.unlinkSync(databasePath + suffix); } catch (err) { /* absent is expected */ }
   }
@@ -107,7 +108,7 @@ async function run() {
       NODE_ENV: 'production',
       STRIPE_KEY: '',
       DATABASE_PATH: databasePath,
-      PERSISTENT_DATA_DIR: '/tmp',
+      PERSISTENT_DATA_DIR: path.dirname(databasePath),
       SESSION_SECRET: 'feature-stripe-prod-session-secret',
       PORT: '0'
     });

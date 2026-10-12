@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { initDb } = require('../db/init');
 const { buildOperationalStatus, exitCodeForOperationalStatus } = require('../lib/operationalStatus');
 
@@ -79,7 +79,7 @@ function run() {
   assert.strictEqual(status.generation.code, 'GENERATION_CONTROL_UNAVAILABLE');
   assert.strictEqual(status.generation.updatedAt, null);
 
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-operations-status-'));
+  const root = createIsolatedTestDirectory('operations-status-');
   const databasePath = path.join(root, 'copyquick.db');
   const backupDirectory = path.join(root, 'backups');
   fs.mkdirSync(backupDirectory);
@@ -92,14 +92,13 @@ function run() {
     .replace(/\.\d{3}Z$/, 'Z');
   fs.copyFileSync(databasePath, path.join(backupDirectory, `copyquick-${recentBackupTimestamp}.db`));
   const script = path.join(__dirname, '..', 'scripts', 'operations-status.js');
-  const env = {
-    ...process.env,
-    NODE_ENV: 'test', DATABASE_PATH: databasePath, DATABASE_BACKUP_DIR: backupDirectory,
+  const env = isolatedTestEnvironment(databasePath, {
+    DATABASE_BACKUP_DIR: backupDirectory,
     OFFSITE_BACKUP_ENABLED: 'false', STRIPE_RECONCILIATION_ENABLED: 'false',
     DATABASE_STORAGE_WARNING_FREE_BYTES: '0', DATABASE_STORAGE_CRITICAL_FREE_BYTES: '0',
     DATABASE_STORAGE_WARNING_FREE_PERCENT: '0', DATABASE_STORAGE_CRITICAL_FREE_PERCENT: '0',
     RESEND_API_KEY: 'must-not-appear', STRIPE_KEY: 'must-not-appear'
-  };
+  });
   const cli = spawnSync(process.execPath, [script], { env, encoding: 'utf8' });
   assert.strictEqual(cli.status, 0, cli.stderr);
   const output = JSON.parse(cli.stdout);

@@ -4,8 +4,9 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
-process.env.DATABASE_URL = path.join('/tmp', 'copyquick-bug-002j-test.sqlite');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 
 for (const suffix of ['', '-wal', '-shm']) {
   try {

@@ -1,6 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+
+assertIsolatedTestDatabase();
 
 const databaseModulePath = require.resolve('../db/database');
 const initModulePath = require.resolve('../db/init');

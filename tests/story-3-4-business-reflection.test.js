@@ -3,6 +3,10 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+assertIsolatedTestDatabase();
+const { initDb } = require('../db/init');
+const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
@@ -112,6 +116,7 @@ async function createReadySession() {
 }
 
 async function run() {
+  initDb();
   const optionalMissing = analyzeDiscovery({
     objective: 'launch_product',
     understanding: requiredUnderstanding(),
@@ -251,6 +256,7 @@ async function run() {
     console.log('Story 3.4 Business Reflection tests passed');
   } finally {
     server.close();
+    getDb().close();
   }
 }
 

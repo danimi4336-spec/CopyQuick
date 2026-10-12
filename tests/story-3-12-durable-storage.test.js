@@ -34,7 +34,10 @@ async function run() {
     const explicit = resolveDatabasePath({ NODE_ENV: 'development', DATABASE_PATH: path.join(tempRoot, 'nested', '..', 'explicit.db') });
     assert.strictEqual(explicit, path.join(tempRoot, 'explicit.db'));
     const legacyTestPath = path.join(tempRoot, 'legacy-test.db');
-    assert.strictEqual(resolveDatabasePath({ NODE_ENV: 'test', DATABASE_URL: legacyTestPath }), legacyTestPath);
+    assert.throws(
+      () => resolveDatabasePath({ NODE_ENV: 'test', DATABASE_URL: legacyTestPath }),
+      error => error.code === 'TEST_DATABASE_ISOLATION_REQUIRED'
+    );
 
     assert.throws(
       () => resolveDatabasePath({ NODE_ENV: 'production' }),

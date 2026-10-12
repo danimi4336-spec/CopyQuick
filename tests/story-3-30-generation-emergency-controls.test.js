@@ -1,8 +1,8 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const {
   PAUSED,
   RUNNING,
@@ -25,10 +25,10 @@ function middlewareResponse() {
 }
 
 async function run() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-generation-control-'));
+  const root = createIsolatedTestDirectory('generation-control-');
   const databasePath = path.join(root, 'copyquick.db');
   const statePath = path.join(root, 'generation-control.json');
-  const env = { NODE_ENV: 'test', DATABASE_PATH: databasePath, GENERATION_CONTROL_STATE_PATH: statePath };
+  const env = isolatedTestEnvironment(databasePath, { GENERATION_CONTROL_STATE_PATH: statePath });
 
   assert.strictEqual(getGenerationControlState({ env }).mode, RUNNING, 'missing control state must preserve normal operation');
   const paused = setGenerationControlMode(PAUSED, { env, now: () => new Date('2026-08-31T12:00:00.000Z') });
@@ -50,9 +50,9 @@ async function run() {
   };
   assert.throws(() => resolveGenerationControlPath(unsafeProductionEnv), error => error.code === 'GENERATION_CONTROL_PATH_UNSAFE');
   assert.strictEqual(getGenerationControlState({ env: unsafeProductionEnv }).mode, PAUSED);
-  assert.throws(() => resolveGenerationControlPath({
-    NODE_ENV: 'test', DATABASE_PATH: databasePath, GENERATION_CONTROL_STATE_PATH: databasePath
-  }), error => error.code === 'GENERATION_CONTROL_PATH_UNSAFE');
+  assert.throws(() => resolveGenerationControlPath(
+    isolatedTestEnvironment(databasePath, { GENERATION_CONTROL_STATE_PATH: databasePath })
+  ), error => error.code === 'GENERATION_CONTROL_PATH_UNSAFE');
 
   const logs = [];
   let advanced = false;
@@ -107,7 +107,7 @@ async function run() {
   assert.match(productionRoute, /production\/start', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
   assert.match(productionRoute, /production\/:id\/run-next', requireAuth, requireGenerationAvailable, generationActionRateLimit/);
 
-  const cliEnv = { ...process.env, NODE_ENV: 'test', DATABASE_PATH: databasePath, GENERATION_CONTROL_STATE_PATH: statePath };
+  const cliEnv = isolatedTestEnvironment(databasePath, { GENERATION_CONTROL_STATE_PATH: statePath });
   let cli = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'generation-control.js'), '--pause'], { env: cliEnv, encoding: 'utf8' });
   assert.strictEqual(cli.status, 0, cli.stderr);
   assert.deepStrictEqual(Object.keys(JSON.parse(cli.stdout)).sort(), ['code', 'mode', 'updatedAt']);

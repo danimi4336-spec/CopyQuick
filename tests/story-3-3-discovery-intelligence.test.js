@@ -3,6 +3,10 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+assertIsolatedTestDatabase();
+const { initDb } = require('../db/init');
+const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const discoveryRoutes = require('../routes/discovery');
@@ -62,6 +66,7 @@ function request(agent, method, url, body) {
 }
 
 async function run() {
+  initDb();
   const complete = analyzeDiscovery({
     objective: 'launch_product',
     understanding: completeUnderstanding(),
@@ -235,6 +240,7 @@ async function run() {
     console.log('Story 3.3 Discovery Intelligence Engine tests passed');
   } finally {
     server.close();
+    getDb().close();
   }
 }
 

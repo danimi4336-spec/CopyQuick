@@ -1,7 +1,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-process.env.DATABASE_URL = path.join('/tmp', `copyquick-story-3-256-${process.pid}.sqlite`);
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+process.env.DATABASE_URL = assertIsolatedTestDatabase();
 for (const suffix of ['', '-wal', '-shm']) {
   try { fs.unlinkSync(process.env.DATABASE_URL + suffix); } catch (_) { /* disposable database absent */ }
 }

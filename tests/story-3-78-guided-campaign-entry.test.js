@@ -5,9 +5,10 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-story-3-78-'));
-process.env.DATABASE_PATH = path.join(root, 'test.db');
+assertIsolatedTestDatabase();
 process.env.NODE_ENV = 'test';
 
 const { initDb } = require('../db/init');

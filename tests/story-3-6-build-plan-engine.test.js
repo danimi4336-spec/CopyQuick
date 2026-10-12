@@ -3,6 +3,10 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
+assertIsolatedTestDatabase();
+const { initDb } = require('../db/init');
+const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan, derivePlanningStage } = require('../lib/buildPlanEngine');
@@ -120,6 +124,7 @@ function sessionState(mode) {
 }
 
 async function run() {
+  initDb();
   assert.strictEqual(derivePlanningStage({ conceptMaturity: 'idea_only', launchStage: 'idea' }), 'validate');
   assert.strictEqual(derivePlanningStage({ conceptMaturity: 'direction_no_formula', launchStage: 'idea' }), 'validate');
   assert.strictEqual(derivePlanningStage({ conceptMaturity: 'in_development', launchStage: 'development' }), 'develop');
@@ -394,6 +399,7 @@ async function run() {
     console.log('Story 3.6 Build Plan Engine tests passed');
   } finally {
     server.close();
+    getDb().close();
   }
 }
 

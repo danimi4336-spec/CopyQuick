@@ -4,12 +4,13 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const session = require('express-session');
+const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
 process.env.SESSION_SECRET = process.env.SESSION_SECRET || 'bug-002t-session-secret';
 process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'test-google-client';
 process.env.GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'test-google-secret';
 
-const dbPath = path.join('/tmp', 'copyquick-bug-002t-test.sqlite');
+const dbPath = assertIsolatedTestDatabase();
 process.env.DATABASE_URL = dbPath;
 
 for (const suffix of ['', '-wal', '-shm']) {

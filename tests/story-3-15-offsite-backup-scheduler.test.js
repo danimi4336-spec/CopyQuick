@@ -1,8 +1,8 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const {
   acquireBackupOperationLock,
   getBackupOperationLockPath,
@@ -19,16 +19,16 @@ const { inspectStorageHealth } = require('../lib/storageHealth');
 function iso(ms) { return new Date(ms).toISOString(); }
 
 async function main() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-story-315-'));
+  const root = createIsolatedTestDirectory('story-315-');
   const backupDirectory = path.join(root, 'backups');
   fs.mkdirSync(backupDirectory, { recursive: true });
   const databasePath = path.join(root, 'copyquick.db');
   fs.writeFileSync(databasePath, 'fixture');
-  const env = {
-    NODE_ENV: 'test', DATABASE_PATH: databasePath, DATABASE_BACKUP_DIR: backupDirectory,
+  const env = isolatedTestEnvironment(databasePath, {
+    DATABASE_BACKUP_DIR: backupDirectory,
     OFFSITE_BACKUP_ENABLED: 'true', OFFSITE_BACKUP_SCHEDULE_ENABLED: 'true',
     OFFSITE_BACKUP_INTERVAL_HOURS: '24', OFFSITE_BACKUP_RETENTION: '30'
-  };
+  });
 
   assert.strictEqual(resolveScheduleConfig({}).enabled, false, 'scheduling must default disabled');
   assert.strictEqual(resolveScheduleConfig({ OFFSITE_BACKUP_SCHEDULE_ENABLED: 'true' }).enabled, false,

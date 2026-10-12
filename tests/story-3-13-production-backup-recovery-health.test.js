@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const Database = require('better-sqlite3');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const {
   cleanupSnapshotSidecars,
   createDatabaseBackup,
@@ -31,11 +31,11 @@ function initializeDatabase(databasePath, marker) {
   runNode(`
     const {initDb}=require('./db/init'); const {getDb}=require('./db/database');
     initDb(); getDb().prepare('INSERT INTO users(email,name) VALUES(?,?)').run(${JSON.stringify(marker + '@example.com')},${JSON.stringify(marker)});
-  `, { NODE_ENV: 'development', DATABASE_PATH: databasePath });
+  `, isolatedTestEnvironment(databasePath));
 }
 
 async function run() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-story-3-13-'));
+  const root = createIsolatedTestDirectory('story-3-13-');
   try {
     const persistentRoot = path.join(root, 'persistent');
     fs.mkdirSync(persistentRoot);

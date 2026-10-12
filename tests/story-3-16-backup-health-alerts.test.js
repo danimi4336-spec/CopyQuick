@@ -1,9 +1,9 @@
 const assert = require('assert');
 const fs = require('fs');
 const http = require('http');
-const os = require('os');
 const path = require('path');
 const express = require('express');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const { evaluateBackupHealth } = require('../lib/backupHealthPolicy');
 const {
   readBackupAlertState,
@@ -47,17 +47,16 @@ async function request(server) {
 }
 
 async function run() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-story-316-'));
+  const root = createIsolatedTestDirectory('story-316-');
   try {
     const databasePath = path.join(root, 'copyquick.db');
     fs.writeFileSync(databasePath, 'fixture');
-    const baseEnv = {
-      NODE_ENV: 'test', DATABASE_PATH: databasePath,
+    const baseEnv = isolatedTestEnvironment(databasePath, {
       OFFSITE_BACKUP_ENABLED: 'true', OFFSITE_BACKUP_SCHEDULE_ENABLED: 'true',
       BACKUP_HEALTH_ALERTS_ENABLED: 'true', BACKUP_ALERT_EMAIL: 'ops@example.com',
       BACKUP_ALERT_REMINDER_HOURS: '24', BACKUP_RECOVERY_NOTIFICATIONS_ENABLED: 'true'
-    };
-    assert.strictEqual(resolveBackupAlertConfig({ NODE_ENV: 'test', DATABASE_PATH: databasePath }).requested, false);
+    });
+    assert.strictEqual(resolveBackupAlertConfig(isolatedTestEnvironment(databasePath)).requested, false);
     assert.strictEqual(resolveBackupAlertConfig({ ...baseEnv, BACKUP_ALERT_EMAIL: '' }).recipient, null);
 
     assert.deepStrictEqual(ids(healthy()), []);
@@ -79,12 +78,11 @@ async function run() {
     } })).includes('OFFSITE_RETENTION_BACKLOG'));
     const healthBackupDirectory = path.join(root, 'health-backups');
     fs.mkdirSync(healthBackupDirectory);
-    const healthEnv = {
-      NODE_ENV: 'test', DATABASE_PATH: databasePath,
+    const healthEnv = isolatedTestEnvironment(databasePath, {
       DATABASE_BACKUP_DIR: healthBackupDirectory, OFFSITE_BACKUP_ENABLED: 'false',
       DATABASE_STORAGE_WARNING_FREE_BYTES: '0', DATABASE_STORAGE_CRITICAL_FREE_BYTES: '0',
       DATABASE_STORAGE_WARNING_FREE_PERCENT: '0', DATABASE_STORAGE_CRITICAL_FREE_PERCENT: '0'
-    };
+    });
     const inspectedMissing = inspectStorageHealth({ env: healthEnv, db: { pragma: () => [{ quick_check: 'ok' }] } });
     assert.strictEqual(inspectedMissing.backups.status, 'missing');
     assert.strictEqual(inspectedMissing.status, 'warning');
@@ -134,7 +132,7 @@ async function run() {
     // A severity change for the same policy condition sends one escalation.
     let severity = 'warning';
     const escalationWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: path.join(root, 'escalation.db') }, now: () => clock,
+      env: isolatedTestEnvironment(path.join(root, 'escalation.db'), baseEnv), now: () => clock,
       inspectHealth: () => healthy(), notifier, logger() {},
       evaluatePolicy: () => [{ id: 'TEST_ESCALATION', severity, description: 'Safe status.', suggestedAction: 'Inspect.', evidenceFingerprint: severity }],
       config: { statePath: path.join(root, 'escalation-state.json') }
@@ -153,7 +151,7 @@ async function run() {
     const coexistSent = [];
     const coexistStatePath = path.join(root, 'coexist-state.json');
     const coexistWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: coexistDb }, now: () => clock,
+      env: isolatedTestEnvironment(coexistDb, baseEnv), now: () => clock,
       inspectHealth: () => healthy({
         capacity: { status: 'critical' },
         offsiteBackup: { ...healthy().offsiteBackup, status: 'warning' }
@@ -181,7 +179,7 @@ async function run() {
     let failedCalls = 0;
     let failureHealth = healthy({ capacity: { status: 'critical' } });
     const failingWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: failureDb }, now: () => clock,
+      env: isolatedTestEnvironment(failureDb, baseEnv), now: () => clock,
       inspectHealth: () => failureHealth, logger() {},
       notifier: { send: async () => { failedCalls += 1; return { sent: false, code: 'BACKUP_ALERT_EMAIL_FAILED' }; } },
       config: { statePath: path.join(root, 'failure-state.json') }
@@ -203,7 +201,7 @@ async function run() {
     let noRecoveryHealth = healthy({ capacity: { status: 'critical' } });
     const noRecoverySent = [];
     const noRecoveryWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: noRecoveryDb, BACKUP_RECOVERY_NOTIFICATIONS_ENABLED: 'false' },
+      env: isolatedTestEnvironment(noRecoveryDb, { ...baseEnv, BACKUP_RECOVERY_NOTIFICATIONS_ENABLED: 'false' }),
       now: () => clock, inspectHealth: () => noRecoveryHealth, logger() {},
       notifier: { send: async payload => { noRecoverySent.push(payload); return { sent: true }; } },
       config: { statePath: path.join(root, 'no-recovery-state.json') }
@@ -217,7 +215,7 @@ async function run() {
     const disabledDb = path.join(root, 'disabled.db'); fs.writeFileSync(disabledDb, 'fixture');
     let disabledCalls = 0;
     const disabledWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: disabledDb, BACKUP_HEALTH_ALERTS_ENABLED: 'false' },
+      env: isolatedTestEnvironment(disabledDb, { ...baseEnv, BACKUP_HEALTH_ALERTS_ENABLED: 'false' }),
       now: () => clock, inspectHealth: () => healthy({ capacity: { status: 'critical' } }), logger() {},
       notifier: { send: async () => { disabledCalls += 1; return { sent: true }; } },
       config: { statePath: path.join(root, 'disabled-state.json') }
@@ -228,7 +226,7 @@ async function run() {
     // Missing recipient uses the safe notifier result and never throws.
     const missingDb = path.join(root, 'missing-recipient.db'); fs.writeFileSync(missingDb, 'fixture');
     const missingWatcher = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: missingDb, BACKUP_ALERT_EMAIL: '', RESEND_API_KEY: '' },
+      env: isolatedTestEnvironment(missingDb, { ...baseEnv, BACKUP_ALERT_EMAIL: '', RESEND_API_KEY: '' }),
       now: () => clock, inspectHealth: () => healthy({ capacity: { status: 'critical' } }), logger() {},
       config: { statePath: path.join(root, 'missing-recipient-state.json') }
     });
@@ -238,7 +236,7 @@ async function run() {
     const lifecycleDb = path.join(root, 'lifecycle.db'); fs.writeFileSync(lifecycleDb, 'fixture');
     let callback; let delay; let clearCount = 0; let resolveInspection;
     const lifecycle = createBackupHealthWatcher({
-      env: { ...baseEnv, DATABASE_PATH: lifecycleDb }, logger() {},
+      env: isolatedTestEnvironment(lifecycleDb, baseEnv), logger() {},
       setTimeoutFn(fn, ms) {
         if (ms === 1) return setTimeout(fn, 0);
         callback = fn; delay = ms; return { unref() {} };

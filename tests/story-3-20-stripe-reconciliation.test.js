@@ -1,8 +1,8 @@
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { createIsolatedTestDirectory, isolatedTestEnvironment } = require('./helpers/isolatedTestDatabase');
 const {
   BillingPolicyError,
   evaluateStripeEntitlement,
@@ -33,7 +33,7 @@ const env = {
 };
 
 function fixture() {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'copyquick-billing-'));
+  const directory = createIsolatedTestDirectory('billing-');
   const databasePath = path.join(directory, 'test.db');
   const db = new Database(databasePath);
   runMigrationEngine(db, { env, logger: () => {} });
@@ -634,7 +634,7 @@ async function run() {
   // Manual and scheduled apply paths share one token-owned cross-process lease.
   {
     const value = fixture();
-    const lockEnv = { NODE_ENV: 'test', DATABASE_PATH: value.databasePath };
+    const lockEnv = isolatedTestEnvironment(value.databasePath);
     let first;
     let replacement;
     try {
