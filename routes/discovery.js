@@ -10,7 +10,7 @@ const { buildPlan } = require('../lib/buildPlanEngine');
 const { getDb } = require('../db/database');
 const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
-const { getSavedPlan, saveBuildPlan } = require('../lib/savedBuildPlans');
+const { saveBuildPlan } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
 const { backfillLegacyBrandBrain, explicitCurrentInput, guardObjectiveSubjectResolution, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
 const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
@@ -739,11 +739,26 @@ router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
   if (!result.valid) {
     return renderBuildPlan(req, res, { status: 409, error: result.error });
   }
-  discoverySession.buildPlanSelection = result.selection;
-  discoverySession.approvedProductionSet = null;
   const db = req.app.locals.copyquickDb || getDb();
   const userId = req.session?.userId || req.session?.passport?.user;
-  if (getSavedPlan(db, { userId, objective: discoverySession.objective })) saveBuildPlan(db, { userId, discoverySession });
+  try {
+    const saved = saveBuildPlan(db, {
+      userId,
+      discoverySession: { ...discoverySession, buildPlanSelection: result.selection }
+    });
+    const approval = buildApprovalView(discoverySession.buildPlan, result.selection);
+    discoverySession.buildPlanSelection = result.selection;
+    discoverySession.approvedProductionSet = null;
+    discoverySession.buildPlanSavedAt = saved.savedAt;
+    discoverySession.buildPlanNotice = approval.counts.productionUnits === 0
+      ? 'Plan saved. No Production credits were used. Resume it anytime from Start an Objective → Saved Plan.'
+      : 'Plan saved. No Production credits are used until you start Production. Resume it anytime from Start an Objective → Saved Plan.';
+  } catch (_) {
+    return renderBuildPlan(req, res, {
+      status: 409,
+      error: 'This plan could not be saved safely. Review it and try again.'
+    });
+  }
   return res.redirect(303, '/discovery/build-plan');
 });
 

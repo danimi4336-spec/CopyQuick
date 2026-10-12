@@ -15,9 +15,11 @@ const { createCsrfProtection } = require('../lib/csrf');
 const { initDb } = require('../db/init');
 const { getDb } = require('../db/database');
 const { runMigrationEngine } = require('../db/migrations');
+const builderRoutes = require('../routes/builder');
 const discoveryRoutes = require('../routes/discovery');
 const { hasPositiveMatch } = require('../lib/discoveryPolarity');
 const { understandBusiness } = require('../lib/businessUnderstanding');
+const { isReadyToUseAsset, productionBillingUnits } = require('../lib/productionArtifactPolicy');
 const {
   activeMemory,
   guardObjectiveSubjectResolution,
@@ -67,7 +69,11 @@ function listen(app) {
 
 function request(agent, method, url, body) {
   return new Promise((resolve, reject) => {
-    const payload = body ? new URLSearchParams(body).toString() : '';
+    const parameters = new URLSearchParams();
+    Object.entries(body || {}).forEach(([key, value]) => {
+      (Array.isArray(value) ? value : [value]).forEach(item => parameters.append(key, item));
+    });
+    const payload = parameters.toString();
     const headers = {};
     if (payload) {
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -93,6 +99,23 @@ function token(body) {
   const value = body.match(/name="_csrf" value="([^"]+)"/)?.[1];
   assert(value, 'rendered form must include a CSRF token');
   return value;
+}
+
+function persistenceSideEffects(db, userId) {
+  return {
+    savedPlans: db.prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(userId).count,
+    runs: db.prepare('SELECT COUNT(*) AS count FROM production_runs WHERE user_id = ?').get(userId).count,
+    jobs: db.prepare(`SELECT COUNT(*) AS count FROM production_jobs
+      WHERE production_run_id IN (SELECT id FROM production_runs WHERE user_id = ?)`).get(userId).count,
+    generations: db.prepare('SELECT COUNT(*) AS count FROM generations WHERE user_id = ?').get(userId).count,
+    generationRequests: db.prepare('SELECT COUNT(*) AS count FROM generation_requests WHERE user_id = ?').get(userId).count,
+    usagePeriods: db.prepare('SELECT COUNT(*) AS count FROM usage_periods WHERE user_id = ?').get(userId).count,
+    usageEvents: db.prepare('SELECT COUNT(*) AS count FROM usage_events WHERE user_id = ?').get(userId).count,
+    memorySubjects: db.prepare('SELECT COUNT(*) AS count FROM business_memory_subjects WHERE user_id = ?').get(userId).count,
+    memoryRows: db.prepare('SELECT COUNT(*) AS count FROM business_memory_records WHERE user_id = ?').get(userId).count,
+    memoryRecords: activeMemory(db, { userId, includePending: true }).length,
+    generationsUsed: db.prepare('SELECT generations_used FROM users WHERE id = ?').get(userId).generations_used
+  };
 }
 
 async function unitAcceptance() {
@@ -259,6 +282,7 @@ async function renderedAcceptance() {
   app.use(createCsrfProtection());
   app.get('/test/session', (req, res) => res.json(req.session.discoverySession || null));
   app.use(discoveryRoutes);
+  app.use(builderRoutes);
 
   const server = await listen(app);
   const agent = { server, port: server.address().port, cookie: '' };
@@ -349,6 +373,73 @@ async function renderedAcceptance() {
     assert.strictEqual(stored.memorySubjectIds.offer, null);
     assert.strictEqual(Boolean(stored.approvedProductionSet), false);
     assert.strictEqual(activeMemory(db, { userId, includePending: true }).length, beforeRecords, 'Build Plan viewing must not promote durable memory');
+
+    const selectedIds = stored.buildPlanSelection.selectedDeliverableIds;
+    const selectedItems = stored.buildPlan.phases.flatMap(phase => phase.deliverables)
+      .filter(item => selectedIds.includes(item.id));
+    assert.deepStrictEqual(selectedItems.map(item => item.title), [
+      'Conversion Diagnostic Brief',
+      'Trial-Signup Conversion Brief',
+      'Conversion Measurement Plan'
+    ]);
+    assert.strictEqual(selectedItems.filter(isReadyToUseAsset).length, 0);
+    assert.strictEqual(selectedItems.reduce((sum, item) => sum + productionBillingUnits(item), 0), 0);
+    const effectsBeforeSave = persistenceSideEffects(db, userId);
+    assert.strictEqual(effectsBeforeSave.savedPlans, 0);
+
+    const buildPlanToken = token(buildPlan.body);
+    const tamperedSave = await request(agent, 'POST', '/discovery/build-plan/selection', {
+      _csrf: buildPlanToken,
+      selectedDeliverableIds: selectedIds.concat('unknown_customer_deliverable')
+    });
+    assert.strictEqual(tamperedSave.res.statusCode, 409);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(userId).count, 0);
+
+    const firstSave = await request(agent, 'POST', '/discovery/build-plan/selection', {
+      _csrf: buildPlanToken,
+      selectedDeliverableIds: selectedIds
+    });
+    assert.strictEqual(firstSave.res.statusCode, 303);
+    assert.strictEqual(firstSave.res.headers.location, '/discovery/build-plan');
+    const savedRows = db.prepare('SELECT * FROM saved_build_plan_states WHERE user_id = ?').all(userId);
+    assert.strictEqual(savedRows.length, 1);
+    assert.strictEqual(savedRows[0].objective, 'increase_conversion_rates');
+    assert.strictEqual(savedRows[0].status, 'saved');
+    assert.strictEqual(savedRows[0].state_version, 1);
+    assert.deepStrictEqual(JSON.parse(savedRows[0].workflow_state).buildPlanSelection.selectedDeliverableIds, selectedIds);
+
+    const confirmation = await request(agent, 'GET', '/discovery/build-plan');
+    assert.strictEqual(confirmation.res.statusCode, 200);
+    assert.match(confirmation.body, /Plan saved\./);
+    assert.match(confirmation.body, /No Production credits were used\./);
+    assert.match(confirmation.body, /Start an Objective → Saved Plan/);
+    const repeatedSave = await request(agent, 'POST', '/discovery/build-plan/selection', {
+      _csrf: token(confirmation.body),
+      selectedDeliverableIds: selectedIds
+    });
+    assert.strictEqual(repeatedSave.res.statusCode, 303);
+    assert.strictEqual(db.prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(userId).count, 1);
+
+    const effectsAfterSave = persistenceSideEffects(db, userId);
+    assert.deepStrictEqual(effectsAfterSave, { ...effectsBeforeSave, savedPlans: 1 });
+
+    await request(agent, 'GET', '/test/reset-discovery');
+    const savedPlanEntry = await request(agent, 'GET', '/welcome?goal=increase_conversion_rates');
+    assert.strictEqual(savedPlanEntry.res.statusCode, 200);
+    assert.match(savedPlanEntry.body, /Saved Plan/);
+    assert.match(savedPlanEntry.body, /Resume Saved Plan/);
+    const resumed = await request(agent, 'POST', '/saved-plan/resume', {
+      _csrf: token(savedPlanEntry.body),
+      objective: 'increase_conversion_rates'
+    });
+    assert.strictEqual(resumed.res.statusCode, 303);
+    assert.strictEqual(resumed.res.headers.location, '/discovery/build-plan');
+    const resumedPlan = await request(agent, 'GET', '/discovery/build-plan');
+    assert.strictEqual(resumedPlan.res.statusCode, 200);
+    assert.match(resumedPlan.body, /Saved plan restored/);
+    const resumedState = JSON.parse((await request(agent, 'GET', '/test/session')).body);
+    assert.deepStrictEqual(resumedState.buildPlanSelection.selectedDeliverableIds, selectedIds);
+    assert.strictEqual(activeMemory(db, { userId, includePending: true }).length, beforeRecords, 'save and resume must not promote durable memory');
 
     await request(agent, 'GET', '/test/reset-discovery');
     const sameOfferInitial = await request(agent, 'GET', '/discovery');

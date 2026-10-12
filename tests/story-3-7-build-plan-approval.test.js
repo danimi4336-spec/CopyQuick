@@ -275,13 +275,16 @@ async function run() {
   initDb();
   getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
     .run(37, 'story-3-7@example.com', 'Build Plan Tester');
+  getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
+    .run(38, 'story-3-7-save-failure@example.com', 'Build Plan Save Failure Tester');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.use(express.urlencoded({ extended: true }));
   app.use(session({ secret: 'story-3-7-test-secret', resave: false, saveUninitialized: true }));
   app.get('/test/authenticate/:mode', (req, res) => {
-    req.session.userId = 37;
-    req.session.discoverySession = discoveryState(req.params.mode);
+    req.session.userId = req.params.mode === 'persistence_failure' ? 38 : 37;
+    const stateMode = req.params.mode === 'persistence_failure' ? 'valid' : req.params.mode;
+    req.session.discoverySession = discoveryState(stateMode);
     req.session.credits = 19;
     req.session.usageCount = 8;
     req.session.generations = ['existing'];
@@ -301,6 +304,7 @@ async function run() {
   const stalePlan = { server, cookie: '' };
   const valid = { server, cookie: '' };
   const planningOnly = { server, cookie: '' };
+  const persistenceFailure = { server, cookie: '' };
   try {
     const denied = await request(anonymous, 'POST', '/discovery/build-plan/approve');
     assert.strictEqual(denied.res.statusCode, 403, 'CSRF runs before authentication for unsafe anonymous requests');
@@ -317,6 +321,28 @@ async function run() {
     const planningOnlyApproval = await request(planningOnly, 'POST', '/discovery/build-plan/approve', { _csrf: planningOnlyToken, batchMode: 'full' });
     assert.strictEqual(planningOnlyApproval.res.statusCode, 409);
     assert.match(planningOnlyApproval.body, /ready-for-review asset/);
+
+    getDb().exec(`CREATE TRIGGER reject_story_3_7_saved_plan
+      BEFORE INSERT ON saved_build_plan_states WHEN NEW.user_id = 38
+      BEGIN SELECT RAISE(ABORT, 'simulated persistence failure'); END`);
+    await request(persistenceFailure, 'GET', '/test/authenticate/persistence_failure');
+    const persistenceFailurePage = await request(persistenceFailure, 'GET', '/discovery/build-plan');
+    const persistenceFailureResponse = await request(persistenceFailure, 'POST', '/discovery/build-plan/selection', {
+      _csrf: persistenceFailurePage.body.match(/name="_csrf" value="([^"]+)"/)?.[1],
+      selectedDeliverableIds: defaults.selectedDeliverableIds
+    });
+    assert.strictEqual(persistenceFailureResponse.res.statusCode, 409);
+    assert.match(persistenceFailureResponse.body, /This plan could not be saved safely\. Review it and try again\./);
+    assert.strictEqual(getDb().prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(38).count, 0);
+    const failedSaveSession = JSON.parse((await request(persistenceFailure, 'GET', '/test/session')).body);
+    assert.strictEqual(failedSaveSession.discoverySession.buildPlanSavedAt, undefined);
+    assert.strictEqual(failedSaveSession.discoverySession.buildPlanNotice, null);
+    assert.deepStrictEqual(
+      failedSaveSession.discoverySession.buildPlanSelection.selectedDeliverableIds,
+      defaults.selectedDeliverableIds,
+      'a failed upsert must not leave an unsaved selection in the session'
+    );
+    getDb().exec('DROP TRIGGER reject_story_3_7_saved_plan');
 
     await request(missingReflection, 'GET', '/test/authenticate/missing_reflection');
     assert.strictEqual((await request(missingReflection, 'POST', '/discovery/build-plan/approve', { _csrf: 'invalid' })).res.statusCode, 403);
@@ -354,27 +380,29 @@ async function run() {
     assert.doesNotMatch(page.body, /priority|estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
     const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
-    const savedForLater = await request(valid, 'POST', '/discovery/build-plan/save-later', { _csrf: token });
-    assert.strictEqual(savedForLater.res.statusCode, 303);
-    assert.strictEqual(savedForLater.res.headers.location, '/discovery/build-plan');
-    const savedForLaterPage = await request(valid, 'GET', '/discovery/build-plan');
-    assert.match(savedForLaterPage.body, /Plan saved\. Resume it anytime from Start an Objective/);
-    const afterSaveForLater = JSON.parse((await request(valid, 'GET', '/test/session')).body);
-    assert(afterSaveForLater.discoverySession.buildPlanSavedAt);
-    assert.strictEqual(afterSaveForLater.credits, 19);
-    assert.strictEqual(afterSaveForLater.usageCount, 8);
-
     const csrfDenied = await request(valid, 'POST', '/discovery/build-plan/selection', {
       selectedDeliverableIds: defaults.selectedDeliverableIds
     });
     assert.strictEqual(csrfDenied.res.statusCode, 403);
 
+    assert.strictEqual(
+      getDb().prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ? AND objective = ?')
+        .get(37, 'launch_product').count,
+      0,
+      'the executable plan must also begin without a saved row'
+    );
     const tamperedSelection = await request(valid, 'POST', '/discovery/build-plan/selection', {
       _csrf: token,
       selectedDeliverableIds: defaults.selectedDeliverableIds.concat('operator_only_deliverable')
     });
     assert.strictEqual(tamperedSelection.res.statusCode, 409);
     assert.match(tamperedSelection.body, /Choose only deliverables from the current Build Plan/);
+    assert.strictEqual(
+      getDb().prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ? AND objective = ?')
+        .get(37, 'launch_product').count,
+      0,
+      'a tampered selection must not create a saved row'
+    );
 
     const selectedWithoutSocial = defaults.selectedDeliverableIds.filter((id) => id !== 'social_launch_campaign');
     const saved = await request(valid, 'POST', '/discovery/build-plan/selection', {
@@ -384,9 +412,28 @@ async function run() {
     assert.strictEqual(saved.res.statusCode, 303);
     assert.strictEqual(saved.res.headers.location, '/discovery/build-plan');
     const persistedPage = await request(valid, 'GET', '/discovery/build-plan');
+    assert.match(persistedPage.body, /Plan saved\./);
+    assert.match(persistedPage.body, /No Production credits are used until you start Production\./);
+    assert.match(persistedPage.body, /Start an Objective → Saved Plan/);
     assert.match(persistedPage.body, /value="amazon_a_plus"[^>]*checked/);
     assert.doesNotMatch(persistedPage.body, /value="social_launch_campaign"[^>]*checked/);
-    const approvalToken = persistedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    assert.strictEqual(
+      getDb().prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ? AND objective = ?')
+        .get(37, 'launch_product').count,
+      1,
+      'the first valid selection save must create one row'
+    );
+    const persistedToken = persistedPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    const savedForLater = await request(valid, 'POST', '/discovery/build-plan/save-later', { _csrf: persistedToken });
+    assert.strictEqual(savedForLater.res.statusCode, 303);
+    assert.strictEqual(savedForLater.res.headers.location, '/discovery/build-plan');
+    const savedForLaterPage = await request(valid, 'GET', '/discovery/build-plan');
+    assert.match(savedForLaterPage.body, /Plan saved\. Resume it anytime from Start an Objective/);
+    const afterSaveForLater = JSON.parse((await request(valid, 'GET', '/test/session')).body);
+    assert(afterSaveForLater.discoverySession.buildPlanSavedAt);
+    assert.strictEqual(afterSaveForLater.credits, 19);
+    assert.strictEqual(afterSaveForLater.usageCount, 8);
+    const approvalToken = savedForLaterPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
     const approvalResponse = await request(valid, 'POST', '/discovery/build-plan/approve', { _csrf: approvalToken });
     assert.strictEqual(approvalResponse.res.statusCode, 303);
