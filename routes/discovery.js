@@ -12,7 +12,7 @@ const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
 const { getSavedPlan, saveBuildPlan } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
-const { backfillLegacyBrandBrain, explicitCurrentInput, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
+const { backfillLegacyBrandBrain, explicitCurrentInput, guardObjectiveSubjectResolution, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
 const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
 const {
   buildApprovalView,
@@ -79,9 +79,17 @@ function getInitialAnswer(req) {
 }
 
 function getUnderstandingSummary(session) {
-  return Object.values(session?.understanding || {}).filter(function(field) {
-    return field && field.source !== 'unknown' && field.value !== null && field.label;
-  });
+  const seenConceptValues = new Set();
+  return Object.entries(session?.understanding || {}).filter(function([fieldKey, field]) {
+    if (!field || field.source === 'unknown' || field.value === null || !field.label) return false;
+    const concept = ['trafficSource', 'currentAcquisitionChannel', 'salesChannel'].includes(fieldKey)
+      ? 'current_channel' : field.memoryConcept || fieldKey;
+    const value = String(field.label || field.value).trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
+    const key = `${concept}:${value}`;
+    if (seenConceptValues.has(key)) return false;
+    seenConceptValues.add(key);
+    return true;
+  }).map(([, field]) => field);
 }
 
 function captureDiscoveryStep(discoverySession) {
@@ -164,10 +172,14 @@ function applyDurableMemory(req, objective, initialDescription, understandingRes
 
 async function initializeDiscovery(req, objective, answer, subjectResolution) {
   const understandingResult = await understandBusiness({ objective, answer });
-  const memorySubjectIds = { business: subjectResolution.business?.id || null, offer: subjectResolution.offer?.id || null };
-  const memoryContext = subjectResolution.offer ? {
-    offerLabel: subjectResolution.offer.displayLabel || subjectResolution.offer.label,
-    selection: subjectResolution.selection
+  const guardedResolution = guardObjectiveSubjectResolution(subjectResolution, {
+    initialDescription: answer,
+    understanding: understandingResult.understanding
+  });
+  const memorySubjectIds = { business: guardedResolution.business?.id || null, offer: guardedResolution.offer?.id || null };
+  const memoryContext = guardedResolution.offer ? {
+    offerLabel: guardedResolution.offer.displayLabel || guardedResolution.offer.label,
+    selection: guardedResolution.selection
   } : null;
   const shell = { objective, memorySubjectIds };
   const memoryMerge = applyDurableMemory(req, objective, answer, understandingResult, shell);
