@@ -381,13 +381,45 @@ async function renderedAcceptance() {
     assert.match(fourOpenSection, /<details>/);
     assert.match(fourOpenSection, /<summary>4 planning inputs remain open<\/summary>/);
     assert.match(fourOpenSection, /<ul aria-label="Open planning inputs">/);
-    for (const label of ['Traffic Source', 'Current Page Experience', 'Conversion Evidence', 'Friction &amp; Objections']) {
-      assert.strictEqual((fourOpenSection.match(new RegExp(label, 'g')) || []).length, 1, `${label} must appear once`);
+    for (const item of [
+      'Traffic source — Not established',
+      'Page experience — Not established',
+      'Conversion evidence — Not established',
+      'Customer friction — Not established'
+    ]) {
+      const renderedItem = `<li><span>${item.replace(' — ', '</span> — ')}</li>`;
+      assert.strictEqual((fourOpenSection.match(new RegExp(renderedItem, 'g')) || []).length, 1, `${item} must appear once`);
+    }
+    for (const rejected of ['Traffic Source', 'Current Page Experience', 'Conversion Evidence', 'Friction &amp; Objections']) {
+      assert.doesNotMatch(fourOpenSection, new RegExp(rejected), `${rejected} must not appear in the open-input presentation`);
     }
     assert.strictEqual((fourOpenSection.match(/<li>/g) || []).length, 4);
     assert.doesNotMatch(fourOpenSection, /I(?:&#39;|')m (?:still )?not sure yet/i);
     assert.doesNotMatch(fourOpenSection, /Scroll to review/);
     assert.doesNotMatch(fourOpen.body, /discovery-conservative-note/);
+    const fourOpenState = JSON.parse((await request(agent, 'GET', '/test/session')).body);
+    assert.deepStrictEqual(
+      ['trafficSource', 'pageExperience', 'conversionEvidence', 'conversionFriction'].map(function(key) {
+        return [key, fourOpenState.understanding[key].value];
+      }),
+      [
+        ['trafficSource', 'unsure'],
+        ['pageExperience', 'unsure'],
+        ['conversionEvidence', 'unsure'],
+        ['conversionFriction', 'unsure']
+      ]
+    );
+    assert.deepStrictEqual(
+      Object.fromEntries(fourOpenState.planningReadiness.requirements
+        .filter(function(requirement) { return ['traffic', 'page', 'evidence', 'friction'].includes(requirement.id); })
+        .map(function(requirement) { return [requirement.id, { domain: requirement.domain, openInputLabel: requirement.openInputLabel }]; })),
+      {
+        traffic: { domain: 'Traffic Source', openInputLabel: 'Traffic source' },
+        page: { domain: 'Current Page Experience', openInputLabel: 'Page experience' },
+        evidence: { domain: 'Conversion Evidence', openInputLabel: 'Conversion evidence' },
+        friction: { domain: 'Friction & Objections', openInputLabel: 'Customer friction' }
+      }
+    );
 
     await request(agent, 'GET', '/test/summary-fixture/many-open');
     const manyOpen = await request(agent, 'GET', '/discovery');
@@ -406,7 +438,7 @@ async function renderedAcceptance() {
     const openOnly = await request(agent, 'GET', '/discovery');
     assert.doesNotMatch(openOnly.body, /discovery-understanding-list|discovery-conservative-note/);
     assert.match(openOnly.body, /1 planning input remains open/);
-    assert.match(openOnly.body, /Traffic Source/);
+    assert.match(openOnly.body, /Traffic source/);
 
     await request(agent, 'GET', '/test/summary-fixture/empty');
     const empty = await request(agent, 'GET', '/discovery');
@@ -421,7 +453,7 @@ async function renderedAcceptance() {
     await request(agent, 'GET', '/test/summary-fixture/open-aliases');
     const openAliases = await request(agent, 'GET', '/discovery');
     assert.match(openAliases.body, /1 planning input remains open/);
-    assert.strictEqual((openAliases.body.match(/Traffic Source/g) || []).length, 1);
+    assert.strictEqual((openAliases.body.match(/Traffic source/g) || []).length, 1);
 
     await request(agent, 'GET', '/test/summary-fixture/fact-aliases');
     const factAliases = await request(agent, 'GET', '/discovery');
@@ -507,7 +539,7 @@ async function renderedAcceptance() {
         const replayedPage = await request(agent, 'GET', '/discovery');
         assert.match(replayedPage.body, /2 planning inputs remain open/);
         const replayedOpen = replayedPage.body.match(/<section class="discovery-open-inputs"[\s\S]*?<\/section>/)?.[0] || '';
-        assert.strictEqual((replayedOpen.match(/Current Page Experience/g) || []).length, 1);
+        assert.strictEqual((replayedOpen.match(/Page experience/g) || []).length, 1);
         replayedPageUncertainty = true;
       }
     }

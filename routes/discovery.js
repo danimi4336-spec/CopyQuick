@@ -92,7 +92,7 @@ function getUnderstandingPresentation(session) {
     ? session.planningReadiness.requirements : [];
   const requirementLabels = new Map(requirements.flatMap(function(requirement) {
     return (requirement.fields || []).map(function(fieldKey) {
-      return [fieldKey, requirement.domain];
+      return [fieldKey, requirement.openInputLabel || requirement.domain];
     });
   }));
   const requirementConceptLabels = new Map(Array.from(requirementLabels, function([fieldKey, label]) {
