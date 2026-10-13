@@ -37,6 +37,83 @@ const SAAS_DESCRIPTION = [
   'Do not reuse residential remodeling, homeowner, referral, consultation, or booked-appointment context.'
 ].join(' ');
 
+const unsure = (label = "I'm not sure yet") => ({
+  value: 'unsure', label, confidence: 1, source: 'user_confirmed'
+});
+
+function summaryFixture(name) {
+  const base = {
+    objective: 'increase_conversion_rates',
+    answers: { initial_description: 'A sanitized software conversion fixture.' },
+    understanding: {},
+    unknowns: [],
+    completedQuestions: ['initial_description'],
+    stepHistory: [],
+    startedAt: '2026-10-12T12:00:00.000Z',
+    updatedAt: '2026-10-12T12:00:00.000Z'
+  };
+  if (name === 'four-open') {
+    base.answers = {
+      ...base.answers,
+      conversion_traffic: 'unsure', conversion_page: 'unsure',
+      conversion_evidence: 'unsure', conversion_friction: 'unsure'
+    };
+    base.understanding = {
+      businessType: confirmed('software', 'Software / SaaS'),
+      industry: confirmed('technology', 'Technology'),
+      currentOffer: confirmed('project_management_software', 'Project management software'),
+      funnelType: confirmed('trial_signup', 'Start a trial or account'),
+      primaryCta: confirmed('start_free_trial', 'Start a free trial'),
+      trafficSource: unsure(), pageExperience: unsure(),
+      conversionEvidence: unsure(), conversionFriction: unsure()
+    };
+  } else if (name === 'facts-only') {
+    base.understanding = { currentOffer: confirmed('software', 'Project management software') };
+  } else if (name === 'open-only') {
+    base.answers.conversion_traffic = 'unsure';
+    base.understanding = { trafficSource: unsure() };
+  } else if (name === 'fallback') {
+    base.understanding = { legacyPrivateMetric: unsure() };
+  } else if (name === 'open-aliases') {
+    base.understanding = {
+      currentAcquisitionChannel: unsure(), salesChannel: unsure(), trafficSource: unsure()
+    };
+  } else if (name === 'fact-aliases') {
+    base.understanding = {
+      trafficSource: confirmed('referrals', 'Referrals'),
+      currentAcquisitionChannel: confirmed('referrals', 'Referrals'),
+      salesChannel: confirmed('referrals', 'Referrals')
+    };
+  } else if (name === 'multi-choice') {
+    base.objective = 'launch_product';
+    base.understanding = {
+      businessType: confirmed('physical_product', 'Physical Product'),
+      category: confirmed('dietary_supplement', 'Dietary Supplement'),
+      intendedOutcome: confirmed('digestive_wellness', 'Digestive health'),
+      conceptMaturity: confirmed('idea_only', 'I only have the product idea'),
+      productExplorationDirections: unsure()
+    };
+  } else if (name === 'supplement-variant') {
+    base.objective = 'launch_product';
+    base.answers.supplement_intended_outcome = 'unsure';
+    base.understanding = {
+      businessType: confirmed('physical_product', 'Physical Product'),
+      category: confirmed('dietary_supplement', 'Dietary Supplement'),
+      intendedOutcome: unsure("I'm still not sure yet")
+    };
+  } else if (name === 'many-open') {
+    base.understanding = {
+      targetAudience: unsure(), trafficSource: unsure(), funnelType: unsure(),
+      pageExperience: unsure(), primaryCta: unsure(), conversionEvidence: unsure(),
+      conversionFriction: unsure()
+    };
+  }
+  base.unknowns = Object.entries(base.understanding)
+    .filter(([, field]) => field.value === 'unsure')
+    .map(([fieldKey]) => fieldKey);
+  return base;
+}
+
 function fixtureDb() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
@@ -279,6 +356,10 @@ async function renderedAcceptance() {
     req.session.discoverySession = null;
     res.redirect('/discovery');
   });
+  app.get('/test/summary-fixture/:name', (req, res) => {
+    req.session.discoverySession = summaryFixture(req.params.name);
+    res.redirect('/discovery');
+  });
   app.use(createCsrfProtection());
   app.get('/test/session', (req, res) => res.json(req.session.discoverySession || null));
   app.use(discoveryRoutes);
@@ -289,6 +370,76 @@ async function renderedAcceptance() {
   const beforeRecords = activeMemory(db, { userId, includePending: true }).length;
   try {
     await request(agent, 'GET', '/test/authenticate');
+    await request(agent, 'GET', '/test/summary-fixture/four-open');
+    const fourOpen = await request(agent, 'GET', '/discovery');
+    assert.strictEqual(fourOpen.res.statusCode, 200);
+    const fourEstablished = fourOpen.body.match(/<ul class="discovery-understanding-list"[\s\S]*?<\/ul>/)?.[0] || '';
+    const fourOpenSection = fourOpen.body.match(/<section class="discovery-open-inputs"[\s\S]*?<\/section>/)?.[0] || '';
+    assert.match(fourEstablished, /Software \/ SaaS/);
+    assert.doesNotMatch(fourEstablished, /I(?:&#39;|')m (?:still )?not sure yet/i);
+    assert.match(fourOpenSection, /<h2[^>]*>Still open<\/h2>/);
+    assert.match(fourOpenSection, /<details>/);
+    assert.match(fourOpenSection, /<summary>4 planning inputs remain open<\/summary>/);
+    assert.match(fourOpenSection, /<ul aria-label="Open planning inputs">/);
+    for (const label of ['Traffic Source', 'Current Page Experience', 'Conversion Evidence', 'Friction &amp; Objections']) {
+      assert.strictEqual((fourOpenSection.match(new RegExp(label, 'g')) || []).length, 1, `${label} must appear once`);
+    }
+    assert.strictEqual((fourOpenSection.match(/<li>/g) || []).length, 4);
+    assert.doesNotMatch(fourOpenSection, /I(?:&#39;|')m (?:still )?not sure yet/i);
+    assert.doesNotMatch(fourOpenSection, /Scroll to review/);
+    assert.doesNotMatch(fourOpen.body, /discovery-conservative-note/);
+
+    await request(agent, 'GET', '/test/summary-fixture/many-open');
+    const manyOpen = await request(agent, 'GET', '/discovery');
+    const manyOpenSection = manyOpen.body.match(/<section class="discovery-open-inputs"[\s\S]*?<\/section>/)?.[0] || '';
+    assert.match(manyOpenSection, /7 planning inputs remain open/);
+    assert.match(manyOpenSection, /Scroll to review all 7 open inputs\./);
+    assert.match(manyOpenSection, /<ul aria-label="Open planning inputs" aria-describedby="discovery-open-inputs-hint">/);
+    assert.strictEqual((manyOpenSection.match(/<li>/g) || []).length, 7);
+
+    await request(agent, 'GET', '/test/summary-fixture/facts-only');
+    const factsOnly = await request(agent, 'GET', '/discovery');
+    assert.match(factsOnly.body, /Established business details/);
+    assert.doesNotMatch(factsOnly.body, /discovery-open-inputs|discovery-conservative-note/);
+
+    await request(agent, 'GET', '/test/summary-fixture/open-only');
+    const openOnly = await request(agent, 'GET', '/discovery');
+    assert.doesNotMatch(openOnly.body, /discovery-understanding-list|discovery-conservative-note/);
+    assert.match(openOnly.body, /1 planning input remains open/);
+    assert.match(openOnly.body, /Traffic Source/);
+
+    await request(agent, 'GET', '/test/summary-fixture/empty');
+    const empty = await request(agent, 'GET', '/discovery');
+    assert.match(empty.body, /discovery-conservative-note/);
+    assert.doesNotMatch(empty.body, /discovery-understanding-list|discovery-open-inputs/);
+
+    await request(agent, 'GET', '/test/summary-fixture/fallback');
+    const fallback = await request(agent, 'GET', '/discovery');
+    assert.match(fallback.body, /Planning input 1/);
+    assert.doesNotMatch(fallback.body, /legacyPrivateMetric/);
+
+    await request(agent, 'GET', '/test/summary-fixture/open-aliases');
+    const openAliases = await request(agent, 'GET', '/discovery');
+    assert.match(openAliases.body, /1 planning input remains open/);
+    assert.strictEqual((openAliases.body.match(/Traffic Source/g) || []).length, 1);
+
+    await request(agent, 'GET', '/test/summary-fixture/fact-aliases');
+    const factAliases = await request(agent, 'GET', '/discovery');
+    const aliasFacts = factAliases.body.match(/<ul class="discovery-understanding-list"[\s\S]*?<\/ul>/)?.[0] || '';
+    assert.strictEqual((aliasFacts.match(/Referrals/g) || []).length, 1);
+
+    await request(agent, 'GET', '/test/summary-fixture/multi-choice');
+    const multiChoice = await request(agent, 'GET', '/discovery');
+    assert.match(multiChoice.body, /Product Exploration/);
+    assert.match(multiChoice.body, /1 planning input remains open/);
+
+    await request(agent, 'GET', '/test/summary-fixture/supplement-variant');
+    const supplementVariant = await request(agent, 'GET', '/discovery');
+    const supplementOpen = supplementVariant.body.match(/<section class="discovery-open-inputs"[\s\S]*?<\/section>/)?.[0] || '';
+    assert.match(supplementOpen, /Customer Need \/ Desired Outcome/);
+    assert.doesNotMatch(supplementOpen, /I(?:&#39;|')m (?:still )?not sure yet/i);
+
+    await request(agent, 'GET', '/test/reset-discovery');
     const initialPage = await request(agent, 'GET', '/discovery');
     const submitted = await request(agent, 'POST', '/discovery', {
       _csrf: token(initialPage.body),
@@ -321,11 +472,10 @@ async function renderedAcceptance() {
     assert.doesNotMatch(discoveryPage.body, /Using what CopyQuick remembers about/);
     assert.strictEqual((summary.match(/Referrals/gi) || []).length, 0);
 
-    const freeTextAnswers = {
-      conversion_page: 'The self-service signup page explains the workflow and invites visitors to start a trial.',
-      conversion_evidence: 'No measured conversion baseline has been confirmed yet.',
-      conversion_friction: 'Some visitors ask what happens after account creation.'
-    };
+    const unsureFreeTextQuestions = new Set([
+      'conversion_page', 'conversion_evidence', 'conversion_friction'
+    ]);
+    let replayedPageUncertainty = false;
     for (let step = 0; step < 10; step += 1) {
       stored = JSON.parse((await request(agent, 'GET', '/test/session')).body);
       if (stored.discoveryCompleteForNow) break;
@@ -334,7 +484,8 @@ async function renderedAcceptance() {
       const page = await request(agent, 'GET', '/discovery');
       const body = { _csrf: token(page.body), questionId: question.id };
       if (question.type === 'free_text') {
-        body.freeTextAnswer = freeTextAnswers[question.id] || 'No additional confirmed detail is available.';
+        if (unsureFreeTextQuestions.has(question.id)) body.unsure = 'unsure';
+        else body.freeTextAnswer = 'No additional confirmed detail is available.';
       } else if (question.type === 'multi_choice') {
         body.choices = question.options.find(option => option.value === 'unsure')?.value || question.options[0].value;
       } else {
@@ -342,11 +493,34 @@ async function renderedAcceptance() {
       }
       const response = await request(agent, 'POST', '/discovery', body);
       assert.strictEqual(response.res.statusCode, 303);
+      if (question.id === 'conversion_page' && !replayedPageUncertainty) {
+        const afterPage = await request(agent, 'GET', '/discovery');
+        assert.match(afterPage.body, /2 planning inputs remain open/);
+        const back = await request(agent, 'POST', '/discovery/back', { _csrf: token(afterPage.body) });
+        assert.strictEqual(back.res.statusCode, 303);
+        const restoredPage = await request(agent, 'GET', '/discovery');
+        assert.match(restoredPage.body, /1 planning input remains open/);
+        const replay = await request(agent, 'POST', '/discovery', {
+          _csrf: token(restoredPage.body), questionId: 'conversion_page', unsure: 'unsure'
+        });
+        assert.strictEqual(replay.res.statusCode, 303);
+        const replayedPage = await request(agent, 'GET', '/discovery');
+        assert.match(replayedPage.body, /2 planning inputs remain open/);
+        const replayedOpen = replayedPage.body.match(/<section class="discovery-open-inputs"[\s\S]*?<\/section>/)?.[0] || '';
+        assert.strictEqual((replayedOpen.match(/Current Page Experience/g) || []).length, 1);
+        replayedPageUncertainty = true;
+      }
     }
 
     stored = JSON.parse((await request(agent, 'GET', '/test/session')).body);
     assert.strictEqual(stored.discoveryCompleteForNow, true);
     assert.strictEqual(stored.planningReadiness.ready, true);
+    for (const fieldKey of ['trafficSource', 'pageExperience', 'conversionEvidence', 'conversionFriction']) {
+      assert.strictEqual(stored.understanding[fieldKey].value, 'unsure');
+      assert(stored.planningReadiness.requirements.some(function(requirement) {
+        return requirement.fields.includes(fieldKey) && requirement.state === 'unresolved_nonblocking';
+      }));
+    }
     assert.strictEqual(activeMemory(db, { userId, includePending: true }).length, beforeRecords, 'Discovery must not promote durable memory');
 
     const reflection = await request(agent, 'GET', '/discovery/reflection');
@@ -354,6 +528,10 @@ async function renderedAcceptance() {
     assert.match(reflection.body, /Project management software/);
     assert.match(reflection.body, /Small professional-services teams/);
     assert.match(reflection.body, /Start a trial or account/);
+    for (const label of ['Primary Traffic Source', 'Current Page or Funnel', 'Builder-Provided Measurements', 'Observed Friction or Objections']) {
+      assert.match(reflection.body, new RegExp(label));
+    }
+    assert.strictEqual((reflection.body.match(/<strong>Not established yet<\/strong>/g) || []).length, 4);
     assert.doesNotMatch(reflection.body, /<strong>(?:Consultation-led remodeling services|Booked call or appointment|Book a consultation)<\/strong>|Using what CopyQuick remembers/i);
 
     const planned = await request(agent, 'POST', '/discovery/reflection/plan', { _csrf: token(reflection.body) });
@@ -406,7 +584,11 @@ async function renderedAcceptance() {
     assert.strictEqual(savedRows[0].objective, 'increase_conversion_rates');
     assert.strictEqual(savedRows[0].status, 'saved');
     assert.strictEqual(savedRows[0].state_version, 1);
-    assert.deepStrictEqual(JSON.parse(savedRows[0].workflow_state).buildPlanSelection.selectedDeliverableIds, selectedIds);
+    const savedWorkflow = JSON.parse(savedRows[0].workflow_state);
+    assert.deepStrictEqual(savedWorkflow.buildPlanSelection.selectedDeliverableIds, selectedIds);
+    for (const fieldKey of ['trafficSource', 'pageExperience', 'conversionEvidence', 'conversionFriction']) {
+      assert.strictEqual(savedWorkflow.understanding[fieldKey].value, 'unsure');
+    }
 
     const confirmation = await request(agent, 'GET', '/discovery/build-plan');
     assert.strictEqual(confirmation.res.statusCode, 200);
@@ -439,6 +621,9 @@ async function renderedAcceptance() {
     assert.match(resumedPlan.body, /Saved plan restored/);
     const resumedState = JSON.parse((await request(agent, 'GET', '/test/session')).body);
     assert.deepStrictEqual(resumedState.buildPlanSelection.selectedDeliverableIds, selectedIds);
+    for (const fieldKey of ['trafficSource', 'pageExperience', 'conversionEvidence', 'conversionFriction']) {
+      assert.strictEqual(resumedState.understanding[fieldKey].value, 'unsure');
+    }
     assert.strictEqual(activeMemory(db, { userId, includePending: true }).length, beforeRecords, 'save and resume must not promote durable memory');
 
     await request(agent, 'GET', '/test/reset-discovery');

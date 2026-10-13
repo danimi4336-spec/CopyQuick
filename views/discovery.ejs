@@ -58,13 +58,30 @@
                 <% if (discoverySession.memoryContext) { %><div class="alert alert-info" role="status">Using what CopyQuick remembers about <strong><%= discoverySession.memoryContext.offerLabel %></strong>. You do not need to explain it again.</div><% } %>
 
                 <% if (understandingSummary.length) { %>
-                    <ul class="discovery-understanding-list" aria-label="Business understanding">
+                    <ul class="discovery-understanding-list" aria-label="Established business details">
                         <% understandingSummary.forEach(function(field) { %>
-                            <li><span aria-hidden="true"><%= field.value === 'unsure' ? '?' : '✓' %></span><%= field.label %></li>
+                            <li><span aria-hidden="true">✓</span><%= field.label %></li>
                         <% }); %>
                     </ul>
-                <% } else { %>
+                <% } else if (!openInputsSummary.length) { %>
                     <p class="discovery-conservative-note">I’m keeping the details open until I know enough to make a reliable conclusion.</p>
+                <% } %>
+
+                <% if (openInputsSummary.length) { %>
+                    <section class="discovery-open-inputs" aria-labelledby="discovery-open-inputs-title">
+                        <h2 id="discovery-open-inputs-title">Still open</h2>
+                        <details>
+                            <summary><%= openInputsSummary.length %> planning input<%= openInputsSummary.length === 1 ? '' : 's' %> remain<%= openInputsSummary.length === 1 ? 's' : '' %> open</summary>
+                            <% if (openInputsSummary.length > 6) { %>
+                                <p class="discovery-open-inputs-hint" id="discovery-open-inputs-hint">Scroll to review all <%= openInputsSummary.length %> open inputs.</p>
+                            <% } %>
+                            <ul aria-label="Open planning inputs"<% if (openInputsSummary.length > 6) { %> aria-describedby="discovery-open-inputs-hint"<% } %>>
+                                <% openInputsSummary.forEach(function(item) { %>
+                                    <li><span><%= item.label %></span> — <%= item.status %></li>
+                                <% }); %>
+                            </ul>
+                        </details>
+                    </section>
                 <% } %>
 
                 <% if (error) { %><div class="alert alert-error discovery-error" role="alert"><%= error %></div><% } %>

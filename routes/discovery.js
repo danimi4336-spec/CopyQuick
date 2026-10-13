@@ -78,18 +78,53 @@ function getInitialAnswer(req) {
     || '';
 }
 
-function getUnderstandingSummary(session) {
+function understandingConcept(fieldKey, field) {
+  return ['trafficSource', 'currentAcquisitionChannel', 'salesChannel'].includes(fieldKey)
+    ? 'current_channel' : field.memoryConcept || fieldKey;
+}
+
+function getUnderstandingPresentation(session) {
   const seenConceptValues = new Set();
-  return Object.entries(session?.understanding || {}).filter(function([fieldKey, field]) {
-    if (!field || field.source === 'unknown' || field.value === null || !field.label) return false;
-    const concept = ['trafficSource', 'currentAcquisitionChannel', 'salesChannel'].includes(fieldKey)
-      ? 'current_channel' : field.memoryConcept || fieldKey;
+  const seenOpenConcepts = new Set();
+  const understandingSummary = [];
+  const unresolvedFields = [];
+  const requirements = Array.isArray(session?.planningReadiness?.requirements)
+    ? session.planningReadiness.requirements : [];
+  const requirementLabels = new Map(requirements.flatMap(function(requirement) {
+    return (requirement.fields || []).map(function(fieldKey) {
+      return [fieldKey, requirement.domain];
+    });
+  }));
+  const requirementConceptLabels = new Map(Array.from(requirementLabels, function([fieldKey, label]) {
+    return [understandingConcept(fieldKey, {}), label];
+  }));
+
+  Object.entries(session?.understanding || {}).forEach(function([fieldKey, field]) {
+    if (!field || field.source === 'unknown' || field.value === null) return;
+    const concept = understandingConcept(fieldKey, field);
+    if (field.value === 'unsure') {
+      if (seenOpenConcepts.has(concept)) return;
+      seenOpenConcepts.add(concept);
+      unresolvedFields.push({
+        label: requirementLabels.get(fieldKey) || requirementConceptLabels.get(concept) || null
+      });
+      return;
+    }
+    if (!field.label) return;
     const value = String(field.label || field.value).trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
     const key = `${concept}:${value}`;
-    if (seenConceptValues.has(key)) return false;
+    if (seenConceptValues.has(key)) return;
     seenConceptValues.add(key);
-    return true;
-  }).map(([, field]) => field);
+    understandingSummary.push(field);
+  });
+
+  let fallbackIndex = 0;
+  const openInputsSummary = unresolvedFields.map(function(item) {
+    if (item.label) return { label: item.label, status: 'Not established' };
+    fallbackIndex += 1;
+    return { label: `Planning input ${fallbackIndex}`, status: 'Not established' };
+  });
+  return { understandingSummary, openInputsSummary };
 }
 
 function captureDiscoveryStep(discoverySession) {
@@ -107,6 +142,7 @@ function appendDiscoveryStepHistory(discoverySession) {
 
 function renderDiscovery(req, res, options = {}) {
   const discoverySession = req.session.discoverySession || null;
+  const understandingPresentation = getUnderstandingPresentation(discoverySession);
   const objective = activeObjective(req);
   const acquisition = objective === 'get_more_customers';
   const conversion = objective === 'increase_conversion_rates';
@@ -129,7 +165,8 @@ function renderDiscovery(req, res, options = {}) {
     examplePrompts: acquisition ? ACQUISITION_EXAMPLE_PROMPTS : conversion ? CONVERSION_EXAMPLE_PROMPTS : search ? SEARCH_EXAMPLE_PROMPTS : brand ? BRAND_EXAMPLE_PROMPTS : service ? SERVICE_EXAMPLE_PROMPTS : validateIdea ? IDEA_EXAMPLE_PROMPTS : EXAMPLE_PROMPTS,
     discoverySession,
     editingInitialDescription: Boolean(discoverySession?.editingInitialDescription),
-    understandingSummary: getUnderstandingSummary(discoverySession),
+    understandingSummary: understandingPresentation.understandingSummary,
+    openInputsSummary: understandingPresentation.openInputsSummary,
     nextQuestion: discoverySession?.nextQuestion || null
   });
 }
