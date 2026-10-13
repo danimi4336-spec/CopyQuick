@@ -39,6 +39,7 @@ const { initDb } = require('../db/init');
 const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const builderRoutes = require('../routes/builder');
+const discoveryRoutes = require('../routes/discovery');
 const generationRoutes = require('../routes/generations');
 
 function request(agent, method, url, options = {}) {
@@ -180,7 +181,7 @@ function assertReadOnlyState(db, userId, before, label) {
   assert.deepStrictEqual(normalizeState(readState(db, userId)), normalizeState(before), label);
 }
 
-async function withServer(userId, fn) {
+async function withServer(userId, fn, options = {}) {
   const app = express();
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
@@ -195,6 +196,10 @@ async function withServer(userId, fn) {
     const db = getDb();
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     req.session.userId = userId;
+    req.session.csrfSecret ||= 'pre-established-read-only-get-secret';
+    if (options.discoverySession && !req.session.discoverySession) {
+      req.session.discoverySession = JSON.parse(JSON.stringify(options.discoverySession));
+    }
     res.locals.user = user;
     next();
   });
@@ -203,6 +208,7 @@ async function withServer(userId, fn) {
     res.json({ csrfToken: req.csrfToken() });
   });
   app.use(builderRoutes);
+  app.use(discoveryRoutes);
   app.use(generationRoutes);
 
   const server = await listen(app);
@@ -336,6 +342,26 @@ async function run() {
     assert.strictEqual(repeated.res.statusCode, 200);
     assertReadOnlyState(db, existingUsageUser, before, 'Repeated GET /dashboard should remain read-only');
   });
+
+  const summaryUser = createUser(db, { email: 'discovery-summary@example.com' });
+  const summaryState = {
+    objective: 'increase_conversion_rates',
+    answers: { initial_description: 'A read-only conversion summary.' },
+    understanding: {
+      currentOffer: { value: 'software', label: 'Software', source: 'user_confirmed', confidence: 1 }
+    },
+    planningReadiness: { policyVersion: 5, ready: true, requirements: [], discoveryCompleteForNow: true },
+    discoveryPolicyVersion: 5,
+    discoveryCompleteForNow: true,
+    reflectionStartedAt: '2026-10-13T12:00:00.000Z'
+  };
+  await withServer(summaryUser, async (agent) => {
+    const before = readState(db, summaryUser);
+    const response = await request(agent, 'GET', '/discovery/summary');
+    assert.strictEqual(response.res.statusCode, 200);
+    assert.match(response.body, /Discovery Summary/);
+    assertReadOnlyState(db, summaryUser, before, 'GET /discovery/summary should be read-only');
+  }, { discoverySession: summaryState });
 
   const generationUser = createUser(db, { email: 'generation@example.com', monthly_limit: 10 });
   await withServer(generationUser, async (agent) => {

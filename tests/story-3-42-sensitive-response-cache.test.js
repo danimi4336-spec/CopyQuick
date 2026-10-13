@@ -30,8 +30,17 @@ async function run() {
       assert.strictEqual(response.headers.pragma, 'no-cache');
       assert.strictEqual(response.headers.expires, '0');
     }
-    const privatePage = await request(server, '/generation/42', true);
-    assert.strictEqual(privatePage.headers['cache-control'], 'private, no-store');
+    for (const path of [
+      '/generation/42',
+      '/discovery/summary',
+      '/discovery/summary/saved/increase_conversion_rates',
+      '/discovery/summary/production/42'
+    ]) {
+      const privatePage = await request(server, path, true);
+      assert.strictEqual(privatePage.headers['cache-control'], 'private, no-store');
+      assert.strictEqual(privatePage.headers.pragma, 'no-cache');
+      assert.strictEqual(privatePage.headers.expires, '0');
+    }
     const publicPage = await request(server, '/about');
     assert.strictEqual(publicPage.headers['cache-control'], undefined);
   } finally { await new Promise(resolve => server.close(resolve)); }

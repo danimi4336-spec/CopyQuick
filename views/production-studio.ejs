@@ -20,6 +20,7 @@
             <div><span>Assets in this run</span><strong><%= production.jobs.length %></strong></div>
             <div><span>Started</span><strong><%= production.started_at %></strong></div>
         </section>
+        <p><a class="btn btn-outline" href="/discovery/summary/production/<%= production.id %>">View Discovery snapshot</a></p>
 
         <% if (typeof planProgress !== 'undefined' && planProgress) { %>
             <section class="production-review-status" aria-label="Overall production plan progress">

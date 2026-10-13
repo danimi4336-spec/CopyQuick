@@ -10,8 +10,15 @@ const { buildPlan } = require('../lib/buildPlanEngine');
 const { getDb } = require('../db/database');
 const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
-const { saveBuildPlan } = require('../lib/savedBuildPlans');
+const { getSavedPlanReadOnly, saveBuildPlan } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
+const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
+const {
+  buildUnderstandingPresentation,
+  projectCurrentDiscoverySummary,
+  projectProductionDiscoverySummary,
+  projectSavedDiscoverySummary
+} = require('../lib/discoverySummary');
 const { backfillLegacyBrandBrain, explicitCurrentInput, guardObjectiveSubjectResolution, memoryUnderstanding, mergeCurrentWithMemory, promoteObjectiveMemory, reconcileMemory, resolveObjectiveSubjects } = require('../lib/businessMemory');
 const { isPlanningFoundation, isReadyToUseAsset } = require('../lib/productionArtifactPolicy');
 const {
@@ -78,55 +85,6 @@ function getInitialAnswer(req) {
     || '';
 }
 
-function understandingConcept(fieldKey, field) {
-  return ['trafficSource', 'currentAcquisitionChannel', 'salesChannel'].includes(fieldKey)
-    ? 'current_channel' : field.memoryConcept || fieldKey;
-}
-
-function getUnderstandingPresentation(session) {
-  const seenConceptValues = new Set();
-  const seenOpenConcepts = new Set();
-  const understandingSummary = [];
-  const unresolvedFields = [];
-  const requirements = Array.isArray(session?.planningReadiness?.requirements)
-    ? session.planningReadiness.requirements : [];
-  const requirementLabels = new Map(requirements.flatMap(function(requirement) {
-    return (requirement.fields || []).map(function(fieldKey) {
-      return [fieldKey, requirement.openInputLabel || requirement.domain];
-    });
-  }));
-  const requirementConceptLabels = new Map(Array.from(requirementLabels, function([fieldKey, label]) {
-    return [understandingConcept(fieldKey, {}), label];
-  }));
-
-  Object.entries(session?.understanding || {}).forEach(function([fieldKey, field]) {
-    if (!field || field.source === 'unknown' || field.value === null) return;
-    const concept = understandingConcept(fieldKey, field);
-    if (field.value === 'unsure') {
-      if (seenOpenConcepts.has(concept)) return;
-      seenOpenConcepts.add(concept);
-      unresolvedFields.push({
-        label: requirementLabels.get(fieldKey) || requirementConceptLabels.get(concept) || null
-      });
-      return;
-    }
-    if (!field.label) return;
-    const value = String(field.label || field.value).trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ');
-    const key = `${concept}:${value}`;
-    if (seenConceptValues.has(key)) return;
-    seenConceptValues.add(key);
-    understandingSummary.push(field);
-  });
-
-  let fallbackIndex = 0;
-  const openInputsSummary = unresolvedFields.map(function(item) {
-    if (item.label) return { label: item.label, status: 'Not established' };
-    fallbackIndex += 1;
-    return { label: `Planning input ${fallbackIndex}`, status: 'Not established' };
-  });
-  return { understandingSummary, openInputsSummary };
-}
-
 function captureDiscoveryStep(discoverySession) {
   const snapshot = { ...discoverySession };
   delete snapshot.stepHistory;
@@ -142,7 +100,7 @@ function appendDiscoveryStepHistory(discoverySession) {
 
 function renderDiscovery(req, res, options = {}) {
   const discoverySession = req.session.discoverySession || null;
-  const understandingPresentation = getUnderstandingPresentation(discoverySession);
+  const understandingPresentation = buildUnderstandingPresentation(discoverySession);
   const objective = activeObjective(req);
   const acquisition = objective === 'get_more_customers';
   const conversion = objective === 'increase_conversion_rates';
@@ -345,6 +303,59 @@ function renderReflection(req, res, options = {}) {
     confirmed: Boolean(discoverySession.planningConfirmedAt)
   });
 }
+
+function renderDiscoverySummary(res, summary, status = 200) {
+  return res.status(status).render('discovery-summary', {
+    title: 'Discovery Summary - CopyQuick',
+    currentPage: 'discovery',
+    summary
+  });
+}
+
+function renderSummaryNotFound(res) {
+  return res.status(404).render('error', {
+    title: 'Discovery Summary Not Found - CopyQuick',
+    currentPage: 'discovery',
+    message: 'Discovery summary not found.'
+  });
+}
+
+router.get('/discovery/summary', requireAuth, (req, res) => {
+  return renderDiscoverySummary(res, projectCurrentDiscoverySummary(req.session.discoverySession));
+});
+
+router.get('/discovery/summary/saved/:objective', requireAuth, (req, res) => {
+  const objective = getAvailableObjective(req.params.objective)?.id;
+  if (!objective) return renderSummaryNotFound(res);
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const result = getSavedPlanReadOnly(db, { userId, objective });
+  if (!result.found) return renderSummaryNotFound(res);
+  if (result.status === 'unsupported_version') {
+    return renderDiscoverySummary(res, {
+      ...projectSavedDiscoverySummary(null),
+      notices: ['This historical saved plan was created by a version that cannot be summarized safely.']
+    }, 409);
+  }
+  if (result.status !== 'valid') return renderDiscoverySummary(res, projectSavedDiscoverySummary(null), 409);
+  return renderDiscoverySummary(res, projectSavedDiscoverySummary(result.plan));
+});
+
+router.get('/discovery/summary/production/:runId', requireAuth, (req, res) => {
+  const runId = parsePositiveIntegerId(req.params.runId);
+  if (!runId) return renderSummaryNotFound(res);
+  const db = req.app.locals.copyquickDb || getDb();
+  const userId = req.session.userId || req.session.passport?.user;
+  const run = db.prepare(`
+    SELECT id, objective, status, approved_at, started_at, completed_at,
+           created_at, updated_at, strategy_snapshot, production_plan_snapshot
+    FROM production_runs
+    WHERE id = ? AND user_id = ?
+  `).get(runId, userId);
+  if (!run) return renderSummaryNotFound(res);
+  const summary = projectProductionDiscoverySummary(run);
+  return renderDiscoverySummary(res, summary, summary.available ? 200 : 409);
+});
 
 router.get('/discovery', requireAuth, (req, res) => {
   refreshDiscoveryPolicy(req.session.discoverySession);

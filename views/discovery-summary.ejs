@@ -1,0 +1,76 @@
+<div class="discovery-summary-page">
+    <div class="container discovery-summary-container">
+        <header class="discovery-summary-header">
+            <span class="discovery-summary-eyebrow">Read-only snapshot</span>
+            <h1>Discovery Summary</h1>
+            <p>Review the understanding saved for this journey. Nothing on this page changes your answers, plan, or Production work.</p>
+        </header>
+
+        <section class="discovery-summary-overview" aria-label="Snapshot overview">
+            <div><span>Objective</span><strong><%= summary.objective ? summary.objective.title : 'Unavailable' %></strong></div>
+            <div><span>Snapshot source</span><strong><%= summary.sourceLabel %></strong></div>
+            <% if (summary.asOf) { %><div><span>As of</span><strong><time datetime="<%= summary.asOf %>"><%= summary.asOf %></time></strong></div><% } %>
+        </section>
+
+        <% summary.notices.forEach(function(notice) { %>
+            <div class="alert alert-info discovery-summary-notice" role="status"><%= notice %></div>
+        <% }); %>
+
+        <% if (summary.available) { %>
+            <% if (summary.originalDescription) { %>
+                <section class="discovery-summary-section" aria-labelledby="discovery-summary-description-title">
+                    <h2 id="discovery-summary-description-title">Original description</h2>
+                    <p class="discovery-summary-description"><%= summary.originalDescription %></p>
+                </section>
+            <% } %>
+
+            <section class="discovery-summary-section" aria-labelledby="discovery-summary-details-title">
+                <h2 id="discovery-summary-details-title">Established business details</h2>
+                <% if (summary.establishedDetails.length) { %>
+                    <ul class="discovery-understanding-list" aria-label="Established business details">
+                        <% summary.establishedDetails.forEach(function(item) { %><li><span aria-hidden="true">✓</span><%= item.label %></li><% }); %>
+                    </ul>
+                <% } else { %>
+                    <p>No established details are available in this snapshot.</p>
+                <% } %>
+            </section>
+
+            <% if (summary.openInputs.length) { %>
+                <section class="discovery-open-inputs discovery-summary-section" aria-labelledby="discovery-summary-open-title">
+                    <h2 id="discovery-summary-open-title">Still open</h2>
+                    <details>
+                        <summary><%= summary.openInputs.length %> planning input<%= summary.openInputs.length === 1 ? '' : 's' %> remain<%= summary.openInputs.length === 1 ? 's' : '' %> open</summary>
+                        <% if (summary.openInputs.length > 6) { %><p class="discovery-open-inputs-hint" id="discovery-summary-open-hint">Scroll to review all <%= summary.openInputs.length %> open inputs.</p><% } %>
+                        <ul aria-label="Open planning inputs"<% if (summary.openInputs.length > 6) { %> aria-describedby="discovery-summary-open-hint"<% } %>>
+                            <% summary.openInputs.forEach(function(item) { %><li><span><%= item.label %></span> — <%= item.status %></li><% }); %>
+                        </ul>
+                    </details>
+                </section>
+            <% } %>
+        <% } else { %>
+            <section class="discovery-summary-unavailable" aria-labelledby="discovery-summary-unavailable-title">
+                <h2 id="discovery-summary-unavailable-title">Summary unavailable</h2>
+                <p>CopyQuick cannot safely display the saved Discovery details for this snapshot.</p>
+            </section>
+        <% } %>
+
+        <section class="discovery-summary-status" aria-label="Planning status">
+            <div><span>Planning readiness</span><strong><%= summary.planningStatus %></strong></div>
+            <div><span>Strategy</span><strong><%= summary.strategyStatus %></strong></div>
+            <div><span>Build Plan</span><strong><%= summary.buildPlanStatus %></strong></div>
+        </section>
+
+        <% if (summary.timestamps.length) { %>
+            <section class="discovery-summary-section" aria-labelledby="discovery-summary-timestamps-title">
+                <h2 id="discovery-summary-timestamps-title">Journey dates</h2>
+                <dl class="discovery-summary-timestamps">
+                    <% summary.timestamps.forEach(function(item) { %><div><dt><%= item.label %></dt><dd><time datetime="<%= item.value %>"><%= item.value %></time></dd></div><% }); %>
+                </dl>
+            </section>
+        <% } %>
+
+        <nav class="discovery-summary-navigation" aria-label="Read-only Discovery navigation">
+            <% summary.links.forEach(function(link) { %><a class="btn btn-outline" href="<%= link.href %>"><%= link.label %></a><% }); %>
+        </nav>
+    </div>
+</div>
