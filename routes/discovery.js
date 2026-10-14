@@ -229,6 +229,13 @@ function refreshDiscoveryPolicy(discoverySession) {
   }
 }
 
+function projectDiscoveryPolicy(discoverySession) {
+  if (!discoverySession) return null;
+  const projection = JSON.parse(JSON.stringify(discoverySession));
+  refreshDiscoveryPolicy(projection);
+  return projection;
+}
+
 function hasCurrentStrategyState(discoverySession) {
   if (!discoverySession?.planningConfirmedAt
     || !discoverySession?.confirmedUnderstanding
@@ -282,9 +289,8 @@ function renderBuildPlan(req, res, options = {}) {
 }
 
 function renderReflection(req, res, options = {}) {
-  const discoverySession = req.session.discoverySession;
+  const discoverySession = options.discoverySession || req.session.discoverySession;
   const productionNotice = discoverySession.productionNotice || null;
-  discoverySession.productionNotice = null;
   const reflection = buildBusinessReflection({
     objective: discoverySession.objective,
     answers: discoverySession.answers,
@@ -630,11 +636,11 @@ router.post('/discovery/back', requireAuth, (req, res) => {
 });
 
 router.get('/discovery/reflection', requireAuth, (req, res) => {
-  refreshDiscoveryPolicy(req.session.discoverySession);
-  if (!canViewReflection(req.session.discoverySession)) {
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
+  if (!canViewReflection(discoverySession)) {
     return res.redirect('/discovery');
   }
-  return renderReflection(req, res);
+  return renderReflection(req, res, { discoverySession });
 });
 
 router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {

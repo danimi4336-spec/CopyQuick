@@ -1,4 +1,5 @@
 const assert = require('assert');
+const crypto = require('crypto');
 const express = require('express');
 const fs = require('fs');
 const http = require('http');
@@ -146,6 +147,12 @@ function databaseSnapshot(db) {
   }));
 }
 
+function workflowHash(serializedWorkflow) {
+  return crypto.createHash('sha256')
+    .update(JSON.stringify(JSON.parse(serializedWorkflow)))
+    .digest('hex');
+}
+
 function rowSnapshot(db, userId) {
   return JSON.stringify(db.prepare('SELECT * FROM saved_build_plan_states WHERE user_id = ? ORDER BY id').all(userId));
 }
@@ -234,10 +241,20 @@ async function run() {
   app.use(createCsrfProtection());
   app.get('/test/state/:name', (req, res) => {
     if (req.params.name === 'complete') req.session.discoverySession = JSON.parse(JSON.stringify(state));
+    else if (req.params.name === 'complete-notice') {
+      req.session.discoverySession = JSON.parse(JSON.stringify(state));
+      req.session.discoverySession.productionNotice = 'Production did not start. Review the plan before continuing. <script>alert("notice")</script>';
+    }
     else if (req.params.name === 'stale') {
       req.session.discoverySession = JSON.parse(JSON.stringify(state));
       req.session.discoverySession.discoveryPolicyVersion = DISCOVERY_POLICY_VERSION - 1;
-      req.session.discoverySession.planningReadiness.policyVersion = DISCOVERY_POLICY_VERSION - 1;
+      req.session.discoverySession.discoveryCompleteForNow = false;
+      req.session.discoverySession.planningReadiness = {
+        ...req.session.discoverySession.planningReadiness,
+        policyVersion: DISCOVERY_POLICY_VERSION - 1,
+        ready: false,
+        discoveryCompleteForNow: false
+      };
     } else if (req.params.name === 'oversized') {
       req.session.discoverySession = JSON.parse(JSON.stringify(state));
       req.session.discoverySession.answers.initial_description = 'x'.repeat(2001);
@@ -307,6 +324,39 @@ async function run() {
     assert.strictEqual((await request(agent, '/test/session')).body, sessionBefore);
     assert.deepStrictEqual(databaseSnapshot(db), dbBefore);
 
+    await request(agent, '/test/state/complete-notice');
+    const workflowBeforeReflection = (await request(agent, '/test/session')).body;
+    const workflowHashBeforeReflection = workflowHash(workflowBeforeReflection);
+    const databaseBeforeReflection = databaseSnapshot(db);
+    for (let index = 0; index < 3; index += 1) {
+      const reflection = await request(agent, '/discovery/reflection');
+      assert.strictEqual(reflection.res.statusCode, 200);
+      assert.strictEqual(reflection.res.headers['cache-control'], 'private, no-store');
+      assert.match(reflection.body, /Here's what I've learned about your business\./);
+      assert.match(reflection.body, /Project-management software/);
+      assert.match(reflection.body, /Small professional-services teams/);
+      assert.match(reflection.body, /What CopyQuick will help determine/);
+      assert.match(reflection.body, /We know enough to build a useful strategy\./);
+      assert.match(reflection.body, /Production did not start\. Review the plan before continuing\./);
+      assert.match(reflection.body, /&lt;script&gt;alert\(&#34;notice&#34;\)&lt;\/script&gt;/);
+      assert.doesNotMatch(reflection.body, /<script>alert\("notice"\)<\/script>/);
+      assert.match(reflection.body, /href="\/discovery\/summary"/);
+      const afterReflection = (await request(agent, '/test/session')).body;
+      assert.strictEqual(afterReflection, workflowBeforeReflection, 'Reflection GET must preserve the exact serialized workflow');
+      assert.strictEqual(workflowHash(afterReflection), workflowHashBeforeReflection, 'Reflection GET must preserve the workflow hash');
+
+      const linkedSummary = await request(agent, '/discovery/summary');
+      assert.strictEqual(linkedSummary.res.statusCode, 200);
+      assert.match(linkedSummary.body, /4 planning inputs remain open/);
+      for (const label of ['Traffic source', 'Page experience', 'Conversion evidence', 'Customer friction']) {
+        assert.match(linkedSummary.body, new RegExp(`${label}<\\/span> — Not established`));
+      }
+      const afterSummary = (await request(agent, '/test/session')).body;
+      assert.strictEqual(afterSummary, workflowBeforeReflection, 'Reflection-to-summary navigation must preserve the exact serialized workflow');
+      assert.strictEqual(workflowHash(afterSummary), workflowHashBeforeReflection, 'Reflection-to-summary navigation must preserve the workflow hash');
+    }
+    assert.deepStrictEqual(databaseSnapshot(db), databaseBeforeReflection, 'read-only Reflection and Summary navigation must not write database state');
+
     await request(agent, '/test/state/oversized');
     const oversized = await request(agent, '/discovery/summary');
     assert.strictEqual(oversized.res.statusCode, 200);
@@ -324,6 +374,16 @@ async function run() {
     assert.doesNotMatch(nul.body, /safe-looking/);
 
     await request(agent, '/test/state/stale');
+    const staleWorkflowBefore = (await request(agent, '/test/session')).body;
+    const staleWorkflowHashBefore = workflowHash(staleWorkflowBefore);
+    const staleReflection = await request(agent, '/discovery/reflection');
+    assert.strictEqual(staleReflection.res.statusCode, 200);
+    assert.match(staleReflection.body, /We know enough to build a useful strategy\./,
+      'Reflection should render from the current policy projection');
+    const staleWorkflowAfter = (await request(agent, '/test/session')).body;
+    assert.strictEqual(staleWorkflowAfter, staleWorkflowBefore,
+      'rendering a stale workflow must not rewrite its stored policy or readiness fields');
+    assert.strictEqual(workflowHash(staleWorkflowAfter), staleWorkflowHashBefore);
     const stale = await request(agent, '/discovery/summary');
     assert.strictEqual(stale.res.statusCode, 200);
     assert.match(stale.body, /historical snapshot/i);
