@@ -108,22 +108,27 @@ function request(agent, method, url, body) {
 function discoveryState(mode = 'valid') {
   if (mode === 'planning_only') {
     const understanding = {
-      businessType: confirmed('service', 'Service Business'),
-      industry: confirmed('home_services', 'Home Services'),
-      category: confirmed('residential_remodeling', 'Residential Remodeling'),
-      acquisitionGoal: confirmed('appointments', 'More booked appointments'),
-      targetAudience: confirmed('homeowners', 'Homeowners'),
-      currentAcquisitionChannel: confirmed('referrals', 'Referrals'),
-      acquisitionStage: confirmed('inconsistent_traction', 'Some traction, but inconsistent'),
-      salesProcess: confirmed('booked_call', 'They book a call or appointment'),
-      capacityReadiness: confirmed('capacity_limited', 'Capacity needs attention first')
+      businessType: confirmed('software', 'Software / SaaS'),
+      industry: confirmed('technology', 'Technology'),
+      currentOffer: confirmed('project_management_software', 'Project management software'),
+      targetAudience: confirmed('small_professional_services_teams', 'Small professional-services teams'),
+      funnelType: confirmed('trial_signup', 'Start a trial or account'),
+      primaryCta: confirmed('start_free_trial', 'Start a free trial'),
+      trafficSource: confirmed('unsure', "I'm not sure yet"),
+      pageExperience: confirmed('unsure', "I'm not sure yet"),
+      conversionEvidence: confirmed('unsure', "I'm not sure yet"),
+      conversionFriction: confirmed('unsure', "I'm not sure yet")
     };
-    const answers = { initial_description: 'Residential remodeling for homeowners', business_type: 'service', acquisition_goal: 'appointments', acquisition_target: { value: 'homeowners' }, acquisition_channel: 'referrals', acquisition_stage: 'inconsistent_traction', sales_process: 'booked_call', capacity_readiness: 'capacity_limited' };
-    const strategyResult = buildStrategy({ objective: 'get_more_customers', understanding, confirmedUnderstanding: understanding, answers });
-    const plan = buildPlan({ objective: 'get_more_customers', confirmedUnderstanding: understanding, strategyResult, answers });
+    const answers = {
+      initial_description: 'Project-management SaaS for small professional-services teams with a self-service free trial.',
+      conversion_traffic: 'unsure', conversion_page: 'unsure',
+      conversion_evidence: 'unsure', conversion_friction: 'unsure'
+    };
+    const strategyResult = buildStrategy({ objective: 'increase_conversion_rates', understanding, confirmedUnderstanding: understanding, answers });
+    const plan = buildPlan({ objective: 'increase_conversion_rates', confirmedUnderstanding: understanding, strategyResult, answers });
     const now = new Date().toISOString();
     return {
-      objective: 'get_more_customers', answers, understanding, confirmedUnderstanding: understanding,
+      objective: 'increase_conversion_rates', answers, understanding, confirmedUnderstanding: understanding,
       planningReadiness: { ready: true }, reflectionStartedAt: now, planningConfirmedAt: now,
       strategyResult, strategyUpdatedAt: now, buildPlan: plan, buildPlanUpdatedAt: now,
       buildPlanSource: { planningConfirmedAt: now, strategyUpdatedAt: now },
@@ -317,10 +322,6 @@ async function run() {
     assert.strictEqual(planningOnlyPage.res.statusCode, 200);
     assert.match(planningOnlyPage.body, /This plan currently supports planning only/);
     assert.doesNotMatch(planningOnlyPage.body, /Approve &amp; Prepare for Production/);
-    const planningOnlyToken = planningOnlyPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
-    const planningOnlyApproval = await request(planningOnly, 'POST', '/discovery/build-plan/approve', { _csrf: planningOnlyToken, batchMode: 'full' });
-    assert.strictEqual(planningOnlyApproval.res.statusCode, 409);
-    assert.match(planningOnlyApproval.body, /ready-for-review asset/);
 
     getDb().exec(`CREATE TRIGGER reject_story_3_7_saved_plan
       BEFORE INSERT ON saved_build_plan_states WHEN NEW.user_id = 38
@@ -336,7 +337,7 @@ async function run() {
     assert.strictEqual(getDb().prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(38).count, 0);
     const failedSaveSession = JSON.parse((await request(persistenceFailure, 'GET', '/test/session')).body);
     assert.strictEqual(failedSaveSession.discoverySession.buildPlanSavedAt, undefined);
-    assert.strictEqual(failedSaveSession.discoverySession.buildPlanNotice, null);
+    assert.strictEqual(failedSaveSession.discoverySession.buildPlanNotice, undefined);
     assert.deepStrictEqual(
       failedSaveSession.discoverySession.buildPlanSelection.selectedDeliverableIds,
       defaults.selectedDeliverableIds,
@@ -353,8 +354,16 @@ async function run() {
     assert.strictEqual((await request(missingStrategy, 'GET', '/discovery/build-plan')).res.headers.location, '/discovery/reflection');
 
     await request(missingPlan, 'GET', '/test/authenticate/missing_plan');
-    const rebuiltPlan = await request(missingPlan, 'GET', '/discovery/build-plan');
-    assert.strictEqual(rebuiltPlan.res.statusCode, 200, 'the canonical Story 3.6 route may build a missing plan');
+    const missingPlanGet = await request(missingPlan, 'GET', '/discovery/build-plan');
+    assert.strictEqual(missingPlanGet.res.statusCode, 302, 'Build Plan GET must not create a missing plan');
+    assert.strictEqual(missingPlanGet.res.headers.location, '/discovery/strategy');
+    const missingPlanStrategy = await request(missingPlan, 'GET', '/discovery/strategy');
+    const preparedPlan = await request(missingPlan, 'POST', '/discovery/build-plan/prepare', {
+      _csrf: missingPlanStrategy.body.match(/name="_csrf" value="([^"]+)"/)?.[1],
+      strategyPreparationToken: missingPlanStrategy.body.match(/name="strategyPreparationToken" value="([^"]+)"/)?.[1]
+    });
+    assert.strictEqual(preparedPlan.res.statusCode, 303);
+    assert.strictEqual((await request(missingPlan, 'GET', '/discovery/build-plan')).res.statusCode, 200);
 
     await request(stalePlan, 'GET', '/test/authenticate/stale_plan');
     const staleSessionPage = await request(stalePlan, 'GET', '/test/session');

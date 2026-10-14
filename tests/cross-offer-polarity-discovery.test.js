@@ -178,6 +178,12 @@ function token(body) {
   return value;
 }
 
+function hiddenValue(body, name) {
+  const value = body.match(new RegExp(`name="${name}" value="([^"]+)"`))?.[1];
+  assert(value, `rendered form must include ${name}`);
+  return value;
+}
+
 function persistenceSideEffects(db, userId) {
   return {
     savedPlans: db.prepare('SELECT COUNT(*) AS count FROM saved_build_plan_states WHERE user_id = ?').get(userId).count,
@@ -574,6 +580,12 @@ async function renderedAcceptance() {
     assert.match(strategy.body, /trial/i);
     assert.doesNotMatch(strategy.body, CONTAMINATED_DISPLAY);
 
+    const prepared = await request(agent, 'POST', '/discovery/build-plan/prepare', {
+      _csrf: token(strategy.body),
+      strategyPreparationToken: hiddenValue(strategy.body, 'strategyPreparationToken')
+    });
+    assert.strictEqual(prepared.res.statusCode, 303);
+    assert.strictEqual(prepared.res.headers.location, '/discovery/build-plan');
     const buildPlan = await request(agent, 'GET', '/discovery/build-plan');
     assert.strictEqual(buildPlan.res.statusCode, 200);
     assert.match(buildPlan.body, /trial/i);

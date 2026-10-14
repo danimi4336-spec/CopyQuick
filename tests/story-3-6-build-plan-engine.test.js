@@ -75,10 +75,15 @@ function listen(app) {
   });
 }
 
-function request(agent, method, url) {
+function request(agent, method, url, form = null) {
   return new Promise((resolve, reject) => {
     const headers = {};
     if (agent.cookie) headers.Cookie = agent.cookie;
+    const body = form ? new URLSearchParams(form).toString() : '';
+    if (body) {
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      headers['Content-Length'] = Buffer.byteLength(body);
+    }
     const req = http.request({
       hostname: '127.0.0.1',
       port: agent.server.address().port,
@@ -94,8 +99,13 @@ function request(agent, method, url) {
       res.on('end', () => resolve({ res, body }));
     });
     req.on('error', reject);
-    req.end();
+    req.end(body);
   });
+}
+
+function hiddenValue(html, name) {
+  const match = html.match(new RegExp(`name="${name}" value="([^"]+)"`));
+  return match ? match[1] : null;
 }
 
 function sessionState(mode) {
@@ -375,7 +385,18 @@ async function run() {
     await request(valid, 'GET', '/test/authenticate/valid');
     const strategyPage = await request(valid, 'GET', '/discovery/strategy');
     assert.strictEqual(strategyPage.res.statusCode, 200);
-    assert.match(strategyPage.body, /href="\/discovery\/build-plan"/);
+    assert.match(strategyPage.body, /form action="\/discovery\/build-plan\/prepare" method="POST"/);
+
+    const missingPlan = await request(valid, 'GET', '/discovery/build-plan');
+    assert.strictEqual(missingPlan.res.statusCode, 302);
+    assert.strictEqual(missingPlan.res.headers.location, '/discovery/strategy');
+
+    const prepared = await request(valid, 'POST', '/discovery/build-plan/prepare', {
+      _csrf: hiddenValue(strategyPage.body, '_csrf'),
+      strategyPreparationToken: hiddenValue(strategyPage.body, 'strategyPreparationToken')
+    });
+    assert.strictEqual(prepared.res.statusCode, 303);
+    assert.strictEqual(prepared.res.headers.location, '/discovery/build-plan');
 
     const page = await request(valid, 'GET', '/discovery/build-plan');
     assert.strictEqual(page.res.statusCode, 200);

@@ -52,6 +52,17 @@ async function sessionState(agent) {
   return JSON.parse((await request(agent, 'GET', '/test/session')).body);
 }
 
+async function prepareBuildPlan(agent) {
+  const strategy = await request(agent, 'GET', '/discovery/strategy');
+  const csrfToken = strategy.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+  const preparationToken = strategy.body.match(/name="strategyPreparationToken" value="([^"]+)"/)?.[1];
+  assert(csrfToken && preparationToken, 'Strategy must provide the protected Build Plan action');
+  return request(agent, 'POST', '/discovery/build-plan/prepare', {
+    _csrf: csrfToken,
+    strategyPreparationToken: preparationToken
+  });
+}
+
 async function answerCurrent(agent, choice, otherAnswer) {
   const page = await request(agent, 'GET', '/discovery');
   const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
@@ -478,7 +489,7 @@ async function run() {
     const planned = await request(ready, 'POST', '/discovery/reflection/plan', { _csrf: readyToken });
     assert.strictEqual(planned.res.statusCode, 303);
     assert.strictEqual(planned.res.headers.location, '/discovery/strategy');
-    assert.strictEqual((await request(ready, 'GET', '/discovery/strategy')).res.statusCode, 200);
+    assert.strictEqual((await prepareBuildPlan(ready)).res.statusCode, 303);
     const buildPlanPage = await request(ready, 'GET', '/discovery/build-plan');
     assert.strictEqual(buildPlanPage.res.statusCode, 200);
     const approvalToken = buildPlanPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
@@ -518,6 +529,7 @@ async function run() {
     assert.doesNotMatch(existingReflection.body, /name="field" value="existingProductDefinition"/);
     const existingToken = existingReflection.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
     await request(existingProduct, 'POST', '/discovery/reflection/plan', { _csrf: existingToken });
+    await prepareBuildPlan(existingProduct);
     await request(existingProduct, 'GET', '/discovery/build-plan');
     state = await sessionState(existingProduct);
     assert(state.strategyResult.assumptions.some(item => /builder-provided context/.test(item)));

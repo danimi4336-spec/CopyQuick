@@ -71,7 +71,11 @@
         <div class="strategy-actions">
             <a href="/discovery/reflection" class="btn btn-outline">← Back</a>
             <% if (canBuildPlan) { %>
-                <a href="/discovery/build-plan" class="btn btn-primary">Continue to Build Plan</a>
+                <form action="/discovery/build-plan/prepare" method="POST">
+                    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                    <input type="hidden" name="strategyPreparationToken" value="<%= strategyPreparationToken %>">
+                    <button type="submit" class="btn btn-primary">Continue to Build Plan</button>
+                </form>
             <% } else { %>
                 <button type="button" class="btn btn-primary" disabled aria-disabled="true">Continue to Build Plan</button>
             <% } %>
