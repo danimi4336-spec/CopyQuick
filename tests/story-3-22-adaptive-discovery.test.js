@@ -416,10 +416,11 @@ async function run() {
     assert(!JSON.stringify(state.strategyResult).includes('clinically proven'));
 
     await request(explorer, 'GET', '/test/stale-strategy');
+    const staleStrategyState = await sessionState(explorer);
     assert.strictEqual((await request(explorer, 'GET', '/discovery/strategy')).res.headers.location, '/discovery/reflection');
     state = await sessionState(explorer);
-    assert.strictEqual(state.strategyResult, null);
-    assert.strictEqual(state.buildPlan, null);
+    assert.deepStrictEqual(state, staleStrategyState,
+      'Strategy GET must reject stale derived state without rewriting the stored workflow');
 
     const uncertainExplorer = { server, cookie: '' };
     await begin(uncertainExplorer, 'An herbal dietary supplement for adults that I plan to sell on Amazon.');

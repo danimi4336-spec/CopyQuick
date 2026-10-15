@@ -424,6 +424,7 @@ async function run() {
     await authenticate(policyAgent, 'valid');
     const policyForm = await strategyForm(policyAgent);
     await request(policyAgent, 'GET', '/test/invalidate-strategy-policy');
+    const invalidatedPolicyHash = workflowHash(await storedWorkflow(policyAgent));
     const policySubmit = await request(policyAgent, 'POST', '/discovery/build-plan/prepare', {
       _csrf: policyForm.csrf,
       strategyPreparationToken: policyForm.preparationToken
@@ -431,10 +432,8 @@ async function run() {
     assert.strictEqual(policySubmit.res.statusCode, 302);
     assert.strictEqual(policySubmit.res.headers.location, '/discovery/reflection');
     const invalidatedPolicyState = await storedWorkflow(policyAgent);
-    for (const key of [
-      'strategyResult', 'strategyUpdatedAt', 'buildPlan', 'buildPlanUpdatedAt',
-      'buildPlanSource', 'buildPlanFingerprint', 'buildPlanSelection'
-    ]) assert.strictEqual(invalidatedPolicyState[key], null, `${key} must clear as one policy transition`);
+    assert.strictEqual(workflowHash(invalidatedPolicyState), invalidatedPolicyHash,
+      'a stale preparation request must fail closed without accepting projected policy changes');
 
     const prepareAgent = { server, cookie: '' };
     await authenticate(prepareAgent, 'missing');
@@ -528,8 +527,9 @@ async function run() {
     const fallbackAgent = { server, cookie: '' };
     await authenticate(fallbackAgent, 'missing_strategy');
     const fallbackPage = await request(fallbackAgent, 'GET', '/discovery/strategy');
-    assert.strictEqual(fallbackPage.res.statusCode, 200);
-    assert.doesNotMatch(fallbackPage.body, /action="\/discovery\/build-plan\/prepare"/);
+    assert.strictEqual(fallbackPage.res.statusCode, 302);
+    assert.strictEqual(fallbackPage.res.headers.location, '/discovery/reflection');
+    assert.doesNotMatch(fallbackPage.body, /Recommended Business Strategy/);
     const fallbackSession = JSON.parse((await request(fallbackAgent, 'GET', '/test/session')).body);
     const fallbackPost = await request(fallbackAgent, 'POST', '/discovery/build-plan/prepare', {
       _csrf: fallbackSession.testCsrfToken,

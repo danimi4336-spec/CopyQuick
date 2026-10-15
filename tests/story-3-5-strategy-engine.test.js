@@ -10,7 +10,7 @@ const { getDb } = require('../db/database');
 const { createCsrfProtection } = require('../lib/csrf');
 const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
-const { buildStrategy } = require('../lib/strategyEngine');
+const { buildStrategy, isRenderableStrategyResult } = require('../lib/strategyEngine');
 const discoveryRoutes = require('../routes/discovery');
 
 function confirmed(value, label = value) {
@@ -83,6 +83,7 @@ function request(agent, method, url, body) {
 }
 
 async function readySession(confirmedReflection) {
+  const now = new Date().toISOString();
   const understanding = completeUnderstanding();
   const answers = {
     initial_description: 'Organic turmeric supplement',
@@ -105,11 +106,13 @@ async function readySession(confirmedReflection) {
     unknowns: ['brand', 'budget', 'timeline'],
     completedQuestions: Object.keys(answers),
     planningReadiness: intelligence.planningReadiness,
-    reflectionStartedAt: new Date().toISOString(),
-    planningConfirmedAt: confirmedReflection ? new Date().toISOString() : null,
+    reflectionStartedAt: now,
+    planningConfirmedAt: confirmedReflection ? now : null,
+    confirmedUnderstanding: confirmedReflection ? JSON.parse(JSON.stringify(understanding)) : null,
     strategyResult: confirmedReflection ? build() : null,
-    startedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    strategyUpdatedAt: confirmedReflection ? now : null,
+    startedAt: now,
+    updatedAt: now
   };
 }
 
@@ -134,6 +137,17 @@ async function run() {
   assert(amazon.assumptions.some((item) => item.includes('Amazon')));
   assert(amazon.recommendations.length > 0);
   assert(amazon.recommendations.every((item) => item.recommendation && item.reason));
+  assert.strictEqual(isRenderableStrategyResult(amazon), true);
+
+  const unknownRenderedSection = JSON.parse(JSON.stringify(amazon));
+  unknownRenderedSection.strategy.unexpected = unknownRenderedSection.strategy.marketPosition;
+  assert.strictEqual(isRenderableStrategyResult(unknownRenderedSection), false);
+  const oversizedRenderedSection = JSON.parse(JSON.stringify(amazon));
+  oversizedRenderedSection.strategy.marketPosition.value = 'x'.repeat(4001);
+  assert.strictEqual(isRenderableStrategyResult(oversizedRenderedSection), false);
+  const excessiveRenderedList = JSON.parse(JSON.stringify(amazon));
+  excessiveRenderedList.assumptions = Array(21).fill('Bounded assumption');
+  assert.strictEqual(isRenderableStrategyResult(excessiveRenderedList), false);
 
   const acceptanceUnderstanding = completeUnderstanding({
     intendedOutcome: confirmed('digestive_wellness', 'Digestive health'),

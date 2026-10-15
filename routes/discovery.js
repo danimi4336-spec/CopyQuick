@@ -5,7 +5,7 @@ const { understandBusiness } = require('../lib/businessUnderstanding');
 const { analyzeDiscovery } = require('../lib/discoveryIntelligence');
 const { DISCOVERY_POLICY_VERSION, isMeaningfullyReady } = require('../lib/discoveryRequirements');
 const { applyReflectionEdit, buildBusinessReflection } = require('../lib/businessReflection');
-const { STRATEGY_POLICY_VERSION, buildStrategy } = require('../lib/strategyEngine');
+const { STRATEGY_POLICY_VERSION, isRenderableStrategyResult } = require('../lib/strategyEngine');
 const { buildStrategyWithAI } = require('../lib/aiStrategySynthesis');
 const { buildPlan } = require('../lib/buildPlanEngine');
 const { getDb } = require('../db/database');
@@ -244,10 +244,14 @@ function projectDiscoveryPolicy(discoverySession) {
 }
 
 function hasCurrentStrategyState(discoverySession) {
-  if (!discoverySession?.planningConfirmedAt
+  if (!getAvailableObjective(discoverySession?.objective)
+    || !discoverySession?.planningConfirmedAt
     || !discoverySession?.confirmedUnderstanding
+    || JSON.stringify(canonicalValue(discoverySession.understanding))
+      !== JSON.stringify(canonicalValue(discoverySession.confirmedUnderstanding))
     || !discoverySession?.strategyResult
-    || !discoverySession?.strategyUpdatedAt) return false;
+    || !discoverySession?.strategyUpdatedAt
+    || !isRenderableStrategyResult(discoverySession.strategyResult)) return false;
 
   const confirmedAt = Date.parse(discoverySession.planningConfirmedAt);
   const strategyAt = Date.parse(discoverySession.strategyUpdatedAt);
@@ -771,8 +775,7 @@ router.post('/discovery/reflection/edit', requireAuth, async (req, res) => {
 });
 
 router.post('/discovery/reflection/plan', requireAuth, async (req, res) => {
-  const discoverySession = req.session.discoverySession;
-  refreshDiscoveryPolicy(discoverySession);
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
   if (!canViewReflection(discoverySession)) {
     return res.redirect('/discovery');
   }
@@ -783,40 +786,70 @@ router.post('/discovery/reflection/plan', requireAuth, async (req, res) => {
     });
   }
 
-  discoverySession.confirmedUnderstanding = { ...discoverySession.understanding };
-  discoverySession.strategyResult = await buildStrategyWithAI({
-    objective: discoverySession.objective,
-    understanding: discoverySession.understanding,
-    answers: discoverySession.answers,
-    confirmedUnderstanding: discoverySession.confirmedUnderstanding
-  });
-  discoverySession.planningConfirmedAt = new Date().toISOString();
-  discoverySession.strategyUpdatedAt = discoverySession.planningConfirmedAt;
-  discoverySession.updatedAt = discoverySession.planningConfirmedAt;
+  const confirmedUnderstanding = JSON.parse(JSON.stringify(discoverySession.understanding));
+  if (hasCurrentStrategyState(discoverySession)
+    && JSON.stringify(canonicalValue(discoverySession.confirmedUnderstanding))
+      === JSON.stringify(canonicalValue(confirmedUnderstanding))) {
+    return res.redirect(303, '/discovery/strategy');
+  }
+
+  let strategyResult;
+  try {
+    strategyResult = await buildStrategyWithAI({
+      objective: discoverySession.objective,
+      understanding: discoverySession.understanding,
+      answers: discoverySession.answers,
+      confirmedUnderstanding
+    });
+  } catch (_) {
+    return renderReflection(req, res, {
+      status: 409,
+      error: 'The Strategy could not be prepared safely. Review the current understanding and try again.'
+    });
+  }
+  if (!isRenderableStrategyResult(strategyResult)) {
+    return renderReflection(req, res, {
+      status: 409,
+      error: 'The Strategy could not be prepared safely. Review the current understanding and try again.'
+    });
+  }
+
+  const preparedAt = new Date().toISOString();
+  req.session.discoverySession = {
+    ...discoverySession,
+    confirmedUnderstanding,
+    strategyResult,
+    planningConfirmedAt: preparedAt,
+    strategyUpdatedAt: preparedAt,
+    updatedAt: preparedAt,
+    buildPlan: null,
+    buildPlanUpdatedAt: null,
+    buildPlanSource: null,
+    buildPlanFingerprint: null,
+    buildPlanSelection: null,
+    buildPlanSavedAt: null,
+    buildPlanNotice: null,
+    approvedProductionSet: null
+  };
   return res.redirect(303, '/discovery/strategy');
 });
 
 router.get('/discovery/strategy', requireAuth, (req, res) => {
-  const discoverySession = req.session.discoverySession;
-  refreshDiscoveryPolicy(discoverySession);
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
   if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !discoverySession?.planningConfirmedAt) {
     return res.redirect('/discovery/reflection');
   }
-
-  const strategyResult = discoverySession.strategyResult || buildStrategy({
-    objective: discoverySession.objective,
-    understanding: discoverySession.understanding,
-    answers: discoverySession.answers,
-    confirmedUnderstanding: discoverySession.confirmedUnderstanding
+  if (!hasCurrentStrategyState(discoverySession)) {
+    return res.redirect('/discovery/reflection');
+  }
+  return renderStrategy(req, res, {
+    discoverySession,
+    error: discoverySession.productionNotice || null
   });
-  const productionNotice = discoverySession.productionNotice || null;
-  discoverySession.productionNotice = null;
-  return renderStrategy(req, res, { strategyResult, error: productionNotice });
 });
 
 router.post('/discovery/build-plan/prepare', requireAuth, (req, res) => {
-  const discoverySession = req.session.discoverySession;
-  refreshDiscoveryPolicy(discoverySession);
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
   if (!getAvailableObjective(discoverySession?.objective)
     || !isMeaningfullyReady(discoverySession?.planningReadiness)
     || !discoverySession?.planningConfirmedAt
@@ -867,13 +900,14 @@ router.post('/discovery/build-plan/prepare', requireAuth, (req, res) => {
     && discoverySession.buildPlanFingerprint === fingerprint
     && JSON.stringify(discoverySession.buildPlan) === JSON.stringify(plan);
 
+  let candidateState = req.session.discoverySession;
   if (!sameSource || !samePlan) {
     const now = new Date().toISOString();
     const preserveSelection = samePlan && discoverySession.buildPlanSelection;
     const selection = preserveSelection
       ? discoverySession.buildPlanSelection
       : createDefaultSelection(plan);
-    const candidateState = {
+    candidateState = {
       ...discoverySession,
       buildPlan: plan,
       buildPlanUpdatedAt: now,
@@ -888,13 +922,8 @@ router.post('/discovery/build-plan/prepare', requireAuth, (req, res) => {
         error: 'This Build Plan could not be prepared safely. Review the current Strategy and try again.'
       });
     }
-    discoverySession.buildPlan = plan;
-    discoverySession.buildPlanUpdatedAt = now;
-    discoverySession.buildPlanSource = source;
-    discoverySession.buildPlanFingerprint = fingerprint;
-    discoverySession.buildPlanSelection = selection;
-    discoverySession.approvedProductionSet = null;
   }
+  req.session.discoverySession = candidateState;
   return res.redirect(303, '/discovery/build-plan');
 });
 
