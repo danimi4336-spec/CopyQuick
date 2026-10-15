@@ -377,6 +377,7 @@ async function renderedAcceptance() {
   try {
     await request(agent, 'GET', '/test/authenticate');
     await request(agent, 'GET', '/test/summary-fixture/four-open');
+    const fourOpenBefore = JSON.parse((await request(agent, 'GET', '/test/session')).body);
     const fourOpen = await request(agent, 'GET', '/discovery');
     assert.strictEqual(fourOpen.res.statusCode, 200);
     const fourEstablished = fourOpen.body.match(/<ul class="discovery-understanding-list"[\s\S]*?<\/ul>/)?.[0] || '';
@@ -415,17 +416,9 @@ async function renderedAcceptance() {
         ['conversionFriction', 'unsure']
       ]
     );
-    assert.deepStrictEqual(
-      Object.fromEntries(fourOpenState.planningReadiness.requirements
-        .filter(function(requirement) { return ['traffic', 'page', 'evidence', 'friction'].includes(requirement.id); })
-        .map(function(requirement) { return [requirement.id, { domain: requirement.domain, openInputLabel: requirement.openInputLabel }]; })),
-      {
-        traffic: { domain: 'Traffic Source', openInputLabel: 'Traffic source' },
-        page: { domain: 'Current Page Experience', openInputLabel: 'Page experience' },
-        evidence: { domain: 'Conversion Evidence', openInputLabel: 'Conversion evidence' },
-        friction: { domain: 'Friction & Objections', openInputLabel: 'Customer friction' }
-      }
-    );
+    assert.deepStrictEqual(fourOpenState, fourOpenBefore,
+      'Discovery GET must project current requirement labels without persisting policy fields');
+    assert.strictEqual(fourOpenState.planningReadiness, undefined);
 
     await request(agent, 'GET', '/test/summary-fixture/many-open');
     const manyOpen = await request(agent, 'GET', '/discovery');

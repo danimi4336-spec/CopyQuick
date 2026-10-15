@@ -11,6 +11,7 @@ const { buildPlan } = require('../lib/buildPlanEngine');
 const { getDb } = require('../db/database');
 const { getCurrentUsageSnapshotReadOnly } = require('../lib/subscriptions');
 const { buildProductionBatchStatus } = require('../lib/productionBatchPlanning');
+const { validateApprovedProductionSession } = require('../lib/productionInitialization');
 const { getSavedPlanReadOnly, saveBuildPlan, validateWorkflowState } = require('../lib/savedBuildPlans');
 const { getAvailableObjective } = require('../lib/businessJourneys');
 const { parsePositiveIntegerId } = require('../lib/httpIdentifiers');
@@ -80,9 +81,9 @@ function activeObjective(req) {
   return getAvailableObjective(goal)?.id || 'launch_product';
 }
 
-function getInitialAnswer(req) {
-  return req.session.discoverySession?.answers?.initial_description
-    || req.session.discoverySession?.whatBuilding
+function getInitialAnswer(discoverySession) {
+  return discoverySession?.answers?.initial_description
+    || discoverySession?.whatBuilding
     || '';
 }
 
@@ -100,9 +101,11 @@ function appendDiscoveryStepHistory(discoverySession) {
 }
 
 function renderDiscovery(req, res, options = {}) {
-  const discoverySession = req.session.discoverySession || null;
+  const discoverySession = Object.prototype.hasOwnProperty.call(options, 'discoverySession')
+    ? options.discoverySession
+    : req.session.discoverySession || null;
   const understandingPresentation = buildUnderstandingPresentation(discoverySession);
-  const objective = activeObjective(req);
+  const objective = getAvailableObjective(discoverySession?.objective)?.id || activeObjective(req);
   const acquisition = objective === 'get_more_customers';
   const conversion = objective === 'increase_conversion_rates';
   const search = objective === 'improve_search_rankings';
@@ -112,7 +115,7 @@ function renderDiscovery(req, res, options = {}) {
   res.status(options.status || 200).render('discovery', {
     title: "Let's Build Something Amazing - CopyQuick",
     currentPage: 'discovery',
-    answer: options.answer ?? getInitialAnswer(req),
+    answer: options.answer ?? getInitialAnswer(discoverySession),
     selectedChoice: options.selectedChoice || '',
     selectedChoices: options.selectedChoices || [],
     otherAnswer: options.otherAnswer || '',
@@ -131,7 +134,10 @@ function renderDiscovery(req, res, options = {}) {
 }
 
 function validationError(req, res, error, options = {}) {
-  return renderDiscovery(req, res, { status: 400, error, ...options });
+  const discoverySession = Object.prototype.hasOwnProperty.call(options, 'discoverySession')
+    ? options.discoverySession
+    : projectDiscoveryPolicy(req.session.discoverySession);
+  return renderDiscovery(req, res, { status: 400, error, ...options, discoverySession });
 }
 
 function applyIntelligenceResult(discoverySession, intelligenceResult) {
@@ -306,10 +312,14 @@ function hasCanonicalBuildPlanSource(discoverySession) {
 }
 
 function hasValidStoredBuildPlan(discoverySession) {
-  return hasCanonicalBuildPlanSource(discoverySession)
-    && typeof discoverySession?.buildPlanUpdatedAt === 'string'
-    && typeof discoverySession?.buildPlanFingerprint === 'string'
-    && validateWorkflowState(discoverySession, discoverySession.buildPlanFingerprint);
+  try {
+    return hasCanonicalBuildPlanSource(discoverySession)
+      && typeof discoverySession?.buildPlanUpdatedAt === 'string'
+      && typeof discoverySession?.buildPlanFingerprint === 'string'
+      && validateWorkflowState(discoverySession, discoverySession.buildPlanFingerprint);
+  } catch (_) {
+    return false;
+  }
 }
 
 function renderBuildPlan(req, res, options = {}) {
@@ -425,11 +435,11 @@ router.get('/discovery/summary/production/:runId', requireAuth, (req, res) => {
 });
 
 router.get('/discovery', requireAuth, (req, res) => {
-  refreshDiscoveryPolicy(req.session.discoverySession);
-  if (canViewReflection(req.session.discoverySession)) {
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
+  if (canViewReflection(discoverySession)) {
     return res.redirect('/discovery/reflection');
   }
-  renderDiscovery(req, res);
+  renderDiscovery(req, res, { discoverySession });
 });
 
 router.post('/discovery', requireAuth, async (req, res) => {
@@ -471,7 +481,8 @@ router.post('/discovery', requireAuth, async (req, res) => {
   }
 
   const discoverySession = req.session.discoverySession;
-  const currentQuestion = discoverySession?.nextQuestion;
+  const projectedDiscoverySession = projectDiscoveryPolicy(discoverySession);
+  const currentQuestion = projectedDiscoverySession?.nextQuestion;
   if (!currentQuestion || currentQuestion.id !== questionId) {
     return validationError(req, res, 'That discovery question is no longer active. Please answer the question shown below.');
   }
@@ -532,6 +543,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       answer: discoverySession.answers.initial_description,
       existingUnderstanding: confirmedUnderstanding
     });
+    refreshDiscoveryPolicy(discoverySession);
     applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
     const intelligenceResult = analyzeDiscovery({
       objective: discoverySession.objective,
@@ -586,6 +598,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
       answer: discoverySession.answers.initial_description,
       existingUnderstanding: confirmedUnderstanding
     });
+    refreshDiscoveryPolicy(discoverySession);
     applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
     const intelligenceResult = analyzeDiscovery({
       objective: discoverySession.objective,
@@ -650,6 +663,7 @@ router.post('/discovery', requireAuth, async (req, res) => {
     answer: discoverySession.answers.initial_description,
     existingUnderstanding: confirmedUnderstanding
   });
+  refreshDiscoveryPolicy(discoverySession);
   applyDurableMemory(req, discoverySession.objective, discoverySession.answers.initial_description, understandingResult, discoverySession);
   const intelligenceResult = analyzeDiscovery({
     objective: discoverySession.objective,
@@ -1023,17 +1037,16 @@ router.post('/discovery/reflection/memory/:recordId', requireAuth, (req, res) =>
 });
 
 router.get('/discovery/production-ready', requireAuth, (req, res) => {
-  const discoverySession = req.session.discoverySession;
-  refreshDiscoveryPolicy(discoverySession);
-  if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
+  const discoverySession = projectDiscoveryPolicy(req.session.discoverySession);
+  if (!isMeaningfullyReady(discoverySession?.planningReadiness)
+    || !hasValidStoredBuildPlan(discoverySession)
+    || !hasCurrentBuildPlanState(discoverySession)) {
     return res.redirect('/discovery/build-plan');
   }
-  if (!discoverySession.approvedProductionSet
-    || discoverySession.approvedProductionSet.planFingerprint !== discoverySession.buildPlanFingerprint) {
-    return res.redirect('/discovery/build-plan');
-  }
+  const approval = validateApprovedProductionSession(discoverySession);
+  if (!approval.valid) return res.redirect(approval.redirect || '/discovery/build-plan');
 
-  const productionSet = discoverySession.approvedProductionSet;
+  const productionSet = approval.approvedProductionSet;
   const db = getDb();
   const userId = req.session?.userId || req.session?.passport?.user;
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
