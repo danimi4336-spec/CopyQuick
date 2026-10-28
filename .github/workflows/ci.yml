@@ -32,6 +32,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Use Node.js 24.20.0
         uses: actions/setup-node@v4
@@ -49,7 +51,7 @@ jobs:
         run: find . -path ./node_modules -prune -o -type f -name '*.js' -print0 | xargs -0 -n1 node --check
 
       - name: Check whitespace
-        run: git show --check --format=
+        run: git diff --check HEAD^ HEAD
 
       - name: Run complete isolated suite
         run: npm test
