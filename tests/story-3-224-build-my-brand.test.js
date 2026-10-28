@@ -1,6 +1,7 @@
 const assert = require('assert');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
+const { understandBusiness, audienceFromDescription } = require('../lib/businessUnderstanding');
 const { buildBrandBrainProposal, applyApprovedBrandBrainProposal, loadBrandObjectiveProposal } = require('../lib/brandObjectiveIntegration');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +11,26 @@ function fact(value, label = value) { return { value, label, confidence: 1, sour
 (async function run() {
   const objective = 'build_brand';
   assert(getAvailableObjective(objective));
+  const opening = await understandBusiness({ objective, answer: 'Build a brand for a ceramics studio' });
+  assert.strictEqual(audienceFromDescription('Build a brand for a ceramics studio', objective), '',
+    'the business represented by a brand must not be reinterpreted as its audience');
+  assert(!opening.understanding.targetAudience,
+    'a brand subject without explicit audience language must leave the audience open');
+  assert.strictEqual(
+    audienceFromDescription('Build a brand for a ceramics studio serving design-conscious apartment renters', objective),
+    'design-conscious apartment renters',
+    'explicit audience language remains eligible for bounded inference'
+  );
+  const openingAnalysis = createObjectiveRuntime(objective).discovery.analyze({
+    understanding: { ...opening.understanding, brandBusiness: fact('A ceramics studio') },
+    answers: {
+      initial_description: 'Build a brand for a ceramics studio',
+      brand_business: { value: 'A ceramics studio' }
+    },
+    unknowns: opening.unknowns
+  });
+  assert.strictEqual(openingAnalysis.nextQuestion.id, 'brand_audience',
+    'Discovery must ask for the priority audience after the brand subject is established');
   const understanding = {
     brandBusiness: fact('A bookkeeping studio for independent retailers'), targetAudience: fact('Independent retailers with small teams'),
     existingBrand: fact('The name North Ledger and a navy visual identity are established'),
