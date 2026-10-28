@@ -250,11 +250,26 @@ promoteObjectiveMemory(serviceDb, {
   objective: 'promote_service',
   referenceId: 'service-plan',
   answers: { initial_description: 'Residential remodeling service in Virginia' },
-  understanding: { serviceDefinition: confirmed('Residential remodeling service'), targetAudience: confirmed('Virginia homeowners') }
+  understanding: {
+    serviceDefinition: confirmed('Residential remodeling service'),
+    targetAudience: confirmed('Virginia homeowners'),
+    serviceMarket: confirmed('Remote United States')
+  }
 });
 const productAfterService = resolveObjectiveSubjects(serviceDb, { userId: serviceUser, initialDescription: arcDescription });
 assert.strictEqual(productAfterService.selection, 'new');
 assert.strictEqual(productAfterService.offer, null, 'product identity excludes unrelated service memory');
+const ideaAfterService = memoryUnderstanding(serviceDb, {
+  userId: serviceUser,
+  objective: 'validate_idea',
+  initialDescription: 'Validate a shared inventory reminder idea'
+});
+assert.strictEqual(ideaAfterService.understanding.serviceMarket, undefined,
+  'a service-market field must not enter an idea-validation journey');
+assert.strictEqual(ideaAfterService.understanding.geographicMarket, undefined,
+  'business geography requires an explicit field mapping for the current objective');
+assert(!ideaAfterService.records.some(record => record.concept === 'geography'),
+  'incompatible geography records must remain outside the new objective context');
 serviceDb.close();
 
 const isolatedDb = new Database(':memory:');
