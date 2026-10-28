@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-10-27
 
-Complete repository suite: 253 test files
+Complete repository suite: 254 test files
 
 ## Current objective matrix
 
@@ -17,6 +17,8 @@ Complete repository suite: 253 test files
 | Validate My Idea | Complete | Passing | Representative bounded generation passed 2026-10-27 |
 
 Every available objective registers Discovery, Strategy, Build Plan, Production, generation, validation, presentation, persistence, and acceptance policies. The cross-objective matrix verifies isolation, safe exclusions, dependency ordering, contract validation, rendering, persistence, and deterministic provider boundaries.
+
+Story 3.264 adds a disposable owner-scoped lifecycle gate across the same seven sanitized scenarios. It verifies canonical saved-plan persistence and resume, cross-owner denial, planning-only zero-usage behavior, idempotent Production initialization, dependency-ordered deterministic execution, stored output validation, public presentation sections, exact usage units, and absence of generation-request or Business Memory side effects. It also corrected Get More Customers plans so scenarios without any available ready asset are truthfully planning-only and remain saveable.
 
 ## Shared regression coverage
 
@@ -38,11 +40,10 @@ Historical live-provider evidence is not treated as blanket acceptance for other
 
 ## Next validation phase
 
-1. Define one sanitized, representative scenario for each objective.
-2. Establish pre-run provider, usage, credit, and database baselines.
-3. Exercise the complete authenticated workflow with controlled test accounts.
-4. Verify content quality, dependency consistency, exports, retries, and recovery.
-5. Compare all post-run counters and record provider cost and credit effects.
-6. Preserve objective-specific regressions for every defect found.
+1. Establish release-environment provider, usage, credit, and database baselines.
+2. Exercise the browser-authenticated workflow with dedicated controlled accounts.
+3. Verify content quality, exports, retries, and recovery against the release candidate.
+4. Compare all post-run counters and record provider cost and credit effects.
+5. Preserve objective-specific regressions for every defect found.
 
 No live-provider execution should occur from automated CI or without explicit authorization.

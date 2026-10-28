@@ -8,7 +8,7 @@ Runtime: Node.js `24.20.0`
 
 Schema: v8
 
-Automated suite: 253 test files
+Automated suite: 254 test files
 
 ## Product state
 
@@ -54,18 +54,19 @@ The bounded 2026-10-27 live-provider work produced a passing representative gene
 
 ## Current release evidence
 
-- Complete isolated suite: 253/253 test files passing
+- Complete isolated suite: 254/254 test files passing
 - Production dependency audit: zero known vulnerabilities at the last review
 - Node version pinned consistently for local development, VS Code, CI, and Render
 - Schema compatibility and production operations covered by dedicated read-only commands and runbooks
 - Real provider execution disabled by default in development and CI
 - Bounded live objective evidence: all 7 objectives have a passing representative generation; one service-page safe rejection remains recorded
+- Disposable owner-scoped lifecycle acceptance: all 7 objectives pass Discovery projection, Strategy, Build Plan, save/resume, ownership, and exact side-effect checks; executable objectives additionally pass deterministic Production persistence and public-section validation
 
 ## Work remaining for broad launch
 
 ### Release validation
 
-- Run controlled end-to-end acceptance for every objective with dedicated test accounts.
+- Run controlled release-environment browser acceptance for every objective with dedicated test accounts; the disposable deterministic lifecycle gate is now automated.
 - Reconfirm live Stripe checkout, webhook, portal, and reconciliation flows without changing unrelated customer state.
 - Reconfirm transactional email delivery, retry behavior, and password recovery in the release environment.
 

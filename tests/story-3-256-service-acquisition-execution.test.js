@@ -183,7 +183,9 @@ function fixture(overrides = {}) {
 
   const capacityLimited = fixture({ capacityReadiness: confirmed('capacity_limited', 'Capacity needs attention first') });
   assert.deepStrictEqual(capacityLimited.plan.phases.flatMap(phase => phase.deliverables).filter(item => getProductionArtifactPolicy(item.id).readyToUse), []);
-  assert.strictEqual(validateSelection(capacityLimited.plan, createDefaultSelection(capacityLimited.plan)).valid, false);
+  assert.strictEqual(capacityLimited.plan.summary.requiresReadyAsset, false);
+  assert.strictEqual(validateSelection(capacityLimited.plan, createDefaultSelection(capacityLimited.plan)).valid, true,
+    'a planning-only acquisition plan must remain saveable without pretending a ready asset exists');
   const unresolvedAudience = fixture({ targetAudience: confirmed('unsure', "I'm not sure yet") });
   assert.deepStrictEqual(unresolvedAudience.plan.phases.flatMap(phase => phase.deliverables).filter(item => getProductionArtifactPolicy(item.id).readyToUse), []);
   const unresolvedService = fixture({ category: confirmed('unsure', "I'm not sure yet"), industry: confirmed('unsure', "I'm not sure yet") });
