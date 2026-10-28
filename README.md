@@ -4,7 +4,7 @@ CopyQuick is an evidence-aware marketing planning and production application. It
 
 ## Current status
 
-CopyQuick is suitable for controlled production use. The application, schema-v8 persistence layer, billing controls, recovery paths, backups, and operational health checks are implemented and covered by 252 isolated test files. Broad public-launch work remains, including complete live-provider acceptance across every objective, broader accessibility review, public SEO metadata, and product-language polish.
+CopyQuick is suitable for controlled production use. The application, schema-v8 persistence layer, billing controls, recovery paths, backups, and operational health checks are implemented and covered by 253 isolated test files. Broad public-launch work remains, including complete live-provider acceptance across every objective, broader accessibility review, public SEO metadata, and product-language polish.
 
 See [Project Status](docs/PROJECT_STATUS.md) for the current capability and readiness summary.
 

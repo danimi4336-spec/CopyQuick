@@ -2,19 +2,19 @@
 
 Last reviewed: 2026-10-27
 
-Complete repository suite: 252 test files
+Complete repository suite: 253 test files
 
 ## Current objective matrix
 
 | Objective | Registered journey | Deterministic acceptance | Controlled live-provider acceptance |
 | --- | --- | --- | --- |
-| Launch a New Product | Complete | Passing | Required before broad launch |
-| Get More Customers | Complete | Passing | Required before broad launch |
-| Increase Conversion Rates | Complete | Passing | Required before broad launch |
-| Improve Search Rankings | Complete | Passing | Extensive search/editorial acceptance recorded |
-| Build My Brand | Complete | Passing | Required before broad launch |
-| Promote My Service | Complete | Passing | Required before broad launch |
-| Validate My Idea | Complete | Passing | Required before broad launch |
+| Launch a New Product | Complete | Passing | Representative bounded generation passed 2026-10-27 |
+| Get More Customers | Complete | Passing | Representative bounded generation passed 2026-10-27 |
+| Increase Conversion Rates | Complete | Passing | Representative bounded generation passed 2026-10-27 |
+| Improve Search Rankings | Complete | Passing | Representative bounded generation passed 2026-10-27; extensive search/editorial acceptance also recorded |
+| Build My Brand | Complete | Passing | Representative bounded generation passed 2026-10-27 |
+| Promote My Service | Complete | Passing | Initial `service_page` safely rejected; identical diagnostic generation passed |
+| Validate My Idea | Complete | Passing | Representative bounded generation passed 2026-10-27 |
 
 Every available objective registers Discovery, Strategy, Build Plan, Production, generation, validation, presentation, persistence, and acceptance policies. The cross-objective matrix verifies isolation, safe exclusions, dependency ordering, contract validation, rendering, persistence, and deterministic provider boundaries.
 
@@ -34,7 +34,7 @@ Every available objective registers Discovery, Strategy, Build Plan, Production,
 
 Improve Search Rankings has the most extensive recorded live-provider validation. Previous acceptance covered cross-industry search composition, claim-level provenance, deterministic fallback, bounded AI revision, saved-result reconstruction, regeneration, credit accounting, and customer-readable exports. Those findings are protected by objective-specific and shared regression tests.
 
-Historical live-provider evidence is not treated as blanket acceptance for other objectives or as permanent evidence for a future release. Each release candidate must still pass the current deterministic suite and any explicitly authorized live acceptance gate.
+Historical live-provider evidence is not treated as blanket acceptance for other objectives or as permanent evidence for a future release. The 2026-10-27 bounded gate, its observed service-page rejection, and the passing diagnostic generation are recorded in [Live Objective Acceptance — 2026-10-27](LIVE_OBJECTIVE_ACCEPTANCE_2026-10-27.md). Each release candidate must still pass the current deterministic suite and any explicitly authorized live acceptance gate.
 
 ## Next validation phase
 

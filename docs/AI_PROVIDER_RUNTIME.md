@@ -44,6 +44,43 @@ the raw prompt, fixture context, dependency content, or provider response. The
 optional preview is intended only for non-production evaluation and remains
 behind the same explicit evaluation guard.
 
+## Seven-objective live acceptance
+
+The repository includes a separate operator-only gate for one sanitized,
+representative generation from each supported objective. It never creates a
+database connection, Production run, generation, usage event, Business Memory
+record, or customer-credit change. It is refused in production and requires
+both an environment guard and an explicit command-line confirmation:
+
+```sh
+AI_OBJECTIVE_EVALUATION_ENABLED=true \
+AI_PROVIDER=openai \
+OPENAI_MODEL=gpt-5.4-mini \
+npm run ai:evaluate:objectives -- --confirm-live-provider
+```
+
+The gate is intentionally bounded to seven sequential provider calls, zero
+revisions, no Web Search, at most 5,000 output tokens per call, and a maximum
+estimated total cost of $0.35. These ceilings may be lowered through
+`AI_OBJECTIVE_EVALUATION_MAX_CALLS`, `AI_OBJECTIVE_EVALUATION_MAX_OUTPUT_TOKENS`,
+and `AI_OBJECTIVE_EVALUATION_MAX_COST_USD`, but they cannot be raised. A
+conservative cost reservation occurs before each request and observed token
+usage is reconciled afterward. Missing usage data, a failed objective, an
+unpriced model, or a budget/call-limit violation stops the run fail-closed.
+
+Output is limited to objective and contract identifiers, validation and quality
+status, section/word counts, timing, token-derived cost, and sanitized failure
+codes. Prompts, credentials, raw model responses, fixture contents, dependency
+payloads, and customer data are never printed. This command is not part of CI
+and must not be used as a substitute for authenticated release acceptance.
+
+An operator may restrict a continuation to a named supported objective with
+`--objective=<objective_id>`. This does not expand any per-process ceiling and
+must remain within the separately authorized aggregate call and cost budget.
+For a separately authorized failed-objective diagnosis, `--rule-diagnostics`
+adds only validated quality-rule identifiers to the sanitized failure object.
+It never adds fields, excerpts, prompts, fixture data, or generated output.
+
 ## AI-assisted Discovery
 
 Set `AI_DISCOVERY_ENABLED=true` together with the provider configuration to

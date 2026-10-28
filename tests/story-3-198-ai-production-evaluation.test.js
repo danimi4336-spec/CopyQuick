@@ -4,6 +4,7 @@ const { getProductionContract } = require('../lib/productionContracts');
 const {
   assertEvaluationAllowed,
   evaluateProductionContract,
+  safeRuleDiagnostics,
   sanitizedFailure
 } = require('../lib/aiProductionEvaluation');
 
@@ -18,6 +19,21 @@ assert.throws(
 assert.deepStrictEqual(sanitizedFailure(new Error('secret provider detail')), {
   code: 'AI_EVALUATION_FAILED', safeToRetry: false, permanent: false, ambiguous: false
 });
+const maliciousDetails = {
+  failures: [
+    { rule: 'service_page_action_missing', field: 'body', excerpt: 'PRIVATE GENERATED OUTPUT' },
+    { rule: 'service_page_action_missing' },
+    { rule: 'unsafe-rule with text' }
+  ],
+  secretPrompt: 'PRIVATE PROMPT'
+};
+assert.deepStrictEqual(safeRuleDiagnostics(maliciousDetails), ['service_page_action_missing']);
+assert.deepStrictEqual(sanitizedFailure({ code: 'READY_ASSET_QUALITY_FAILED', details: maliciousDetails }, { includeRuleDiagnostics: true }), {
+  code: 'READY_ASSET_QUALITY_FAILED', safeToRetry: false, permanent: false, ambiguous: false,
+  rules: ['service_page_action_missing']
+});
+assert(!JSON.stringify(sanitizedFailure({ code: 'READY_ASSET_QUALITY_FAILED', details: maliciousDetails }, { includeRuleDiagnostics: true }))
+  .includes('PRIVATE'));
 
 const enabled = { NODE_ENV: 'test', AI_EVALUATION_ENABLED: 'true' };
 const passthroughRuntime = { run: ({ invoke, signal }) => invoke({ signal }) };
