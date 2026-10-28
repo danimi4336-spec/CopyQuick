@@ -139,6 +139,13 @@ assert.strictEqual(progress.batchNew.length, 2, 'completed batch work must remai
 assert.strictEqual(progress.batchIncomplete.length, 1);
 assert.strictEqual(progress.completed.length, 2);
 
+db.prepare("UPDATE generations SET structured_result = '{}' WHERE id = ?").run(positioningGenerationId);
+progress = buildProductionPlanProgress({ db, userId, production: production(), approvedProductionSet });
+assert.strictEqual(progress.completed.length, 2,
+  'a completed item in the current run must count as progress even when its output is not reusable in a future run');
+db.prepare('UPDATE generations SET structured_result = ? WHERE id = ?')
+  .run(JSON.stringify(positioningOutput), positioningGenerationId);
+
 const valueOutput = valueHandler.generateOutput({
   objective: 'launch_product', title: 'Value Proposition', strategicDirection: 'Define value.',
   strategySnapshot,
