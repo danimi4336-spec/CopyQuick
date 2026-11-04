@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= title %></title>
     <% if (typeof csrfToken !== 'undefined' && csrfToken) { %>
     <meta name="csrf-token" content="<%= csrfToken %>">
@@ -14,10 +14,11 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✍️</text></svg>">
 </head>
 <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
     <!-- Top Nav -->
-    <nav class="navbar">
+    <nav class="navbar" aria-label="Primary navigation">
         <div class="container">
-            <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+            <% if (locals.user) { %><button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false">☰</button><% } %>
             <a href="/" class="logo">CopyQuick</a>
             <div class="nav-right">
                 <% if (locals.user) { %>
@@ -37,37 +38,37 @@
 
     <!-- Sidebar -->
     <% if (locals.user) { %>
-    <aside class="sidebar" id="sidebar">
-        <nav class="sidebar-nav">
-            <a href="/dashboard" class="sidebar-link <%= currentPage === 'dashboard' ? 'active' : '' %>">
-                <span class="sidebar-icon">📊</span> Dashboard
+    <aside class="sidebar" id="sidebar" aria-label="Workspace navigation">
+        <nav class="sidebar-nav" aria-label="Workspace">
+            <a href="/dashboard" class="sidebar-link <%= currentPage === 'dashboard' ? 'active' : '' %>" <%- currentPage === 'dashboard' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">📊</span> Dashboard
             </a>
-            <a href="/brand-brain" class="sidebar-link <%= currentPage === 'brand-brain' ? 'active' : '' %>">
-                <span class="sidebar-icon">🧠</span> Brand Brain™
+            <a href="/brand-brain" class="sidebar-link <%= currentPage === 'brand-brain' ? 'active' : '' %>" <%- currentPage === 'brand-brain' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">🧠</span> Brand Brain™
             </a>
-            <a href="/welcome" class="sidebar-link <%= currentPage === 'welcome' ? 'active' : '' %>">
-                <span class="sidebar-icon">🚀</span> Start an Objective
+            <a href="/welcome" class="sidebar-link <%= currentPage === 'welcome' ? 'active' : '' %>" <%- currentPage === 'welcome' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">🚀</span> Start an Objective
             </a>
-            <a href="/production" class="sidebar-link <%= currentPage === 'production' ? 'active' : '' %>">
-                <span class="sidebar-icon">📋</span> Production Plans
+            <a href="/production" class="sidebar-link <%= currentPage === 'production' ? 'active' : '' %>" <%- currentPage === 'production' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">📋</span> Production Plans
             </a>
-            <a href="/history" class="sidebar-link <%= currentPage === 'history' ? 'active' : '' %>">
-                <span class="sidebar-icon">📜</span> History
+            <a href="/history" class="sidebar-link <%= currentPage === 'history' ? 'active' : '' %>" <%- currentPage === 'history' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">📜</span> History
             </a>
-            <a href="/favorites" class="sidebar-link <%= currentPage === 'favorites' ? 'active' : '' %>">
-                <span class="sidebar-icon">⭐</span> Favorites
+            <a href="/favorites" class="sidebar-link <%= currentPage === 'favorites' ? 'active' : '' %>" <%- currentPage === 'favorites' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">⭐</span> Favorites
             </a>
             <div class="sidebar-divider"></div>
-            <a href="/profile" class="sidebar-link <%= currentPage === 'profile' ? 'active' : '' %>">
-                <span class="sidebar-icon">⚙️</span> Settings
+            <a href="/profile" class="sidebar-link <%= currentPage === 'profile' ? 'active' : '' %>" <%- currentPage === 'profile' ? 'aria-current="page"' : '' %>>
+                <span class="sidebar-icon" aria-hidden="true">⚙️</span> Settings
             </a>
         </nav>
     </aside>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="sidebar-overlay" id="sidebarOverlay" aria-hidden="true"></div>
     <% } %>
 
     <!-- Main Content -->
-    <main class="main-content <%= locals.user ? 'has-sidebar' : '' %>">
+    <main id="main-content" class="main-content <%= locals.user ? 'has-sidebar' : '' %>" tabindex="-1">
         <%- body %>
     </main>
 
@@ -133,13 +134,28 @@
         var sidebar = document.getElementById('sidebar');
         var overlay = document.getElementById('sidebarOverlay');
         if (toggle && sidebar) {
+            function setSidebarOpen(open, restoreFocus) {
+                sidebar.classList.toggle('open', open);
+                if (overlay) overlay.classList.toggle('visible', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                toggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+                if (open) {
+                    var firstLink = sidebar.querySelector('a[href]');
+                    if (firstLink) firstLink.focus();
+                } else if (restoreFocus) {
+                    toggle.focus();
+                }
+            }
             toggle.addEventListener('click', function() {
-                sidebar.classList.toggle('open');
-                if (overlay) overlay.classList.toggle('visible');
+                setSidebarOpen(toggle.getAttribute('aria-expanded') !== 'true', false);
             });
             if (overlay) overlay.addEventListener('click', function() {
-                sidebar.classList.remove('open');
-                overlay.classList.remove('visible');
+                setSidebarOpen(false, true);
+            });
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+                    setSidebarOpen(false, true);
+                }
             });
         }
     })();

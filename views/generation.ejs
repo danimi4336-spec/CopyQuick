@@ -140,6 +140,7 @@
             <div class="sidebar-card">
                 <h3 class="h4">Tags</h3>
                 <div class="tags-input-wrap">
+                    <label class="sr-only" for="tagInput">Tags</label>
                     <input type="text" id="tagInput" placeholder="Add tags..." value="<%= gen.tags || '' %>" onkeydown="handleTagKey(event)">
                     <button class="btn btn-primary btn-sm" onclick="saveTags()" style="margin-top:0.5rem;width:100%;">Save Tags</button>
                 </div>

@@ -11,22 +11,26 @@
     <div class="workspace-filters fade-in">
         <form method="GET" action="/history" class="filters-form">
             <div class="search-bar">
-                <span class="search-icon">🔍</span>
-                <input type="text" name="search" placeholder="Search titles, prompts, tags..." value="<%= search %>" class="search-input">
+                <span class="search-icon" aria-hidden="true">🔍</span>
+                <label class="sr-only" for="history-search">Search generation history</label>
+                <input id="history-search" type="search" name="search" placeholder="Search titles, prompts, tags..." value="<%= search %>" class="search-input">
             </div>
-            <select name="type" class="filter-select">
+            <label class="sr-only" for="history-type">Content type</label>
+            <select id="history-type" name="type" class="filter-select">
                 <option value="">All Types</option>
                 <% Object.keys(contentTypes).forEach(function(t) { %>
                     <option value="<%= t %>" <%= type === t ? 'selected' : '' %>><%= contentTypes[t] || t.replace(/_/g, ' ') %></option>
                 <% }); %>
             </select>
-            <select name="sort" class="filter-select">
+            <label class="sr-only" for="history-sort">Sort generations</label>
+            <select id="history-sort" name="sort" class="filter-select">
                 <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest</option>
                 <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
                 <option value="title" <%= sort === 'title' ? 'selected' : '' %>>Title A-Z</option>
                 <option value="words_desc" <%= sort === 'words_desc' ? 'selected' : '' %>>Most Words</option>
             </select>
-            <select name="favorite" class="filter-select">
+            <label class="sr-only" for="history-favorite">Favorite status</label>
+            <select id="history-favorite" name="favorite" class="filter-select">
                 <option value="">All</option>
                 <option value="1" <%= favorite === '1' ? 'selected' : '' %>>Favorites Only</option>
             </select>
