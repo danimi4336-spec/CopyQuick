@@ -336,7 +336,7 @@ async function run() {
   assert.match(productionHtml, /Positioning Statement/);
   assert.doesNotMatch(productionHtml, /Generation Method|Structured Production Engine|Output Source|gpt-test/);
   assert.match(productionHtml, /Improve this asset with AI/);
-  assert.match(productionHtml, /One generation credit/);
+  assert.match(productionHtml, /One credit/);
   assert.doesNotMatch(productionHtml, /AI Model|CopyQuick AI/);
 
   const legacyOutreachHtml = await render('generation.ejs', {
@@ -351,7 +351,7 @@ async function run() {
       sections: [{ label: 'Legacy Outreach Outline', value: ['Message 1 — relevance'], isList: true }]
     }
   });
-  assert.match(legacyOutreachHtml, /legacy planning outline, not a copy-ready deliverable/i);
+  assert.match(legacyOutreachHtml, /legacy planning outline, not a copy-ready asset/i);
   assert.match(legacyOutreachHtml, /Legacy Outreach Outline/);
   assert.match(legacyOutreachHtml, /Improve this asset with AI/);
 
@@ -368,7 +368,7 @@ async function run() {
       sections: []
     }
   });
-  assert.match(invalidReadyAssetHtml, /This deliverable needs review before it can be used or exported/i);
+  assert.match(invalidReadyAssetHtml, /This asset needs review before it can be used or exported/i);
   assert.match(invalidReadyAssetHtml, /Correct or regenerate it to create customer-ready content/i);
   assert.doesNotMatch(invalidReadyAssetHtml, /legacy planning outline|historical outline/i);
   assert.doesNotMatch(invalidReadyAssetHtml, /public-deliverable-section|Copy All/i);
@@ -410,7 +410,7 @@ async function run() {
   try {
     const invalidDetail = await request(server, `/generation/${invalidReadyGenerationId}`);
     assert.strictEqual(invalidDetail.res.statusCode, 200);
-    assert.match(invalidDetail.body, /This deliverable needs review before it can be used or exported/i);
+    assert.match(invalidDetail.body, /This asset needs review before it can be used or exported/i);
     assert.doesNotMatch(invalidDetail.body, /legacy planning outline|public-deliverable-section|Copy All/i);
     assert.strictEqual((await request(server, `/generation/${invalidReadyGenerationId}/export?format=txt`)).res.statusCode, 409);
     assert.strictEqual((await request(server, `/generation/${invalidReadyGenerationId}/export?format=md`)).res.statusCode, 409);
@@ -433,7 +433,7 @@ async function run() {
       sections: [{ label: 'Campaign Brief', value: ['Define the audience and offer.'], isList: true }]
     }
   });
-  assert.match(campaignBriefHtml, /Planning deliverable:/);
+  assert.match(campaignBriefHtml, /Supporting document:/);
   assert.match(campaignBriefHtml, /not customer-facing sales copy/i);
   assert.match(campaignBriefHtml, /href="\/generation\/11"/);
   assert.match(campaignBriefHtml, /Open the ready-to-use email campaign/);

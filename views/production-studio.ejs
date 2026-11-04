@@ -26,7 +26,7 @@
             <section class="production-review-status" aria-label="Overall production plan progress">
                 <div><h2>Overall plan progress</h2><p id="plan-progress-overall"><strong><%= planProgress.completed.length %> of <%= planProgress.total %></strong> steps completed across Production work. The plan contains <%= planProgress.readyToUseAssetCount %> ready-to-use asset<%= planProgress.readyToUseAssetCount === 1 ? '' : 's' %> and <%= planProgress.planningFoundationCount %> free supporting document<%= planProgress.planningFoundationCount === 1 ? '' : 's' %>.</p></div>
                 <div><h2>Current work</h2><p id="plan-progress-current"><%= planProgress.batchNew.length %> new item<%= planProgress.batchNew.length === 1 ? '' : 's' %> in this run; <%= planProgress.batchIncomplete.length %> remain incomplete. <%= planProgress.reused.length %> completed supporting item<%= planProgress.reused.length === 1 ? '' : 's' %> reused.</p></div>
-                <div><h2>Saved for later</h2><p id="plan-progress-deferred"><%= planProgress.deferred.length %> deliverable<%= planProgress.deferred.length === 1 ? '' : 's' %> <%= planProgress.deferred.length === 1 ? 'remains' : 'remain' %> deferred (estimated <%= planProgress.remainingEstimatedCost %> generation<%= planProgress.remainingEstimatedCost === 1 ? '' : 's' %>).</p></div>
+                <div><h2>Saved for later</h2><p id="plan-progress-deferred"><%= planProgress.deferred.length %> item<%= planProgress.deferred.length === 1 ? '' : 's' %> <%= planProgress.deferred.length === 1 ? 'remains' : 'remain' %> deferred (estimated <%= planProgress.remainingEstimatedCost %> credit<%= planProgress.remainingEstimatedCost === 1 ? '' : 's' %>).</p></div>
             </section>
         <% } %>
 
@@ -168,7 +168,7 @@
                         actions.appendChild(resultLink);
                     }
                     resultLink.href = job.resultUrl;
-                    resultLink.textContent = 'View Deliverable →';
+                    resultLink.textContent = 'Open Asset →';
                 } else if (resultLink) {
                     resultLink.remove();
                 }

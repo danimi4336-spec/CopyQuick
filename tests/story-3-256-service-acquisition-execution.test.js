@@ -232,7 +232,7 @@ function fixture(overrides = {}) {
   assert.match(template, /This plan currently supports planning only/);
   assert.match(template, /No Production work is selected/);
   assert.match(template, /outputPlanItems\.length && approval\.counts\.readyToUseAssets > 0/);
-  assert.match(template, /production credit.*selected/);
+  assert.match(template, /credit.*selected/);
 
   console.log('Story 3.256 service acquisition execution tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -14,8 +14,8 @@ assert.match(index, /Validated Production Deliverables/);
 assert.match(index, /Email Drafts/);
 assert.match(index, /Landing Page CTAs/);
 assert.match(index, /SEO Article Introductions|Article Introductions/);
-assert.match(index, /200 generations per month/);
-assert.match(index, /10 generations per month/);
+assert.match(index, /200 credits per month/);
+assert.match(index, /10 credits per month/);
 
 for (const unsupportedClaim of [
   'Premium Natural Wellness',

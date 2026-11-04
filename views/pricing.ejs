@@ -6,7 +6,7 @@
     <% } %>
     <div class="section-title">
         <h1>Choose Your Plan</h1>
-        <p class="tagline">Choose the monthly generation allowance that fits your work.</p>
+        <p class="tagline">Choose the monthly credit allowance that fits your work.</p>
     </div>
 
     <div class="pricing-grid">
@@ -15,9 +15,9 @@
             <h3>Free</h3>
             <div class="price"><span>$</span>0<span>/mo</span></div>
             <ul class="price-features">
-                <li>10 generations / mo</li>
+                <li>10 credits / mo</li>
                 <li>Access to current creation workflows</li>
-                <li>Saved generation history</li>
+                <li>Saved content history</li>
             </ul>
             <% if (user && user.plan_tier === 'free') { %>
                 <button class="btn btn-outline btn-block" disabled>Current Plan</button>
@@ -34,9 +34,9 @@
             <h3>Pro</h3>
             <div class="price"><span>$</span>9<span>/mo</span></div>
             <ul class="price-features">
-                <li>200 generations / mo</li>
+                <li>200 credits / mo</li>
                 <li>Access to current creation workflows</li>
-                <li>Saved generation history</li>
+                <li>Saved content history</li>
             </ul>
             <% if (user && user.plan_tier === 'pro') { %>
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>
@@ -62,9 +62,9 @@
             <h3>Unlimited</h3>
             <div class="price"><span>$</span>29<span>/mo</span></div>
             <ul class="price-features">
-                <li>Unlimited monthly generation allowance</li>
+                <li>Unlimited monthly credits</li>
                 <li>Access to current creation workflows</li>
-                <li>Saved generation history</li>
+                <li>Saved content history</li>
             </ul>
             <% if (user && user.plan_tier === 'unlimited') { %>
                 <button class="btn btn-primary btn-block" disabled>Current Plan</button>

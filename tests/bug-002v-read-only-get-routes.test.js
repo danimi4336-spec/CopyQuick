@@ -308,7 +308,7 @@ async function run() {
     const before = readState(db, dashboardUser);
     const response = await request(agent, 'GET', '/dashboard');
     assert.strictEqual(response.res.statusCode, 200);
-    assert.match(response.body, /AI Credits/);
+    assert.match(response.body, /Credits/);
     assert.match(response.body, /10 remaining|10 of 10 remaining/);
     assertReadOnlyState(db, dashboardUser, before, 'GET /dashboard without usage period should be read-only');
   });

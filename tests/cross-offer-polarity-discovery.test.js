@@ -630,7 +630,7 @@ async function renderedAcceptance() {
     const confirmation = await request(agent, 'GET', '/discovery/build-plan');
     assert.strictEqual(confirmation.res.statusCode, 200);
     assert.match(confirmation.body, /Plan saved\./);
-    assert.match(confirmation.body, /No Production credits were used\./);
+    assert.match(confirmation.body, /No credits were used\./);
     assert.match(confirmation.body, /Start an Objective → Saved Plan/);
     const repeatedSave = await request(agent, 'POST', '/discovery/build-plan/selection', {
       _csrf: token(confirmation.body),

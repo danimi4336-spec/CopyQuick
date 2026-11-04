@@ -14,11 +14,11 @@ function render(user = null) {
 }
 
 const publicPricing = render();
-assert.match(publicPricing, /10 generations \/ mo/);
-assert.match(publicPricing, /200 generations \/ mo/);
-assert.match(publicPricing, /Unlimited monthly generation allowance/);
+assert.match(publicPricing, /10 credits \/ mo/);
+assert.match(publicPricing, /200 credits \/ mo/);
+assert.match(publicPricing, /Unlimited monthly credits/);
 assert.match(publicPricing, /Access to current creation workflows/);
-assert.match(publicPricing, /Saved generation history/);
+assert.match(publicPricing, /Saved content history/);
 assert.match(publicPricing, /href="\/signup\?next=%2Fpricing"/);
 assert.doesNotMatch(publicPricing, /action="\/subscribe"/);
 

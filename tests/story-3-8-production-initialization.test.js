@@ -235,7 +235,7 @@ async function run() {
     await request(sufficient, 'GET', `/test/authenticate/${sufficientUserId}/valid`);
     const review = await request(sufficient, 'GET', '/production/review');
     assert.strictEqual(review.res.statusCode, 200);
-    assert.match(review.body, new RegExp(`${units} production credit`));
+    assert.match(review.body, new RegExp(`${units} credit`));
     assert.match(review.body, /Starting this run will use/);
     assert.match(review.body, /Start Production/);
     assert.match(review.body, /What you'll receive/);

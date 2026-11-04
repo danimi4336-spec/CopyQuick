@@ -55,7 +55,7 @@ assert.strictEqual(getLatestProductionResume(db, 999999), null);
 db.prepare("UPDATE production_runs SET status = 'completed' WHERE id = ?").run(activeRunId);
 const completedResume = getLatestProductionResume(db, ownerId);
 assert.strictEqual(completedResume.id, newerCompletedId);
-assert.strictEqual(completedResume.actionLabel, 'View Deliverables');
+assert.strictEqual(completedResume.actionLabel, 'View Assets');
 
 db.prepare("UPDATE production_runs SET production_plan_snapshot = '{invalid json' WHERE id = ?").run(newerCompletedId);
 const degraded = getLatestProductionResume(db, ownerId);

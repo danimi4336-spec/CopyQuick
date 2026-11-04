@@ -8,18 +8,18 @@
         </header>
 
         <section class="deliverable-display-section deliverable-output-section" aria-labelledby="handoff-output-title">
-            <header><div><span class="build-plan-eyebrow">Your outputs</span><h2 id="handoff-output-title">Ready-to-use output deliverables</h2></div><strong><%= readyToUseAssets.length %> output<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
-            <p>These are the deliverables you will copy, export, and use with customers.</p>
+            <header><div><span class="build-plan-eyebrow">Your assets</span><h2 id="handoff-output-title">Ready-to-use assets</h2></div><strong><%= readyToUseAssets.length %> asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
+            <p>These are the assets you will copy, export, and use with customers.</p>
             <ol class="deliverable-display-list">
                 <% readyToUseAssets.forEach(function(item, index) { %>
-                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready-to-use asset · 1 production credit</small><p><%= item.reason %></p></div></li>
+                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready-to-use asset · 1 credit</small><p><%= item.reason %></p></div></li>
                 <% }); %>
             </ol>
         </section>
 
         <% if (planningFoundation.length) { %>
             <details class="planning-foundation-disclosure">
-                <summary><span>Free planning foundation documents</span><small><%= planningFoundation.length %> supporting document<%= planningFoundation.length === 1 ? '' : 's' %> · no production credits</small></summary>
+                <summary><span>Free planning foundation documents</span><small><%= planningFoundation.length %> supporting document<%= planningFoundation.length === 1 ? '' : 's' %> · no credits</small></summary>
                 <div class="planning-foundation-content">
                     <p>CopyQuick uses these internal briefs and decisions to guide the ready-to-use outputs. They are planning documents, not customer-facing copy.</p>
                     <ol class="deliverable-display-list">

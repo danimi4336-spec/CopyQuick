@@ -379,14 +379,14 @@ async function run() {
     assert.match(page.body, /Save Plan Choices/);
     assert.match(page.body, /Include in production|Included as a prerequisite/);
     assert.match(page.body, /Free planning foundation:/);
-    assert.match(page.body, /Production credits:/);
+    assert.match(page.body, /Credits:/);
     assert.match(page.body, /Total steps:/);
-    assert.match(page.body, /Ready-to-use output deliverables/);
+    assert.match(page.body, /Ready-to-use assets/);
     assert.match(page.body, /<details class="planning-foundation-disclosure">/);
-    assert(page.body.indexOf('Ready-to-use output deliverables') < page.body.indexOf('Free planning foundation documents'));
+    assert(page.body.indexOf('Ready-to-use assets') < page.body.indexOf('Free planning foundation documents'));
     assert.doesNotMatch(page.body, /Strategic direction|Builder-provided offer description|Treat this as unverified context/);
     assert.match(page.body, /Amazon is the confirmed sales channel/);
-    assert.doesNotMatch(page.body, /priority|estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
+    assert.doesNotMatch(page.body, /priority|estimatedCredits|estimatedTime|\d+ seconds/i);
     const token = page.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
 
     const csrfDenied = await request(valid, 'POST', '/discovery/build-plan/selection', {
@@ -422,7 +422,7 @@ async function run() {
     assert.strictEqual(saved.res.headers.location, '/discovery/build-plan');
     const persistedPage = await request(valid, 'GET', '/discovery/build-plan');
     assert.match(persistedPage.body, /Plan saved\./);
-    assert.match(persistedPage.body, /No Production credits are used until you start Production\./);
+    assert.match(persistedPage.body, /No credits are used until you start Production\./);
     assert.match(persistedPage.body, /Start an Objective → Saved Plan/);
     assert.match(persistedPage.body, /value="amazon_a_plus"[^>]*checked/);
     assert.doesNotMatch(persistedPage.body, /value="social_launch_campaign"[^>]*checked/);
@@ -453,9 +453,9 @@ async function run() {
     assert.match(handoff.body, /Nothing has been generated yet/);
     assert.match(handoff.body, /Review Cost &amp; Start Production/);
     assert.match(handoff.body, /No usage is consumed until/);
-    assert.match(handoff.body, /Ready-to-use output deliverables/);
+    assert.match(handoff.body, /Ready-to-use assets/);
     assert.match(handoff.body, /<details class="planning-foundation-disclosure">/);
-    assert(handoff.body.indexOf('Ready-to-use output deliverables') < handoff.body.indexOf('Free planning foundation documents'));
+    assert(handoff.body.indexOf('Ready-to-use assets') < handoff.body.indexOf('Free planning foundation documents'));
     assert.doesNotMatch(handoff.body, /Builder-provided offer description|Treat this as unverified context|Inferred primary customer/);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);

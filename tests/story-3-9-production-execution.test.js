@@ -314,7 +314,7 @@ async function run() {
     assert.strictEqual(executed.res.headers.location, `/production/${routeRunId}`);
     const studioAfter = await request(owner, 'GET', `/production/${routeRunId}`);
     assert.match(studioAfter.body, /Creating your assets · 1 of \d+ complete/);
-    assert.match(studioAfter.body, /View Deliverable/);
+    assert.match(studioAfter.body, /Open Asset/);
     assert.match(studioAfter.body, /completed/);
   } finally {
     server.close();

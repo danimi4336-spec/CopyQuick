@@ -44,10 +44,10 @@ assert.match(fixture, /Review what CopyQuick will create/);
 assert.match(fixture, /Plan readiness[\s\S]*Ready to start/);
 assert.match(fixture, /Finished assets[\s\S]*>1</);
 assert.match(fixture, /Supporting documents[\s\S]*>3</);
-assert.match(fixture, /What you'll receive[\s\S]*1 ready asset/);
+assert.match(fixture, /What you'll receive[\s\S]*1 ready-to-use asset/);
 assert.match(fixture, /Consultation Conversion Page Copy/);
 assert.match(fixture, /Supporting work[\s\S]*3 supporting documents · included free/);
-assert.match(fixture, /1 production credit/);
+assert.match(fixture, /1 credit/);
 assert.match(fixture, /Current usage[\s\S]*>2</);
 assert.match(fixture, /Monthly allowance[\s\S]*>10</);
 assert.match(fixture, /Available after production[\s\S]*>7</);
@@ -71,24 +71,24 @@ const planningOnly = renderReview({
   supporting: [deliverable('conversion_diagnostic_brief', 'Conversion Diagnostic Brief')]
 });
 assert.match(planningOnly, /Planning work ready to start/);
-assert.match(planningOnly, /0 ready assets/);
+assert.match(planningOnly, /0 ready-to-use assets/);
 assert.match(planningOnly, /supporting work only; no ready-to-use asset is included/);
-assert.match(planningOnly, /0 production credits/);
+assert.match(planningOnly, /0 credits/);
 
 const mixed = renderReview({
   assets: [deliverable('priority_search_article', 'Priority Search Article'), deliverable('lead_capture_page', 'Lead Capture Page')],
   supporting: [deliverable('research_evidence_pack', 'Research Evidence Pack'), deliverable('priority_content_brief', 'Priority Content Brief')]
 });
-assert.match(mixed, /2 ready assets/);
+assert.match(mixed, /2 ready-to-use assets/);
 assert.match(mixed, /2 supporting documents/);
 assert.match(mixed, /Research &amp; Sources/);
-assert.match(mixed, /2 production credits/);
+assert.match(mixed, /2 credits/);
 
 const blocked = renderReview({
   assets: [deliverable('consultation_conversion_page_copy', 'Consultation Conversion Page Copy')],
   supporting: [deliverable('conversion_diagnostic_brief', 'Conversion Diagnostic Brief')],
   canAfford: false,
-  blockingReason: 'This plan needs 1 Production credit, but only 0 remain.'
+  blockingReason: 'This plan needs 1 credit, but only 0 remain.'
 });
 assert.match(blocked, /Action needed before Production/);
 assert.match(blocked, /only 0 remain/);

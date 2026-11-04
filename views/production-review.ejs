@@ -23,8 +23,8 @@
         <section class="production-cost-card" aria-labelledby="production-cost-title">
             <div>
                 <span>Authoritative production cost</span>
-                <h2 id="production-cost-title"><%= cost.productionUnitCount %> production credit<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
-                <p>Only ready-to-use assets use Production credits. <%= cost.planningFoundationCount %> supporting document<%= cost.planningFoundationCount === 1 ? '' : 's' %> will be prepared at no additional Production-credit cost.</p>
+                <h2 id="production-cost-title"><%= cost.productionUnitCount %> credit<%= cost.productionUnitCount === 1 ? '' : 's' %></h2>
+                <p>Only ready-to-use assets use credits. <%= cost.planningFoundationCount %> supporting document<%= cost.planningFoundationCount === 1 ? '' : 's' %> will be prepared at no additional cost.</p>
             </div>
             <dl>
                 <div><dt>Current usage</dt><dd><%= cost.currentUsage %></dd></div>
@@ -35,11 +35,11 @@
         </section>
 
         <section class="deliverable-display-section deliverable-output-section" aria-labelledby="production-review-plan-title">
-            <header><div><span class="build-plan-eyebrow">Your finished work</span><h2 id="production-review-plan-title">What you'll receive</h2></div><strong><%= readyToUseAssets.length %> ready asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
+            <header><div><span class="build-plan-eyebrow">Your finished work</span><h2 id="production-review-plan-title">What you'll receive</h2></div><strong><%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %></strong></header>
             <% if (readyToUseAssets.length) { %><p>These assets will be ready for your review after Production completes. <%= batch.completed.length %> completed step<%= batch.completed.length === 1 ? '' : 's' %> will not be repeated.</p><% } else { %><p>This plan contains supporting work only; no ready-to-use asset is included.</p><% } %>
             <ol class="deliverable-display-list">
                 <% readyToUseAssets.forEach(function(item, index) { %>
-                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready for review after Production completes · 1 Production credit</small><p><%= item.reason %></p></div></li>
+                    <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small>Ready for review after Production completes · 1 credit</small><p><%= item.reason %></p></div></li>
                 <% }); %>
             </ol>
         </section>
@@ -48,7 +48,7 @@
             <details class="planning-foundation-disclosure">
                 <summary><span>Supporting work</span><small><%= planningFoundation.length %> supporting document<%= planningFoundation.length === 1 ? '' : 's' %> · included free</small></summary>
                 <div class="planning-foundation-content">
-                    <p>CopyQuick prepares these documents to guide and validate the finished work. They are included at no additional Production-credit cost.</p>
+                    <p>CopyQuick prepares these documents to guide and validate the finished work. They are included at no additional cost.</p>
                     <ol class="deliverable-display-list">
                         <% planningFoundation.forEach(function(item, index) { %>
                             <li><span class="production-job-order"><%= index + 1 %></span><div><strong><%= item.title %></strong><small><% if (item.id === 'research_evidence_pack') { %>Research &amp; Sources<% } else { %>Supporting document<% } %> · included free</small><p><%= item.reason %></p></div></li>
@@ -67,7 +67,7 @@
 
         <% if (cost.canAfford) { %>
             <div class="production-confirmation">
-                <p>Starting this run will use <strong><%= cost.productionUnitCount %></strong> Production credit<%= cost.productionUnitCount === 1 ? '' : 's' %> for <%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %>. Supporting work is included at no additional Production-credit cost. Usage begins when you select Start Production.</p>
+                <p>Starting this run will use <strong><%= cost.productionUnitCount %></strong> credit<%= cost.productionUnitCount === 1 ? '' : 's' %> for <%= readyToUseAssets.length %> ready-to-use asset<%= readyToUseAssets.length === 1 ? '' : 's' %>. Supporting documents are included at no additional cost. Usage begins when you select Start Production.</p>
                 <div class="production-confirmation-actions">
                     <a href="/discovery/production-ready" class="btn btn-outline">← Back</a>
                     <form action="/production/start" method="POST"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button type="submit" class="btn btn-primary">Start Production</button></form>

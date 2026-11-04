@@ -970,8 +970,8 @@ router.post('/discovery/build-plan/selection', requireAuth, (req, res) => {
     discoverySession.approvedProductionSet = null;
     discoverySession.buildPlanSavedAt = saved.savedAt;
     discoverySession.buildPlanNotice = approval.counts.productionUnits === 0
-      ? 'Plan saved. No Production credits were used. Resume it anytime from Start an Objective → Saved Plan.'
-      : 'Plan saved. No Production credits are used until you start Production. Resume it anytime from Start an Objective → Saved Plan.';
+      ? 'Plan saved. No credits were used. Resume it anytime from Start an Objective → Saved Plan.'
+      : 'Plan saved. No credits are used until you start Production. Resume it anytime from Start an Objective → Saved Plan.';
   } catch (_) {
     return renderBuildPlan(req, res, {
       status: 409,

@@ -38,7 +38,7 @@ assert.match(route, /router\.get\('\/production', requireAuth/);
 assert.match(route, /const history = listProductionHistoryPage\(db, user\.id/);
 assert.match(route, /productionRuns: history\.items/);
 const view = fs.readFileSync(path.join(__dirname, '..', 'views', 'production-history.ejs'), 'utf8');
-assert.match(view, /Opening a plan does not restart production or use credits/);
+assert.match(view, /Opening a plan does not restart Production or use credits/);
 assert.match(view, /run\.href/);
 assert.doesNotMatch(view, /<form/);
 const layout = fs.readFileSync(path.join(__dirname, '..', 'views', 'layout.ejs'), 'utf8');

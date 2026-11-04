@@ -171,7 +171,7 @@ function formatAiCredits(snapshot, user) {
   const periodEnd = snapshot?.usagePeriod?.period_end || null;
 
   return {
-    label: 'AI Credits',
+    label: 'Credits',
     planName: formatPlanName(user.plan_tier),
     monthlyAllocation: monthlyLimit,
     used,
@@ -700,10 +700,10 @@ router.get('/generation/:id', requireAuth, (req, res) => {
       purposeNotice: contract?.artifactRole === 'planning_foundation'
         ? isCustomerReadablePlanningDocument(gen.deliverable_id)
           ? readyAssetBilling
-            ? 'This customer-readable planning document guides the finished work and did not consume a production credit.'
+            ? 'This customer-readable supporting document guides the finished work and did not use a credit.'
             : 'This customer-readable planning document guides the finished work. This historical run used the earlier per-step billing model; future planning foundation is included at no credit cost.'
           : readyAssetBilling
-            ? 'This is internal foundation work that guides later execution. It is not customer-facing or publishable copy, and it did not consume a production credit.'
+            ? 'This is internal foundation work that guides later execution. It is not customer-facing or publishable copy, and it did not use a credit.'
             : 'This is internal foundation work, not customer-facing or publishable copy. This historical run used the earlier per-step billing model; future runs include planning foundation at no credit cost.'
         : null,
       nextDeliverable: nextDeliverable
@@ -873,7 +873,7 @@ router.post('/generation/:id/regenerate-production', requireAuth, requireGenerat
     return res.status(status).json({
       error: status === 403 ? 'Monthly limit reached'
         : status === 404 ? 'Production deliverable not found.'
-          : 'The AI version could not be created. No CopyQuick generation credit was used.',
+          : 'The AI version could not be created. No credit was used.',
       retryWithNewRequestKey: generationRequest.enabled
     });
   }

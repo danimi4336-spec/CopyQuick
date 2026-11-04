@@ -406,7 +406,7 @@ async function run() {
     assert.match(page.body, /Prepare Your Sales Channel/);
     assert.match(page.body, /Amazon Listing/);
     assert.doesNotMatch(page.body, /Strategic direction|Builder-provided offer description|Treat this as unverified context/);
-    assert.doesNotMatch(page.body, /estimatedCredits|estimatedTime|\d+ credits|\d+ seconds/i);
+    assert.doesNotMatch(page.body, /estimatedCredits|estimatedTime|\d+ seconds/i);
 
     const stored = JSON.parse((await request(valid, 'GET', '/test/session')).body);
     assert.strictEqual(stored.discoverySession.buildPlan.objective, 'launch_product');

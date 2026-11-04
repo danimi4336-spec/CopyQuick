@@ -1,8 +1,8 @@
 <div class="container workspace-page">
     <header class="workspace-header fade-in">
         <div>
-            <h1>Generation History</h1>
-            <p class="text-secondary"><%= total %> generation<%= total !== 1 ? 's' : '' %> total</p>
+            <h1>Content History</h1>
+            <p class="text-secondary"><%= total %> saved item<%= total !== 1 ? 's' : '' %></p>
         </div>
         <a href="/favorites" class="btn btn-outline">⭐ Favorites</a>
     </header>
@@ -12,7 +12,7 @@
         <form method="GET" action="/history" class="filters-form">
             <div class="search-bar">
                 <span class="search-icon" aria-hidden="true">🔍</span>
-                <label class="sr-only" for="history-search">Search generation history</label>
+                <label class="sr-only" for="history-search">Search content history</label>
                 <input id="history-search" type="search" name="search" placeholder="Search titles, prompts, tags..." value="<%= search %>" class="search-input">
             </div>
             <label class="sr-only" for="history-type">Content type</label>
@@ -22,7 +22,7 @@
                     <option value="<%= t %>" <%= type === t ? 'selected' : '' %>><%= contentTypes[t] || t.replace(/_/g, ' ') %></option>
                 <% }); %>
             </select>
-            <label class="sr-only" for="history-sort">Sort generations</label>
+            <label class="sr-only" for="history-sort">Sort saved content</label>
             <select id="history-sort" name="sort" class="filter-select">
                 <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>Newest</option>
                 <option value="oldest" <%= sort === 'oldest' ? 'selected' : '' %>>Oldest</option>
@@ -45,7 +45,7 @@
     <% if (generations.length === 0) { %>
         <div class="empty-state fade-in">
             <div class="empty-icon">🚀</div>
-            <h2>No generations yet</h2>
+            <h2>No saved content yet</h2>
             <p>Build your first campaign and everything you create will automatically appear here. Your marketing assets, ready when you need them.</p>
             <a href="/dashboard" class="btn btn-primary">Build My First Campaign →</a>
         </div>
@@ -107,7 +107,7 @@ function toggleFavorite(id, btn) {
 }
 
 function deleteGen(id, btn) {
-    if (!confirm('Move this generation to trash? You can restore it within 30 days.')) return;
+    if (!confirm('Move this item to trash? You can restore it within 30 days.')) return;
     fetch('/generation/' + id + '/delete', { method: 'POST', headers: window.CopyQuickCsrf.headers() })
         .then(r => r.json())
         .then(function() {

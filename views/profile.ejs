@@ -1,6 +1,6 @@
 <%
     var credits = typeof aiCredits !== 'undefined' && aiCredits ? aiCredits : {
-        label: 'AI Credits',
+        label: 'Credits',
         monthlyAllocation: user.monthly_limit || 10,
         used: 0,
         remaining: user.monthly_limit || 10,
@@ -44,7 +44,7 @@
             </div>
             
             <div class="info-group">
-                <label>AI Credits</label>
+                <label>Credits</label>
                 <p><%= credits.remaining %> of <%= credits.monthlyAllocation %> remaining</p>
                 <div class="progress-bar">
                     <div class="progress" style="width: <%= credits.usedPercentage %>%"></div>

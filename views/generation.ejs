@@ -45,14 +45,14 @@
                         <% if (productionDeliverable.historicalReadOnly) { %>
                             <div class="alert alert-info" role="status">This historical record is preserved, but its saved content cannot be safely displayed, copied, or exported.</div>
                         <% } else if (productionDeliverable.legacyPlanningOutline) { %>
-                            <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready deliverable. Create an improved AI version below to replace it with complete content.</div>
+                            <div class="alert alert-info" role="status">This is a legacy planning outline, not a copy-ready asset. Create an improved AI version below to replace it with complete content.</div>
                         <% } else { %>
-                            <div class="alert alert-info" role="status">This deliverable needs review before it can be used or exported. Correct or regenerate it to create customer-ready content.</div>
+                            <div class="alert alert-info" role="status">This asset needs review before it can be used or exported. Correct or regenerate it to create customer-ready content.</div>
                         <% } %>
                     <% } %>
                     <% if (productionDeliverable && productionDeliverable.purposeNotice) { %>
                         <div class="alert alert-info production-purpose-notice" role="status">
-                            <strong>Planning deliverable:</strong> <%= productionDeliverable.purposeNotice %>
+                            <strong>Supporting document:</strong> <%= productionDeliverable.purposeNotice %>
                             <% if (productionDeliverable.nextDeliverable) { %>
                                 <a href="/generation/<%= productionDeliverable.nextDeliverable.id %>">Open the ready-to-use email campaign →</a>
                             <% } %>
@@ -194,8 +194,8 @@ function regenerateProductionWithAi() {
     var button = document.getElementById('productionRegenerateBtn');
     var planningDeliverable = button && button.dataset.artifactRole === 'planning_foundation';
     var confirmation = planningDeliverable
-        ? 'Regenerate this planning foundation? This optional regeneration uses 1 generation credit and replaces the current planning document. It will not create customer-facing sales copy.'
-        : 'Improve this asset with AI? The displayed version will be replaced. One generation credit is used only when the improved asset passes validation.';
+        ? 'Regenerate this supporting document? This optional regeneration uses 1 credit and replaces the current document. It will not create customer-facing sales copy.'
+        : 'Improve this asset with AI? The displayed version will be replaced. One credit is used only when the improved asset passes validation.';
     if (!confirm(confirmation)) return;
     if (button) { button.disabled = true; button.textContent = 'Creating AI version…'; }
     fetch('/generation/' + genId + '/regenerate-production', {
