@@ -44,6 +44,7 @@ const { createRequestContextMiddleware } = require('./lib/requestContext');
 const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
+const { pageMetadataFor, sitemapEntries, normalizedOrigin } = require('./lib/pageMetadata');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
 const { closeApplicationServices } = require('./lib/httpShutdown');
@@ -138,6 +139,15 @@ app.use(createCsrfProtection());
 // are revoked before protected routes can treat a stale user ID as valid.
 app.use(createAuthenticatedUserMiddleware({ getDb }));
 
+// Public marketing pages receive canonical metadata. Every other rendered
+// surface defaults to noindex so account and customer content cannot be
+// indexed accidentally.
+app.use((req, res, next) => {
+  res.locals.pageMetadata = pageMetadataFor(req.path, { origin: process.env.PUBLIC_APP_ORIGIN });
+  if (!res.locals.pageMetadata.indexable) res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  next();
+});
+
 // Wrapper for layout
 app.use((req, res, next) => {
   const _render = res.render;
@@ -177,6 +187,17 @@ app.post('/contact', createContactRateLimiter(), createContactHandler({ sendCont
 
 app.get('/blog', (req, res) => {
   res.redirect(302, '/about');
+});
+
+app.get('/robots.txt', (req, res) => {
+  const origin = normalizedOrigin(process.env.PUBLIC_APP_ORIGIN);
+  res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /profile\nDisallow: /history\nDisallow: /favorites\nDisallow: /discovery\nDisallow: /production\nDisallow: /generation\nDisallow: /billing\nSitemap: ${origin}/sitemap.xml\n`);
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const urls = sitemapEntries({ origin: process.env.PUBLIC_APP_ORIGIN });
+  const body = urls.map(url => `  <url><loc>${url}</loc></url>`).join('\n');
+  res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`);
 });
 
 app.get('/privacy', (req, res) => {

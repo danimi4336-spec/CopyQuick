@@ -1,7 +1,7 @@
 {
   "name": "copyquick",
   "version": "1.0.0",
-  "description": "",
+  "description": "Evidence-aware marketing planning and production application",
   "main": "index.js",
   "scripts": {
     "start": "node server.js",

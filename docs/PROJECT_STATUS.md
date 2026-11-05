@@ -8,7 +8,7 @@ Runtime: Node.js `24.20.0`
 
 Schema: v8
 
-Automated suite: 256 test files
+Automated suite: 257 test files
 
 ## Product state
 
@@ -54,7 +54,7 @@ The bounded 2026-10-27 live-provider work produced a passing representative gene
 
 ## Current release evidence
 
-- Complete isolated suite: 256/256 test files passing
+- Complete isolated suite: 257 test files; the new metadata regression and related focused gates pass locally, and the complete socket-capable CI gate is pending for this changeset
 - Production dependency audit: zero known vulnerabilities at the last review
 - Node version pinned consistently for local development, VS Code, CI, and Render
 - Schema compatibility and production operations covered by dedicated read-only commands and runbooks
@@ -62,6 +62,7 @@ The bounded 2026-10-27 live-provider work produced a passing representative gene
 - Bounded live objective evidence: all 7 objectives have a passing representative generation; one service-page safe rejection remains recorded
 - Disposable owner-scoped lifecycle acceptance: all 7 objectives pass Discovery projection, Strategy, Build Plan, save/resume, ownership, and exact side-effect checks; executable objectives additionally pass deterministic Production persistence and public-section validation
 - Customer-facing terminology is standardized around credits, ready-to-use assets, supporting documents, Production, and Content History, with a repository-level regression contract
+- Public marketing pages have page-specific descriptions, canonical URLs, Open Graph and social-preview metadata, a branded favicon and sharing image, robots policy, and a public-only sitemap; private and authenticated routes default to noindex
 
 ## Work remaining for broad launch
 
@@ -78,7 +79,7 @@ The bounded 2026-10-27 live-provider work produced a passing representative gene
 
 ### Public launch surface
 
-- Add and verify public metadata such as descriptions, canonical URLs, social previews, robots policy, and sitemap behavior where appropriate.
+- Verify public metadata and social previews in the eventual staging environment.
 - Define a privacy-respecting analytics and product-observability policy before adding tracking.
 - Complete legal, support, and incident-contact review for the intended launch audience.
 
