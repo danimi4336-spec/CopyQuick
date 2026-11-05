@@ -197,7 +197,8 @@ async function initializeDiscovery(req, objective, answer, subjectResolution) {
   req.session.discoverySession = {
     objective, answers, understanding: understandingResult.understanding, unknowns: understandingResult.unknowns,
     interpretation: understandingResult.interpretation, memorySources: memoryMerge.sources, memoryConflicts: memoryMerge.conflicts,
-    memorySubjectIds, memoryContext, completedQuestions: ['initial_description'], completion: intelligenceResult.completion,
+    memorySubjectIds, memoryContext, memorySelection: guardedResolution.selection,
+    completedQuestions: ['initial_description'], completion: intelligenceResult.completion,
     knowledgeDomains: intelligenceResult.knowledgeDomains, nextQuestion: intelligenceResult.nextQuestion,
     reasoning: intelligenceResult.reasoning, remainingKnowledgeGaps: intelligenceResult.remainingKnowledgeGaps,
     planningReadiness: intelligenceResult.planningReadiness, discoveryCompleteForNow: intelligenceResult.discoveryCompleteForNow,

@@ -724,6 +724,22 @@ async function renderedAcceptance() {
     assert.doesNotMatch(explicitNewPage.body, /Residential remodeling/i,
       'an explicitly new offer must not display remembered remodeling context');
     assert.doesNotMatch(explicitNewPage.body, /Using what CopyQuick remembers about/i);
+
+    const explicitNewQuestion = explicitNewSession.nextQuestion;
+    assert.strictEqual(explicitNewQuestion.id, 'conversion_offer');
+    const explicitNewAnswer = await request(agent, 'POST', '/discovery', {
+      _csrf: token(explicitNewPage.body),
+      questionId: explicitNewQuestion.id,
+      freeTextAnswer: 'A bookkeeping service for studio owners'
+    });
+    assert.strictEqual(explicitNewAnswer.res.statusCode, 303);
+    const explicitNewFollowUpPage = await request(agent, 'GET', '/discovery');
+    const explicitNewFollowUpSession = JSON.parse((await request(agent, 'GET', '/test/session')).body);
+    assert.strictEqual(explicitNewFollowUpSession.memorySelection, 'new');
+    assert.strictEqual(explicitNewFollowUpSession.memorySubjectIds.offer, null);
+    assert.doesNotMatch(explicitNewFollowUpPage.body, /Residential remodeling/i,
+      'an explicitly new offer must remain isolated after answering later questions');
+    assert.doesNotMatch(explicitNewFollowUpPage.body, /Using what CopyQuick remembers about/i);
   } finally {
     await new Promise(resolve => server.close(resolve));
     db.close();
