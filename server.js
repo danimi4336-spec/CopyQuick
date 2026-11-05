@@ -45,6 +45,7 @@ const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
 const { pageMetadataFor, sitemapEntries, normalizedOrigin } = require('./lib/pageMetadata');
+const { authConfigurationEvent } = require('./lib/authConfiguration');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
 const { closeApplicationServices } = require('./lib/httpShutdown');
@@ -72,13 +73,7 @@ configureBrowserSecurity(app);
 validateBillingReturnOrigin(process.env);
 
 // Startup auth config check
-const hasGoogleClientId = Boolean(String(process.env.GOOGLE_CLIENT_ID || '').trim());
-const hasGoogleClientSecret = Boolean(String(process.env.GOOGLE_CLIENT_SECRET || '').trim());
-writeOperationalEvent({
-  event: 'auth_configuration_loaded',
-  operation: 'google_oauth',
-  outcome: hasGoogleClientId && hasGoogleClientSecret ? 'configured' : 'disabled'
-});
+writeOperationalEvent(authConfigurationEvent(process.env));
 
 // Validate storage before opening SQLite. Production never falls back to a local path.
 const databaseStorage = getDatabaseStorage();

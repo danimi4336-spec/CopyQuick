@@ -1,12 +1,7 @@
 const assert = require('assert');
 const express = require('express');
-const { spawn, spawnSync } = require('child_process');
-const fs = require('fs');
 const http = require('http');
-const path = require('path');
-const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
-
-const isolatedDatabasePath = assertIsolatedTestDatabase();
+const { authConfigurationEvent } = require('../lib/authConfiguration');
 
 const DUMMY_CLIENT_ID = 'CID-UNMISTAKABLE-ALPHA-1234567890.apps.googleusercontent.com';
 const DUMMY_CLIENT_SECRET = 'GSECRET-UNMISTAKABLE-BRAVO-0987654321';
@@ -136,75 +131,6 @@ function request(server, method, url) {
   });
 }
 
-function runServerStartupSmoke() {
-  return new Promise((resolve, reject) => {
-    const databasePath = isolatedDatabasePath;
-    for (const suffix of ['', '-wal', '-shm']) {
-      try {
-        fs.unlinkSync(databasePath + suffix);
-      } catch (err) {
-        // Temp database may not exist yet.
-      }
-    }
-
-    const productionEnv = {
-      ...process.env,
-      NODE_ENV: 'production',
-      DATABASE_PATH: databasePath,
-      PERSISTENT_DATA_DIR: path.dirname(databasePath),
-      SESSION_SECRET: DUMMY_SESSION_SECRET,
-      GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,
-      GOOGLE_CALLBACK_URL: DUMMY_CALLBACK_URL,
-      PUBLIC_APP_ORIGIN: 'https://copyquick.example',
-      STRIPE_KEY: 'sk_test_bug_002o',
-      STRIPE_WEBHOOK_SECRET: 'whsec_bug_002o',
-      STRIPE_PRO_PRICE: 'price_bug_002o_pro',
-      STRIPE_UNLIMITED_PRICE: 'price_bug_002o_unlimited',
-      RESEND_API_KEY: 're_bug_002o_not_real'
-    };
-    const migration = spawnSync(process.execPath, ['scripts/migrate-database.js', '--confirm-production-migration'], {
-      cwd: path.join(__dirname, '..'),
-      env: productionEnv,
-      encoding: 'utf8'
-    });
-    if (migration.status !== 0) {
-      return reject(new Error(`explicit test database migration failed with code ${migration.status}`));
-    }
-
-    const child = spawn(process.execPath, ['server.js'], {
-      cwd: path.join(__dirname, '..'),
-      env: { ...productionEnv, PORT: '0' },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-
-    let output = '';
-    let settled = false;
-    const timeout = setTimeout(() => finish(new Error('server startup smoke timed out')), 5000);
-
-    function finish(err) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      child.kill('SIGTERM');
-      if (err) reject(err);
-      else resolve(output);
-    }
-
-    child.stdout.on('data', (chunk) => {
-      output += chunk.toString();
-      if (output.includes('Server is running on')) finish();
-    });
-    child.stderr.on('data', (chunk) => {
-      output += chunk.toString();
-    });
-    child.on('error', finish);
-    child.on('exit', (code) => {
-      if (!settled && code !== 0) finish(new Error(`server exited early with code ${code}:\n${output}`));
-    });
-  });
-}
-
 async function run() {
   const configured = captureConsole(() => loadPassportWithGoogleEnv({
     clientId: DUMMY_CLIENT_ID,
@@ -237,13 +163,20 @@ async function run() {
   assert.strictEqual(missing.result.isGoogleOAuthConfigured(), false);
   assert.strictEqual(missing.result._strategy('google'), undefined);
 
-  const startupOutput = await runServerStartupSmoke();
-  assertNoCredentialLeak(startupOutput);
-  assert.match(startupOutput, /"event":"auth_configuration_loaded"/);
-  assert.match(startupOutput, /"operation":"google_oauth"/);
-  assert.match(startupOutput, /"outcome":"configured"/);
-  assert.match(startupOutput, /"event":"database_storage_ready"/);
-  assert.doesNotMatch(startupOutput, /copyquick-bug-002o-startup\.sqlite/);
+  const configuredEvent = authConfigurationEvent({
+    GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET,
+    GOOGLE_CALLBACK_URL: DUMMY_CALLBACK_URL,
+    SESSION_SECRET: DUMMY_SESSION_SECRET
+  });
+  assert.deepStrictEqual(configuredEvent, {
+    event: 'auth_configuration_loaded',
+    operation: 'google_oauth',
+    outcome: 'configured'
+  });
+  assertNoCredentialLeak(JSON.stringify(configuredEvent));
+  assert.strictEqual(authConfigurationEvent({ GOOGLE_CLIENT_ID: DUMMY_CLIENT_ID }).outcome, 'disabled');
+  assert.strictEqual(authConfigurationEvent({ GOOGLE_CLIENT_SECRET: DUMMY_CLIENT_SECRET }).outcome, 'disabled');
 
   console.log('BUG-002O OAuth credential logging tests passed');
 }

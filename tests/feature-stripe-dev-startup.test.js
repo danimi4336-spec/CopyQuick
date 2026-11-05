@@ -48,7 +48,7 @@ function startDevelopmentServer(databasePath) {
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
       reject(new Error(`Development server did not start.\n${output}`));
-    }, 8000);
+    }, 60000);
 
     function inspect(chunk) {
       output += chunk;

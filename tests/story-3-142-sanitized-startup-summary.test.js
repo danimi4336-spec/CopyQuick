@@ -3,9 +3,11 @@ const fs = require('fs');
 const path = require('path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+const authConfigurationSource = fs.readFileSync(path.join(__dirname, '..', 'lib', 'authConfiguration.js'), 'utf8');
 
-assert.match(source, /event: 'auth_configuration_loaded'/);
-assert.match(source, /operation: 'google_oauth'/);
+assert.match(source, /writeOperationalEvent\(authConfigurationEvent\(process\.env\)\)/);
+assert.match(authConfigurationSource, /event: 'auth_configuration_loaded'/);
+assert.match(authConfigurationSource, /operation: 'google_oauth'/);
 assert.match(source, /event: 'database_storage_ready'/);
 assert.match(source, /outcome: databaseDiagnostics\.writable \? 'writable' : 'read_only'/);
 assert.doesNotMatch(source, /console\.log\(`\s*path:/);
