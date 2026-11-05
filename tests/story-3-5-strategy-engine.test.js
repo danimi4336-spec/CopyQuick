@@ -128,6 +128,27 @@ async function run() {
   assert.strictEqual(amazon.strategy.launchApproach.semanticRole, 'strategic_recommendation');
   assert.strictEqual(amazon.strategy.risks.semanticRole, 'derived_risk');
   assert.strictEqual(amazon.strategy.pricingPosition.semanticRole, 'unresolved');
+
+  const acquisitionUnderstanding = {
+    businessType: confirmed('service', 'A service'),
+    targetAudience: confirmed('studio owners', 'studio owners'),
+    acquisitionGoal: confirmed('qualified_leads', 'More qualified leads'),
+    currentAcquisitionChannel: confirmed('referrals', 'Referrals'),
+    acquisitionStage: confirmed('inconsistent_traction', 'Some traction, but inconsistent'),
+    salesProcess: confirmed('booked_call', 'They book a call or appointment'),
+    capacityReadiness: confirmed('capacity_ready', 'Yes, we are ready for more customers')
+  };
+  const acquisition = buildStrategy({
+    objective: 'get_more_customers',
+    understanding: acquisitionUnderstanding,
+    confirmedUnderstanding: acquisitionUnderstanding,
+    answers: { initial_description: 'A bookkeeping service seeking qualified studio owners' }
+  });
+  assert.strictEqual(
+    acquisition.strategy.customerMotivation.explanation,
+    'The priority customer’s motivation is not established by the business acquisition goal and remains unresolved.'
+  );
+  assert.doesNotMatch(acquisition.strategy.customerMotivation.explanation, /homeowner/i);
   assert.strictEqual(amazon.status, 'Strategy Ready — Open Decisions');
   assert.notStrictEqual(amazon.confidence, 'High Confidence');
   assert.strictEqual(amazon.strategy.communicationStyle.value, 'Evidence-Based and Reassuring');
