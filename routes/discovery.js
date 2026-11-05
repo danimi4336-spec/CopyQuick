@@ -157,7 +157,13 @@ function applyDurableMemory(req, objective, initialDescription, understandingRes
   const explicit = explicitCurrentInput(objective, initialDescription);
   Object.assign(understandingResult.understanding, explicit);
   understandingResult.unknowns = (understandingResult.unknowns || []).filter(key => !explicit[key]);
-  const remembered = memoryUnderstanding(db, { userId, objective, initialDescription, subjectId: discoverySession?.memorySubjectIds?.offer });
+  const remembered = memoryUnderstanding(db, {
+    userId,
+    objective,
+    initialDescription,
+    subjectId: discoverySession?.memorySubjectIds?.offer,
+    newOffer: discoverySession?.memorySelection === 'new'
+  });
   const merged = mergeCurrentWithMemory(understandingResult.understanding, remembered);
   understandingResult.understanding = merged.understanding;
   understandingResult.unknowns = (understandingResult.unknowns || []).filter(field => {
@@ -183,7 +189,7 @@ async function initializeDiscovery(req, objective, answer, subjectResolution) {
     offerLabel: guardedResolution.offer.displayLabel || guardedResolution.offer.label,
     selection: guardedResolution.selection
   } : null;
-  const shell = { objective, memorySubjectIds };
+  const shell = { objective, memorySubjectIds, memorySelection: guardedResolution.selection };
   const memoryMerge = applyDurableMemory(req, objective, answer, understandingResult, shell);
   const answers = { initial_description: answer };
   const intelligenceResult = analyzeDiscovery({ objective, understanding: understandingResult.understanding, unknowns: understandingResult.unknowns, answers });

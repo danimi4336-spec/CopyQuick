@@ -710,6 +710,20 @@ async function renderedAcceptance() {
     assert.match(ambiguousPage.body, /Accounting Software/);
     assert.match(ambiguousPage.body, /different or new offer/i);
     assert.doesNotMatch(ambiguousPage.body, /Using what CopyQuick remembers about/);
+
+    const explicitNew = await request(agent, 'POST', '/discovery', {
+      _csrf: token(ambiguousPage.body),
+      questionId: 'offer_subject_selection',
+      offerSubjectId: 'new'
+    });
+    assert.strictEqual(explicitNew.res.statusCode, 303);
+    const explicitNewPage = await request(agent, 'GET', '/discovery');
+    const explicitNewSession = JSON.parse((await request(agent, 'GET', '/test/session')).body);
+    assert.strictEqual(explicitNewSession.memorySubjectIds.offer, null);
+    assert.strictEqual(explicitNewSession.memoryContext, null);
+    assert.doesNotMatch(explicitNewPage.body, /Residential remodeling/i,
+      'an explicitly new offer must not display remembered remodeling context');
+    assert.doesNotMatch(explicitNewPage.body, /Using what CopyQuick remembers about/i);
   } finally {
     await new Promise(resolve => server.close(resolve));
     db.close();
