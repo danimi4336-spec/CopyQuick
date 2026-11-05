@@ -38,6 +38,12 @@ Improve Search Rankings has the most extensive recorded live-provider validation
 
 Historical live-provider evidence is not treated as blanket acceptance for other objectives or as permanent evidence for a future release. The 2026-10-27 bounded gate, its observed service-page rejection, and the passing diagnostic generation are recorded in [Live Objective Acceptance — 2026-10-27](LIVE_OBJECTIVE_ACCEPTANCE_2026-10-27.md). Each release candidate must still pass the current deterministic suite and any explicitly authorized live acceptance gate.
 
+A further bounded `service_page` call on 2026-11-04 passed validation and
+quality with no application mutations. Across the three preserved observations,
+two passed and one safely rejected. This sample is too small to establish a
+reliable success rate; see [Promote My Service Provider Reliability —
+2026-11-04](SERVICE_PAGE_RELIABILITY_2026-11-04.md).
+
 ## Next validation phase
 
 1. Establish release-environment provider, usage, credit, and database baselines.

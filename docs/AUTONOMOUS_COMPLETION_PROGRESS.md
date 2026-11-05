@@ -57,6 +57,19 @@ release-readiness phases without a production deployment.
   dashboard errors as accessible alerts and moved focus to the first rendered
   validation error after navigation; contact success feedback is now a status
   message.
+- Ran one newly authorized, sanitized `service_page` provider evaluation. It
+  passed validation and quality in one call for an estimated $0.00304875, with
+  zero research calls, database writes, usage, memory, or credit effects.
+- Reconciled that call with two preserved October observations: 2 passes and 1
+  safe rejection. Documented that three calls are insufficient for a stable
+  reliability estimate and retained all fail-closed rules.
+- Completed an engineering consistency review of legal and support surfaces and
+  documented the material owner/legal decisions without changing policy text.
+- Prepared a conservative controlled-beta provider configuration recommendation
+  and enumerated the owner decisions required before enabling billable
+  production generation.
+- Documented the isolation requirements and acceptance gate for a future staging
+  service; no infrastructure or production configuration was changed.
 
 ## Tests and checks performed
 
@@ -77,24 +90,39 @@ release-readiness phases without a production deployment.
   257 isolated test files.
 - Accessibility foundation regression passed after adding alert semantics and
   validation-error focus management.
+- CI run 41965178197 exposed a brittle OAuth credential test that spawned the
+  entire production server only to inspect one configuration event. Replaced
+  that startup-coupled smoke with a pure event projection used by production and
+  directly verified for configured, partially configured, and secret-safe
+  behavior.
+- Corrected the remaining cold-start test boundary by allowing the real Stripe
+  development-startup smoke up to 60 seconds on slower runners; the server
+  remained required to start and emit its disabled-billing guidance.
+- Reconciled the extracted auth event with the sanitized-startup static gate and
+  removed an unnecessary internal HTML comment term that collided with the
+  unsafe-summary leakage guard.
+- Re-ran the complete isolated repository suite: all 257 test files passed with
+  Node `v24.20.0`, no real provider calls, and no production access.
 
 ## Outstanding work
 
 1. Establish or obtain authorization for a non-production staging environment.
-2. Deploy checkpoint `340da406...` to staging and verify the bookkeeping
-   Strategy and Build Plan terminology correction.
+2. Deploy the current `next-gen` release candidate to staging and verify the
+   bookkeeping Strategy and Build Plan terminology correction plus public
+   metadata.
 3. Complete browser acceptance for all seven objectives in a release-like
    environment, including exports, retry/recovery, ownership, and counter checks.
-4. Run a small bounded Promote My Service provider-reliability sample and record
-   the limits of the resulting evidence.
+4. Obtain explicit authorization for any larger Promote My Service reliability
+   sample; the current three-observation evidence is documented but insufficient
+   for a stable rate.
 5. Reconfirm Stripe test checkout, webhook, portal, entitlement, and
    reconciliation behavior without real charges.
 6. Reconfirm transactional email and authentication flows using controlled test
    recipients and accounts.
 7. Complete broad accessibility, responsive, and first-time-customer reviews.
-8. Complete public metadata, robots, sitemap, favicon, and social-preview work.
-9. Review legal/support content against actual behavior and prepare owner/legal
-   questions without making material policy decisions.
+8. Verify public metadata and social previews in staging.
+9. Obtain owner/legal review of the documented legal and support decisions and
+   complete controlled support-delivery verification.
 10. Recommend controlled-beta provider and operational settings without enabling
     new billable production services.
 11. Run final release validation, freeze a release candidate, and prepare
