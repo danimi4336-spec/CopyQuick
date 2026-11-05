@@ -9,6 +9,11 @@ const layout = read('views/layout.ejs');
 const history = read('views/history.ejs');
 const generation = read('views/generation.ejs');
 const css = read('public/css/style.css');
+const login = read('views/login.ejs');
+const signup = read('views/signup.ejs');
+const resetPassword = read('views/reset-password.ejs');
+const contact = read('views/contact.ejs');
+const dashboard = read('views/dashboard.ejs');
 
 assert.match(layout, /name="viewport" content="width=device-width, initial-scale=1\.0"/);
 assert.doesNotMatch(layout, /user-scalable=no|maximum-scale=1\.0/);
@@ -21,6 +26,9 @@ assert.match(layout, /setAttribute\('aria-expanded'/);
 assert.match(layout, /event\.key === 'Escape'/);
 assert.match(layout, /firstLink\.focus\(\)/);
 assert.match(layout, /toggle\.focus\(\)/);
+assert.match(layout, /querySelector\('\.alert-error\[role="alert"\]'\)/);
+assert.match(layout, /errorAlert\.setAttribute\('tabindex', '-1'\)/);
+assert.match(layout, /errorAlert\.focus\(\)/);
 assert.strictEqual((layout.match(/aria-current="page"/g) || []).length, 7);
 assert.strictEqual((layout.match(/class="sidebar-icon" aria-hidden="true"/g) || []).length, 7);
 
@@ -36,6 +44,11 @@ assert.match(css, /\.sr-only\s*\{[^}]*position: absolute[^}]*clip: rect\(0, 0, 0
 assert.match(css, /\*:focus-visible\s*\{[^}]*outline: 3px solid #312e81 !important/s);
 assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation-duration: \.01ms !important/);
 assert.match(css, /transition-duration: \.01ms !important/);
+
+for (const view of [login, signup, resetPassword, contact, dashboard]) {
+  assert.doesNotMatch(view, /class="alert alert-error"(?![^>]*role="alert")/);
+}
+assert.match(contact, /class="alert alert-success" role="status"/);
 
 const authenticated = ejs.render(layout, {
   title: 'History - CopyQuick',

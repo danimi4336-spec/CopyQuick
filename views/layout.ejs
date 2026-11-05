@@ -148,6 +148,16 @@
         };
     })();
 
+    // Server-rendered validation errors are announced and receive focus after
+    // navigation so keyboard and screen-reader users land on the failure
+    // context before correcting the form.
+    (function(){
+        var errorAlert = document.querySelector('.alert-error[role="alert"]');
+        if (!errorAlert) return;
+        if (!errorAlert.hasAttribute('tabindex')) errorAlert.setAttribute('tabindex', '-1');
+        errorAlert.focus();
+    })();
+
     // Sidebar toggle
     (function(){
         var toggle = document.getElementById('sidebarToggle');

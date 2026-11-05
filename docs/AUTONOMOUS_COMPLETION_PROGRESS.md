@@ -53,6 +53,10 @@ release-readiness phases without a production deployment.
   `noindex, nofollow, noarchive`, including an `X-Robots-Tag` response header.
 - Added deterministic regression coverage for metadata, sitemap isolation,
   private-route indexing protection, and required brand assets.
+- Standardized server-rendered authentication, contact, password-reset, and
+  dashboard errors as accessible alerts and moved focus to the first rendered
+  validation error after navigation; contact success feedback is now a status
+  message.
 
 ## Tests and checks performed
 
@@ -68,6 +72,11 @@ release-readiness phases without a production deployment.
 - The existing sensitive-response cache test could not open a local loopback
   listener in this workspace (`EPERM`). No product assertion ran or failed; the
   socket-capable GitHub CI gate remains required after push.
+- GitHub CI run 41965031107 passed for metadata checkpoint `03920c3`, including
+  dependency audit, repository-wide syntax checks, whitespace checks, and all
+  257 isolated test files.
+- Accessibility foundation regression passed after adding alert semantics and
+  validation-error focus management.
 
 ## Outstanding work
 

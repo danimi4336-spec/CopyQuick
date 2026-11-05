@@ -12,7 +12,7 @@
                 <h2>Send us a Message</h2>
 
                 <% if (locals.sent) { %>
-                    <div class="alert alert-success" style="text-align:center;padding:2rem;">
+                    <div class="alert alert-success" role="status" style="text-align:center;padding:2rem;">
                         <div style="font-size:3rem;margin-bottom:1rem;">✅</div>
                         <h3 style="margin-bottom:0.5rem;">Message Sent!</h3>
                         <p style="max-width:none;font-size:1rem;">Thanks for reaching out! Our team received your message and will review it as soon as possible.</p>
@@ -24,7 +24,7 @@
                     </div>
                 <% } else { %>
                     <% if (locals.error) { %>
-                        <div class="alert alert-error"><%= error %></div>
+                        <div class="alert alert-error" role="alert"><%= error %></div>
                     <% } %>
                     <form class="contact-form" action="/contact" method="POST">
                         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
