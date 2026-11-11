@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { understandBusiness } = require('../lib/businessUnderstanding');
+const { understandBusiness, audienceFromDescription } = require('../lib/businessUnderstanding');
 const { evaluateRequirements } = require('../lib/discoveryRequirements');
 const { buildStrategy } = require('../lib/strategyEngine');
 const { buildPlan } = require('../lib/buildPlanEngine');
@@ -12,6 +12,11 @@ const { generateDeliverable } = require('../lib/generationService');
 (async function run() {
   const objective = 'get_more_customers';
   const description = 'A bookkeeping service that wants more qualified small-business leads';
+  assert.strictEqual(
+    audienceFromDescription('A lightweight project-management SaaS for independent consultants that wants more qualified trial users.', objective),
+    'independent consultants',
+    'the business acquisition goal must not be appended to the inferred audience'
+  );
   const result = await understandBusiness({ objective, answer: description });
   const understanding = { ...result.understanding };
   const values = {
@@ -29,6 +34,7 @@ const { generateDeliverable } = require('../lib/generationService');
   assert.strictEqual(evaluateRequirements({ objective, understanding, answers }).ready, true);
   const strategyResult = buildStrategy({ objective, understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategyResult.status, /Strategy Ready/);
+  assert.doesNotMatch(strategyResult.assumptions.join(' '), /\.\./, 'sentence-ending input punctuation must be normalized in assumptions');
   assert.match(strategyResult.strategy.launchApproach.value, /Prepare consultation conversion now/i);
   assert.match(strategyResult.strategy.launchApproach.value, /evaluate acquisition channels separately/i);
   assert.strictEqual(strategyResult.strategy.customerMotivation.value, 'Unknown');
