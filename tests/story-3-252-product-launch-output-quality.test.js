@@ -120,6 +120,23 @@ async function run() {
     assert.doesNotMatch(publicText, /Ceylon|softgel|clinical|health outcome/i);
   }
 
+  const softwareContext = {
+    objective: 'launch_product',
+    strategicDirection: 'Builder-provided product context: A project management app for independent consultants. Treat this as unverified context, not proof of ingredients, efficacy, claims, or substantiation.',
+    strategySnapshot: {
+      primaryCustomer: { value: 'Independent consultants', semanticRole: 'confirmed_fact' },
+      marketPosition: { value: 'Focused Productivity Software', semanticRole: 'strategic_recommendation' },
+      communicationStyle: { value: 'Professional, Clear, and Demonstration-Led', semanticRole: 'strategic_recommendation' },
+      builderProductContext: { value: 'A project management app for independent consultants', semanticRole: 'builder_provided_product_context' },
+      builderDifferentiationDetails: { value: 'Client projects, tasks, deadlines, and a weekly workload view in one workspace', semanticRole: 'builder_provided_product_context' }
+    }
+  };
+  const softwareEducation = output('educational_content', softwareContext).result;
+  const softwareText = JSON.stringify(softwareEducation);
+  assert.match(softwareText, /workflow fit|available capabilities/i);
+  assert.match(softwareText, /client projects, tasks, deadlines/i);
+  assert.doesNotMatch(softwareText, /formulation|dosage|package count|botanical|full label|directions and warnings/i);
+
   console.log('Story 3.252 Product Launch Output Quality tests passed');
 }
 

@@ -66,6 +66,7 @@
 
         <form action="/discovery/build-plan/selection" method="POST" id="build-plan-selection-form">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="selectionSubmitted" value="1">
             <% const allPlanItems = approval.phases.reduce(function(items, phase) { return items.concat(phase.deliverables.map(function(item) { return { ...item, phaseTitle: phase.title }; })); }, []); %>
             <% const outputPlanItems = allPlanItems.filter(function(item) { return item.artifactRole !== 'planning_foundation'; }); %>
             <% const foundationPlanItems = allPlanItems.filter(function(item) { return item.artifactRole === 'planning_foundation'; }); %>
@@ -130,19 +131,11 @@
             <div class="build-plan-approval-actions">
             <% if (affordability && affordability.valid && !affordability.cost.canAfford && affordability.affordableRecommendation.length) { %>
             <% if (outputPlanItems.length && approval.counts.readyToUseAssets > 0) { %>
-            <form action="/discovery/build-plan/approve" method="POST">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="batchMode" value="affordable">
-                <button type="submit" class="btn btn-primary">Produce Affordable Batch Now</button>
-            </form>
+            <button type="submit" class="btn btn-primary" form="build-plan-selection-form" formaction="/discovery/build-plan/approve" formmethod="POST" name="batchMode" value="affordable">Produce Affordable Batch Now</button>
             <% } %>
             <% } %>
             <% if (outputPlanItems.length && approval.counts.readyToUseAssets > 0) { %>
-            <form action="/discovery/build-plan/approve" method="POST">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="batchMode" value="full">
-                <button type="submit" class="btn <%= affordability && affordability.valid && affordability.cost.canAfford ? 'btn-primary' : 'btn-outline' %>">Approve &amp; Prepare for Production</button>
-            </form>
+            <button type="submit" class="btn <%= affordability && affordability.valid && affordability.cost.canAfford ? 'btn-primary' : 'btn-outline' %>" form="build-plan-selection-form" formaction="/discovery/build-plan/approve" formmethod="POST" name="batchMode" value="full">Approve &amp; Prepare for Production</button>
             <% } else { %>
             <% const planningOnlyGuidance = {
                 build_brand: 'Save this plan and use the brand foundation to confirm proof and final brand decisions before creating customer-ready brand copy.',

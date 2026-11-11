@@ -282,13 +282,17 @@ async function run() {
     .run(37, 'story-3-7@example.com', 'Build Plan Tester');
   getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
     .run(38, 'story-3-7-save-failure@example.com', 'Build Plan Save Failure Tester');
+  getDb().prepare('INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)')
+    .run(39, 'story-3-7-inline-approval@example.com', 'Build Plan Inline Approval Tester');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, '..', 'views'));
   app.use(express.urlencoded({ extended: true }));
   app.use(session({ secret: 'story-3-7-test-secret', resave: false, saveUninitialized: true }));
   app.get('/test/authenticate/:mode', (req, res) => {
-    req.session.userId = req.params.mode === 'persistence_failure' ? 38 : 37;
-    const stateMode = req.params.mode === 'persistence_failure' ? 'valid' : req.params.mode;
+    req.session.userId = req.params.mode === 'persistence_failure'
+      ? 38
+      : req.params.mode === 'inline_approval' ? 39 : 37;
+    const stateMode = ['persistence_failure', 'inline_approval'].includes(req.params.mode) ? 'valid' : req.params.mode;
     req.session.discoverySession = discoveryState(stateMode);
     req.session.credits = 19;
     req.session.usageCount = 8;
@@ -310,6 +314,7 @@ async function run() {
   const valid = { server, cookie: '' };
   const planningOnly = { server, cookie: '' };
   const persistenceFailure = { server, cookie: '' };
+  const inlineApproval = { server, cookie: '' };
   try {
     const denied = await request(anonymous, 'POST', '/discovery/build-plan/approve');
     assert.strictEqual(denied.res.statusCode, 403, 'CSRF runs before authentication for unsafe anonymous requests');
@@ -344,6 +349,26 @@ async function run() {
       'a failed upsert must not leave an unsaved selection in the session'
     );
     getDb().exec('DROP TRIGGER reject_story_3_7_saved_plan');
+
+    await request(inlineApproval, 'GET', '/test/authenticate/inline_approval');
+    const inlineApprovalPage = await request(inlineApproval, 'GET', '/discovery/build-plan');
+    const inlineApprovalToken = inlineApprovalPage.body.match(/name="_csrf" value="([^"]+)"/)?.[1];
+    assert.match(inlineApprovalPage.body, /form="build-plan-selection-form"[^>]*formaction="\/discovery\/build-plan\/approve"/);
+    const inlineApproved = await request(inlineApproval, 'POST', '/discovery/build-plan/approve', {
+      _csrf: inlineApprovalToken,
+      selectionSubmitted: '1',
+      batchMode: 'full',
+      selectedDeliverableIds: withoutSocial
+    });
+    assert.strictEqual(inlineApproved.res.statusCode, 303);
+    assert.strictEqual(inlineApproved.res.headers.location, '/discovery/production-ready');
+    const inlineApprovedSession = JSON.parse((await request(inlineApproval, 'GET', '/test/session')).body);
+    assert(!inlineApprovedSession.discoverySession.buildPlanSelection.selectedDeliverableIds.includes('social_launch_campaign'));
+    assert(!inlineApprovedSession.discoverySession.approvedProductionSet.productionOrder.includes('social_launch_campaign'));
+    const inlineSavedRow = getDb().prepare('SELECT workflow_state FROM saved_build_plan_states WHERE user_id = ? AND objective = ?')
+      .get(39, 'launch_product');
+    assert(inlineSavedRow, 'inline approval must persist the submitted selection before production handoff');
+    assert(!JSON.parse(inlineSavedRow.workflow_state).buildPlanSelection.selectedDeliverableIds.includes('social_launch_campaign'));
 
     await request(missingReflection, 'GET', '/test/authenticate/missing_reflection');
     assert.strictEqual((await request(missingReflection, 'POST', '/discovery/build-plan/approve', { _csrf: 'invalid' })).res.statusCode, 403);

@@ -1016,9 +1016,27 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
   if (!isMeaningfullyReady(discoverySession?.planningReadiness) || !hasCurrentBuildPlanState(discoverySession)) {
     return res.redirect('/discovery/build-plan');
   }
+
+  const selectionSubmitted = req.body.selectionSubmitted === '1';
+  let selection = discoverySession.buildPlanSelection;
+  if (selectionSubmitted) {
+    const requested = Array.isArray(req.body.selectedDeliverableIds)
+      ? req.body.selectedDeliverableIds
+      : req.body.selectedDeliverableIds ? [req.body.selectedDeliverableIds] : [];
+    const selectionResult = updateSelection({
+      plan: discoverySession.buildPlan,
+      currentSelection: discoverySession.buildPlanSelection,
+      requestedDeliverableIds: requested
+    });
+    if (!selectionResult.valid) {
+      return renderBuildPlan(req, res, { status: 409, error: selectionResult.error });
+    }
+    selection = selectionResult.selection;
+  }
+
   const result = createApprovedProductionSet({
     plan: discoverySession.buildPlan,
-    selection: discoverySession.buildPlanSelection,
+    selection,
     strategyResult: discoverySession.strategyResult,
     confirmedUnderstanding: discoverySession.confirmedUnderstanding,
     batchMode: req.body.batchMode
@@ -1027,11 +1045,29 @@ router.post('/discovery/build-plan/approve', requireAuth, (req, res) => {
     return renderBuildPlan(req, res, { status: 409, error: result.error });
   }
 
-  discoverySession.buildPlanSelection.approvedAt = result.approvedAt;
-  discoverySession.buildPlanSelection.updatedAt = result.approvedAt;
-  discoverySession.approvedProductionSet = result.productionSet;
   const db = req.app.locals.copyquickDb || getDb();
   const userId = req.session.userId || req.session.passport?.user;
+  const approvedSelection = {
+    ...selection,
+    approvedAt: result.approvedAt,
+    updatedAt: result.approvedAt
+  };
+  if (selectionSubmitted) {
+    try {
+      const saved = saveBuildPlan(db, {
+        userId,
+        discoverySession: { ...discoverySession, buildPlanSelection: approvedSelection }
+      });
+      discoverySession.buildPlanSavedAt = saved.savedAt;
+    } catch (_) {
+      return renderBuildPlan(req, res, {
+        status: 409,
+        error: 'This plan could not be saved safely. Review it and try again.'
+      });
+    }
+  }
+  discoverySession.buildPlanSelection = approvedSelection;
+  discoverySession.approvedProductionSet = result.productionSet;
   const promotion = promoteObjectiveMemory(db, {
     userId,
     objective: discoverySession.objective,
