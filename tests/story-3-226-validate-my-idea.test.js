@@ -1,12 +1,18 @@
 const assert = require('assert');
 const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
+const { understandBusiness } = require('../lib/businessUnderstanding');
 
 function fact(value, label = value) { return { value, label, confidence: 1, source: 'user_confirmed', semanticRole: 'confirmed_fact' }; }
 
 (async function run() {
   const objective = 'validate_idea';
   assert(getAvailableObjective(objective));
+  const inferred = await understandBusiness({
+    objective,
+    answer: 'A shared appointment coordination assistant for independent home-service contractors who lose time rescheduling clients.'
+  });
+  assert.strictEqual(inferred.understanding.targetAudience.label, 'Independent home-service contractors');
   const understanding = {
     ideaDefinition: fact('A scheduling assistant for independent contractors'), ideaMaturity: fact('idea_only', 'Idea only'),
     targetAudience: fact('Independent contractors coordinating appointments by text'), problemHypothesis: fact('Scheduling changes consume time and create missed appointments'),
