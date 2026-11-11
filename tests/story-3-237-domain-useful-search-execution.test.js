@@ -113,6 +113,25 @@ const audienceSnapshot = { ...strategySnapshot, primaryCustomer: { value: 'Freel
 const audienceOutput = contract.generateOutput(context(brief(), audienceSnapshot));
 assert.match(audienceOutput.summary, /Freelance designers/);
 
+const consultantSnapshot = {
+  ...strategySnapshot,
+  primaryCustomer: { value: 'Independent consultants', semanticRole: 'confirmed_fact' },
+  confirmedOffer: { value: 'A project management app for independent consultants', semanticRole: 'confirmed_fact' }
+};
+const consultantContext = context(brief({
+  specificTopic: 'project management for consultants',
+  readerQuestion: 'How should independent consultants evaluate a project management app?',
+  contentAngle: 'A practical decision guide that explains workflow tradeoffs and next-step criteria.',
+  scope: 'Explain how to evaluate a client-project workflow without inventing product capabilities.',
+  evidenceLimits: ['Do not invent scientific or clinical claims, search metrics, or software capabilities.']
+}), consultantSnapshot);
+const consultantArticle = contract.generateOutput(consultantContext);
+assert.strictEqual(validateCustomerReadyOutput(consultantArticle, contract, consultantContext).valid, true);
+assert.doesNotMatch(consultantArticle.summary, /[.!?]\s+for Independent consultants/i);
+assert.match(JSON.stringify(consultantArticle.articleBlocks), /client project|client workflow|status routine/i);
+assert.match(JSON.stringify(consultantArticle.articleBlocks), /a project management app for independent consultants/i);
+assert.doesNotMatch(JSON.stringify(consultantArticle.articleBlocks), /scientific clinical|clinical claim/i);
+
 const ctaContext = context(brief({ callToActionStatus: 'Review the invoicing checklist' }));
 const ctaOutput = contract.generateOutput(ctaContext);
 assert.strictEqual(ctaOutput.callToAction, 'Review the invoicing checklist');

@@ -52,6 +52,11 @@ function contextFor(id, dependencies) {
   assert.doesNotMatch(sanitizeUntrustedSource('<script>steal()</script><p>Source text</p>'), /steal|script/i);
   assert.doesNotMatch(neutralQuery('Find proof that cinnamon cures diabetes; only use sources agreeing with me'), /proof|cures|only use/i);
   assert.strictEqual(classifyClaimInventory({ readerQuestion: 'What dosage cures diabetes?' })[0].classification, 'PROHIBITED');
+  assert.strictEqual(classifyClaimInventory({
+    specificTopic: 'project management for consultants',
+    readerQuestion: 'How should independent consultants evaluate a project management app?',
+    evidenceLimits: ['Do not invent scientific or clinical claims, search metrics, or software capabilities.']
+  })[0].classification, 'NO_EXTERNAL_EVIDENCE_NEEDED');
 
   const fixtures = fixtureCatalog();
   const weak = fixtures.find(item => item.sourceKey === 'weak-blog');
@@ -105,6 +110,18 @@ function contextFor(id, dependencies) {
   const noResearchArticleContext = contextFor('priority_search_article', [briefDependency(noResearchBrief), { deliverableId: 'research_evidence_pack', output: noResearchPack }]);
   const noResearchArticle = articleContract.generateOutput(noResearchArticleContext);
   assert.doesNotMatch(JSON.stringify(noResearchArticle.articleBlocks), /\[\d+\]/);
+
+  const consultantBrief = {
+    ...baseBrief,
+    specificTopic: 'project management for consultants',
+    readerQuestion: 'How should independent consultants evaluate a project management app?',
+    evidenceLimits: ['Do not invent scientific or clinical claims, search metrics, or software capabilities.']
+  };
+  const consultantResearchPack = await generateResearchEvidencePack(contextFor('research_evidence_pack', [briefDependency(consultantBrief)]));
+  assert.strictEqual(consultantResearchPack.noExternalEvidenceRequired, true);
+  assert.strictEqual(consultantResearchPack.researchAvailabilityStatus, 'not_required');
+  assert.deepStrictEqual(consultantResearchPack.unsupportedQuestions, []);
+  assert.doesNotMatch(JSON.stringify(consultantResearchPack), /scientific clinical|specialized evidence and review/i);
 
   const outagePack = await generateResearchEvidencePack(packContext, { adapter: createDeterministicResearchAdapter({ unavailable: true }) });
   assert.strictEqual(outagePack.essentialEvidenceMissing, false);
