@@ -1,10 +1,10 @@
 # Autonomous Completion Progress
 
-Last updated: 2026-11-04
+Last updated: 2026-11-10
 
 Branch: `next-gen`
 
-Current checkpoint: `340da4065adbb09cec322c9d804c32840328b8c9`
+Current checkpoint: `c8edf6a7a182ee5fe42a8518662f90f61c6550c6`
 
 ## Current phase
 
@@ -17,7 +17,8 @@ release-readiness phases without a production deployment.
 - The working tree was clean at the start of autonomous completion work.
 - Local `next-gen` matched `origin/next-gen` at checkpoint `340da406...`.
 - The repository runner discovered 256 `tests/*.test.js` files at the starting
-  checkpoint and discovers 257 after adding the public-metadata regression.
+  checkpoint and discovers 258 after adding the public-metadata and staging
+  isolation regressions.
 - GitHub CI for checkpoint `340da406...` passed.
 - CI uses deterministic providers, disposable fail-closed storage, and no
   production credentials.
@@ -70,13 +71,22 @@ release-readiness phases without a production deployment.
   production generation.
 - Documented the isolation requirements and acceptance gate for a future staging
   service; no infrastructure or production configuration was changed.
+- Added a separate, non-active `render.staging.yaml` Blueprint pinned to
+  `next-gen`, manual deployments, a dedicated 1 GB disk, deterministic provider
+  mode, test-only integration placeholders, and no production identifiers.
+- Added an environment-wide public-indexing switch. The staging Blueprint sets
+  it false, producing noindex metadata, a site-wide robots disallow, and no
+  sitemap entries without changing production defaults.
+- Added a staging creation and fresh-database initialization runbook. The normal
+  startup migration guard remains fail-closed and no hosted resource was
+  created.
 
 ## Tests and checks performed
 
 - `node --version`: `v24.20.0`
 - Branch and local/remote checkpoint comparison: matched
 - Working tree baseline: clean
-- Test discovery: 257 executable `tests/*.test.js` files after this changeset
+- Test discovery: 258 executable `tests/*.test.js` files after this changeset
 - Public metadata regression: passed
 - Accessibility foundation regression: passed
 - Public navigation and truthful-resource regressions: passed
@@ -103,11 +113,16 @@ release-readiness phases without a production deployment.
   unsafe-summary leakage guard.
 - Re-ran the complete isolated repository suite: all 257 test files passed with
   Node `v24.20.0`, no real provider calls, and no production access.
+- Re-ran the complete suite after the staging safeguards: all 258 test files
+  passed with Node `v24.20.0`, no real provider calls, and no production access.
 
 ## Outstanding work
 
-1. Establish or obtain authorization for a non-production staging environment.
-2. Deploy the current `next-gen` release candidate to staging and verify the
+1. Obtain explicit approval for the estimated $7.25/month base staging cost,
+   then create the isolated Blueprint instance without reusing production data
+   or secrets.
+2. Initialize the fresh staging database through the documented explicit gate,
+   deploy the approved `next-gen` release candidate, and verify the
    bookkeeping Strategy and Build Plan terminology correction plus public
    metadata.
 3. Complete browser acceptance for all seven objectives in a release-like

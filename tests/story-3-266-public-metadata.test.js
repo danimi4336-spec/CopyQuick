@@ -5,6 +5,8 @@ const ejs = require('ejs');
 const {
   PUBLIC_PAGES,
   pageMetadataFor,
+  publicIndexingEnabled,
+  robotsText,
   sitemapEntries
 } = require('../lib/pageMetadata');
 
@@ -41,10 +43,27 @@ for (const privatePath of ['/dashboard', '/discovery', '/production/9', '/genera
 }
 
 assert.deepStrictEqual(sitemapEntries({ origin: 'https://copyquick.co' }), publicPaths.map(publicPath => `https://copyquick.co${publicPath === '/' ? '/' : publicPath}`));
+assert.deepStrictEqual(sitemapEntries({ origin: 'https://staging.example', indexingEnabled: false }), []);
+assert.strictEqual(publicIndexingEnabled({}), true);
+assert.strictEqual(publicIndexingEnabled({ PUBLIC_INDEXING_ENABLED: 'false' }), false);
+assert.strictEqual(publicIndexingEnabled({ PUBLIC_INDEXING_ENABLED: ' FALSE ' }), false);
+assert.strictEqual(publicIndexingEnabled({ PUBLIC_INDEXING_ENABLED: 'invalid' }), false);
+assert.strictEqual(publicIndexingEnabled({ PUBLIC_INDEXING_ENABLED: ' true ' }), true);
+assert.strictEqual(robotsText({ indexingEnabled: false }), 'User-agent: *\nDisallow: /\n');
+assert.match(robotsText({ origin: 'https://copyquick.co' }), /Sitemap: https:\/\/copyquick\.co\/sitemap\.xml/);
+for (const publicPath of publicPaths) {
+  const metadata = pageMetadataFor(publicPath, {
+    origin: 'https://staging.example',
+    indexingEnabled: false
+  });
+  assert.strictEqual(metadata.indexable, false);
+  assert.strictEqual(metadata.robots, 'noindex, nofollow, noarchive');
+}
 assert.doesNotMatch(JSON.stringify(sitemapEntries()), /dashboard|profile|history|discovery|production|generation|billing/);
 assert.match(server, /app\.get\('\/robots\.txt'/);
 assert.match(server, /app\.get\('\/sitemap\.xml'/);
 assert.match(server, /X-Robots-Tag/);
+assert.match(server, /robotsText/);
 assert(fs.existsSync(path.join(root, 'public', 'images', 'copyquick-favicon.svg')));
 assert(fs.existsSync(path.join(root, 'public', 'images', 'copyquick-social-card.png')));
 

@@ -44,7 +44,7 @@ const { createRequestContextMiddleware } = require('./lib/requestContext');
 const { writeOperationalEvent } = require('./lib/operationalLogger');
 const { configureBrowserSecurity } = require('./lib/browserSecurity');
 const { validateBillingReturnOrigin } = require('./lib/publicAppOrigin');
-const { pageMetadataFor, sitemapEntries, normalizedOrigin } = require('./lib/pageMetadata');
+const { pageMetadataFor, publicIndexingEnabled, robotsText, sitemapEntries } = require('./lib/pageMetadata');
 const { authConfigurationEvent } = require('./lib/authConfiguration');
 const { createSensitiveResponseCacheMiddleware } = require('./lib/sensitiveResponseCache');
 const { defaultEmailDeliveryTracker } = require('./lib/emailDeliveryTracker');
@@ -138,7 +138,10 @@ app.use(createAuthenticatedUserMiddleware({ getDb }));
 // surface defaults to noindex so account and customer content cannot be
 // indexed accidentally.
 app.use((req, res, next) => {
-  res.locals.pageMetadata = pageMetadataFor(req.path, { origin: process.env.PUBLIC_APP_ORIGIN });
+  res.locals.pageMetadata = pageMetadataFor(req.path, {
+    origin: process.env.PUBLIC_APP_ORIGIN,
+    indexingEnabled: publicIndexingEnabled(process.env)
+  });
   if (!res.locals.pageMetadata.indexable) res.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
   next();
 });
@@ -185,12 +188,17 @@ app.get('/blog', (req, res) => {
 });
 
 app.get('/robots.txt', (req, res) => {
-  const origin = normalizedOrigin(process.env.PUBLIC_APP_ORIGIN);
-  res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /dashboard\nDisallow: /profile\nDisallow: /history\nDisallow: /favorites\nDisallow: /discovery\nDisallow: /production\nDisallow: /generation\nDisallow: /billing\nSitemap: ${origin}/sitemap.xml\n`);
+  res.type('text/plain').send(robotsText({
+    origin: process.env.PUBLIC_APP_ORIGIN,
+    indexingEnabled: publicIndexingEnabled(process.env)
+  }));
 });
 
 app.get('/sitemap.xml', (req, res) => {
-  const urls = sitemapEntries({ origin: process.env.PUBLIC_APP_ORIGIN });
+  const urls = sitemapEntries({
+    origin: process.env.PUBLIC_APP_ORIGIN,
+    indexingEnabled: publicIndexingEnabled(process.env)
+  });
   const body = urls.map(url => `  <url><loc>${url}</loc></url>`).join('\n');
   res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`);
 });
