@@ -5,7 +5,7 @@ const { createObjectiveRuntime } = require('../lib/objectiveRuntime');
 const { getAvailableObjective } = require('../lib/objectiveFramework');
 const { buildBusinessReflection } = require('../lib/businessReflection');
 const { createApprovedProductionSet, createDefaultSelection } = require('../lib/buildPlanApproval');
-const { understandBusiness } = require('../lib/businessUnderstanding');
+const { understandBusiness, audienceFromDescription } = require('../lib/businessUnderstanding');
 const { validateApprovedProductionSession } = require('../lib/productionInitialization');
 
 function fact(value, label = value) {
@@ -22,6 +22,11 @@ function fact(value, label = value) {
   assert.strictEqual(openingUnderstanding.understanding.targetAudience.value, 'small ecommerce businesses');
   assert.strictEqual(openingUnderstanding.understanding.targetAudience.label, 'Small ecommerce businesses');
   assert.doesNotMatch(openingUnderstanding.understanding.targetAudience.value, /bookkeeping service/i);
+  assert.strictEqual(
+    audienceFromDescription('A SaaS pricing page for independent consultants receives referral traffic, but trial-start conversion has not been measured.', objective),
+    'independent consultants',
+    'the current traffic clause must not become part of the inferred conversion audience'
+  );
   const understanding = {
     currentOffer: fact('A 14-day team scheduling trial'),
     targetAudience: fact('Operations leaders at growing software companies'),
