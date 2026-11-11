@@ -46,6 +46,24 @@ function fact(value, label = value) { return { value, label, confidence: 1, sour
   const strategy = runtime.strategy.build({ understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategy.status, /Brand Decisions to Approve/);
   assert.match(JSON.stringify(strategy), /must not silently overwrite established Brand Brain facts/i);
+  assert.strictEqual(strategy.strategy.launchApproach.value, 'Evolve the established foundation deliberately');
+
+  const newBrandUnderstanding = {
+    ...understanding,
+    existingBrand: fact('This is a new brand. No established name, visual system, or positioning exists yet.'),
+    brandProof: fact('No substantiated credentials, testimonials, case studies, or results are available yet.'),
+    brandConstraints: fact("I'm not sure yet")
+  };
+  const newBrandStrategy = runtime.strategy.build({
+    understanding: newBrandUnderstanding,
+    confirmedUnderstanding: newBrandUnderstanding,
+    answers: { ...answers, brand_state: { value: newBrandUnderstanding.existingBrand.value } }
+  });
+  assert.strictEqual(newBrandStrategy.strategy.launchApproach.value, 'Establish and test the brand foundation');
+  assert.doesNotMatch(newBrandStrategy.strategy.launchApproach.explanation, /preserv/i);
+  assert.match(newBrandStrategy.strategy.launchApproach.explanation, /no established brand foundation/i);
+  assert.match(newBrandStrategy.strategy.risks.value.join(' '), /proof.*remain unestablished/i);
+  assert.match(newBrandStrategy.assumptions.join(' '), /no established brand foundation is assumed/i);
   const plan = runtime.buildPlan({ confirmedUnderstanding: understanding, strategyResult: strategy, answers });
   assert.deepStrictEqual(plan.phases.flatMap(phase => phase.deliverables).map(item => item.id), ['customer_profile', 'product_positioning', 'value_proposition', 'core_messaging']);
 

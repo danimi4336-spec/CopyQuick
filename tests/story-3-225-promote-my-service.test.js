@@ -23,6 +23,23 @@ function fact(value, label = value) { return { value, label, confidence: 1, sour
   const strategy = runtime.strategy.build({ understanding, confirmedUnderstanding: understanding, answers });
   assert.match(strategy.status, /Service Proof Boundaries/);
   assert.match(JSON.stringify(strategy), /No testimonial, credential, certification, case study, client count, or performance result is invented/);
+  assert.strictEqual(strategy.strategy.primarySalesChannel.value, 'Outbound outreach');
+  assert.match(strategy.strategy.primarySalesChannel.explanation, /actual or test channel/i);
+  assert.doesNotMatch(strategy.strategy.primarySalesChannel.explanation, /current customer-acquisition source/i);
+  assert.match(strategy.strategy.launchApproach.explanation, /does not establish that it is current or effective/i);
+
+  const noProofUnderstanding = {
+    ...understanding,
+    serviceExpertise: fact('No substantiated credentials, testimonials, case studies, or performance results are available yet.')
+  };
+  const noProofStrategy = runtime.strategy.build({
+    understanding: noProofUnderstanding,
+    confirmedUnderstanding: noProofUnderstanding,
+    answers
+  });
+  assert.match(noProofStrategy.strategy.marketingFocus.value, /keeping proof claims out/i);
+  assert.match(noProofStrategy.strategy.marketingFocus.explanation, /remain unavailable/i);
+  assert.doesNotMatch(noProofStrategy.strategy.marketingFocus.explanation, /builder-supplied expertise/i);
   const plan = runtime.buildPlan({ confirmedUnderstanding: understanding, strategyResult: strategy, answers });
   const items = plan.phases.flatMap(phase => phase.deliverables);
   assert.deepStrictEqual(items.map(item => item.id), ['customer_profile', 'product_positioning', 'value_proposition', 'core_messaging', 'service_page']);
