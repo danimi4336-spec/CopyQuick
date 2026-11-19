@@ -116,6 +116,24 @@ async function run() {
   for (const status of ['active', 'trialing']) {
     assert.strictEqual(evaluateStripeEntitlement(remote({ status }), { env, now }).entitled, true);
   }
+  const itemPeriodSubscription = remote({ items: { data: [{
+    price: { id: env.STRIPE_PRO_PRICE },
+    current_period_start: 1767225600,
+    current_period_end: 1769904000
+  }] } });
+  delete itemPeriodSubscription.current_period_start;
+  delete itemPeriodSubscription.current_period_end;
+  const itemPeriodEntitlement = evaluateStripeEntitlement(itemPeriodSubscription, { env, now });
+  assert.strictEqual(itemPeriodEntitlement.planTier, 'pro');
+  assert.strictEqual(itemPeriodEntitlement.monthlyLimit, 200);
+  assert.strictEqual(itemPeriodEntitlement.currentPeriodStart, 1767225600);
+  assert.strictEqual(itemPeriodEntitlement.currentPeriodEnd, 1769904000);
+  const incompletePeriod = { ...itemPeriodSubscription, current_period_start: 1767225600 };
+  expectPolicyCode(() => evaluateStripeEntitlement(incompletePeriod, { env, now }), 'STRIPE_RECORD_INCOMPLETE');
+  const invalidItemPeriod = { ...itemPeriodSubscription, items: { data: [{
+    price: { id: env.STRIPE_PRO_PRICE }, current_period_start: 1769904000, current_period_end: 1767225600
+  }] } };
+  expectPolicyCode(() => evaluateStripeEntitlement(invalidItemPeriod, { env, now }), 'STRIPE_RECORD_INCOMPLETE');
   for (const status of ['unpaid', 'incomplete', 'incomplete_expired', 'paused', 'canceled', 'deleted']) {
     const result = evaluateStripeEntitlement(remote({ status }), { env, now });
     assert.strictEqual(result.entitled, false, status);
