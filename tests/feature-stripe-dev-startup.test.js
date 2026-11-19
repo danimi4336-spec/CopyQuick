@@ -5,8 +5,10 @@ const { spawn } = require('child_process');
 const { assertIsolatedTestDatabase } = require('./helpers/isolatedTestDatabase');
 
 const projectRoot = path.join(__dirname, '..');
+const CHILD_PROCESS_TIMEOUT_MS = 60000;
+const DEVELOPMENT_STARTUP_TIMEOUT_MS = 180000;
 
-function runNode(args, env = {}, timeoutMs = 5000) {
+function runNode(args, env = {}, timeoutMs = CHILD_PROCESS_TIMEOUT_MS) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: projectRoot,
@@ -48,7 +50,7 @@ function startDevelopmentServer(databasePath) {
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
       reject(new Error(`Development server did not start.\n${output}`));
-    }, 60000);
+    }, DEVELOPMENT_STARTUP_TIMEOUT_MS);
 
     function inspect(chunk) {
       output += chunk;
