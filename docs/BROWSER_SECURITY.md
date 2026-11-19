@@ -5,7 +5,7 @@ including static assets, redirects, errors, `/healthz`, and signed Stripe
 webhooks.
 
 The baseline prevents framing, MIME sniffing, plug-in content, untrusted base
-URLs, cross-origin form submission, and access to unused camera, microphone,
+URLs, unauthorized cross-origin form submission, and access to unused camera, microphone,
 and geolocation capabilities. Referrers are reduced on cross-origin requests.
 Production HTTPS responses also advertise one year of HSTS. HSTS is omitted
 from local development and any non-HTTPS response so localhost is not pinned.
@@ -13,7 +13,9 @@ from local development and any non-HTTPS response so localhost is not pinned.
 The Content Security Policy permits the application's current same-origin
 JavaScript and assets, Google Fonts, HTTPS images (including OAuth avatars),
 and the existing inline scripts and styles used by EJS views. `object-src`,
-`frame-ancestors`, `base-uri`, and `form-action` remain tightly restricted.
+`frame-ancestors` and `base-uri` remain tightly restricted. `form-action`
+permits same-origin submissions and redirects to Stripe's hosted checkout and
+customer portal; the billing routes separately validate the redirect hosts.
 
 ## Remaining hardening
 

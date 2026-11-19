@@ -50,7 +50,10 @@ async function run() {
   assert.match(CONTENT_SECURITY_POLICY, /frame-ancestors 'none'/);
   assert.match(CONTENT_SECURITY_POLICY, /object-src 'none'/);
   assert.match(CONTENT_SECURITY_POLICY, /base-uri 'self'/);
-  assert.match(CONTENT_SECURITY_POLICY, /form-action 'self'/);
+  assert.strictEqual(
+    CONTENT_SECURITY_POLICY.split('; ').find((directive) => directive.startsWith('form-action ')),
+    "form-action 'self' https://checkout.stripe.com https://billing.stripe.com"
+  );
   assert.match(CONTENT_SECURITY_POLICY, /style-src[^;]*https:\/\/fonts\.googleapis\.com/);
   assert.match(CONTENT_SECURITY_POLICY, /font-src[^;]*https:\/\/fonts\.gstatic\.com/);
   assert.match(CONTENT_SECURITY_POLICY, /img-src[^;]*data:[^;]*https:/);
