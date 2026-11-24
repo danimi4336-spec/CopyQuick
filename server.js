@@ -19,6 +19,7 @@ const builderRoutes = require('./routes/builder');
 const discoveryRoutes = require('./routes/discovery');
 const productionRoutes = require('./routes/production');
 const { createPasswordRecoveryRouter } = require('./routes/passwordRecovery');
+const { createTrafficRouter, isTrafficOwner } = require('./routes/traffic');
 const { createHealthRouter } = require('./routes/health');
 const { sendContactFormEmails } = require('./lib/email');
 const { contentTypes } = require('./lib/contentTypes');
@@ -148,12 +149,15 @@ app.use((req, res, next) => {
 
 // Wrapper for layout
 app.use((req, res, next) => {
+  res.locals.canViewTraffic = isTrafficOwner(res.locals.user);
   const _render = res.render;
   res.render = function(view, options, fn) {
     if (view === 'layout') return _render.call(this, view, options, fn);
     
     _render.call(this, view, options, (err, html) => {
       if (err) return next(err);
+      res.locals.measureVisit = req.method === 'GET' && res.statusCode === 200
+        && !res.locals.canViewTraffic && view !== 'error';
       _render.call(this, 'layout', { ...options, ...res.locals, body: html }, fn);
     });
   };
@@ -161,6 +165,7 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.use('/', createTrafficRouter({ getDb }));
 app.use('/', authRoutes);
 app.use('/', createPasswordRecoveryRouter());
 app.use('/', dashboardRoutes);

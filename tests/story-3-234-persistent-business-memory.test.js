@@ -11,7 +11,7 @@ const { explicitCurrentInput } = require('../lib/businessMemory');
 const db = new Database(':memory:');
 db.pragma('foreign_keys = ON');
 runMigrationEngine(db, { logger() {} });
-assert.strictEqual(MAX_SUPPORTED_SCHEMA_VERSION, 8);
+assert(MAX_SUPPORTED_SCHEMA_VERSION >= 8);
 assert(db.prepare("SELECT 1 FROM sqlite_master WHERE name='business_memory_subjects'").get());
 assert(db.prepare("SELECT 1 FROM sqlite_master WHERE name='business_memory_records'").get());
 

@@ -3,7 +3,7 @@ const Database = require('better-sqlite3');
 const { BASELINE_INDEXES, BASELINE_SCHEMA_SQL, BASELINE_TABLES } = require('./schema');
 
 const MIN_SUPPORTED_SCHEMA_VERSION = 1;
-const MAX_SUPPORTED_SCHEMA_VERSION = 8;
+const MAX_SUPPORTED_SCHEMA_VERSION = 9;
 const LEDGER_TABLE = 'schema_migrations';
 const LEDGER_SQL = `
   CREATE TABLE schema_migrations (
@@ -304,7 +304,20 @@ const MIGRATIONS = Object.freeze([
   SAVED_BUILD_PLANS_MIGRATION,
   SAVED_BUILD_PLAN_FINGERPRINT_MIGRATION,
   PRODUCTION_PLAN_PROGRESS_SNAPSHOT_MIGRATION,
-  BUSINESS_MEMORY_MIGRATION
+  BUSINESS_MEMORY_MIGRATION,
+  Object.freeze({
+    version: 9,
+    name: 'site_visitor_counts',
+    kind: 'migration',
+    policy: 'additive',
+    rollbackCompatible: false,
+    statements: Object.freeze([
+      `CREATE TABLE site_visitors (
+        browser_hash TEXT PRIMARY KEY NOT NULL,
+        email_invite INTEGER NOT NULL CHECK(email_invite IN (0, 1))
+      ) WITHOUT ROWID`
+    ])
+  })
 ]);
 
 function migrationChecksum(migration) {

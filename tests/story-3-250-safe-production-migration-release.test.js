@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { MAX_SUPPORTED_SCHEMA_VERSION } = require('../db/migrations');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -128,7 +129,7 @@ async function run() {
     assert.ok(fs.existsSync(backupPath));
 
     const migrated = runMigrationEngine(value.db, { logger: () => {} });
-    assert.strictEqual(migrated.currentVersion, 8);
+    assert.strictEqual(migrated.currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
     assert.strictEqual(migrated.pendingCount, 0);
     assert.strictEqual(migrated.integrity, 'ok');
     assertSeedPreserved(value.db, ids);
@@ -142,10 +143,10 @@ async function run() {
       cwd: projectRoot, env: releaseEnv(value.env), encoding: 'utf8'
     });
     assert.strictEqual(releasePass.status, 0, releasePass.stdout + releasePass.stderr);
-    assert.strictEqual(JSON.parse(releasePass.stdout.slice(releasePass.stdout.indexOf('\n{') + 1)).migration.currentVersion, 8);
+    assert.strictEqual(JSON.parse(releasePass.stdout.slice(releasePass.stdout.indexOf('\n{') + 1)).migration.currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
 
     const secondPass = runMigrationEngine(value.db, { logger: () => {} });
-    assert.strictEqual(secondPass.currentVersion, 8);
+    assert.strictEqual(secondPass.currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
     assert.strictEqual(secondPass.pendingCount, 0);
 
     value.db.close();
@@ -176,11 +177,11 @@ async function run() {
 
   const future = fixture();
   try {
-    const v9 = {
-      version: 9, name: 'future_schema_probe', kind: 'migration', policy: 'additive',
+    const futureMigration = {
+      version: MAX_SUPPORTED_SCHEMA_VERSION + 1, name: 'future_schema_probe', kind: 'migration', policy: 'additive',
       rollbackCompatible: false, statements: ['CREATE TABLE future_schema_probe(id INTEGER PRIMARY KEY)']
     };
-    runMigrationEngine(future.db, { registry: [...MIGRATIONS, v9], minVersion: 1, maxVersion: 9, logger: () => {} });
+    runMigrationEngine(future.db, { registry: [...MIGRATIONS, futureMigration], minVersion: 1, maxVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1, logger: () => {} });
     assert.strictEqual(inspectReleaseMigrationReadiness(future.env).code, 'MIGRATION_INCOMPATIBLE');
   } finally {
     future.db.close();
@@ -190,7 +191,7 @@ async function run() {
   const failure = fixture();
   try {
     const failing = {
-      version: 9,
+      version: MAX_SUPPORTED_SCHEMA_VERSION + 1,
       name: 'forced_release_failure',
       kind: 'migration',
       policy: 'additive',
@@ -199,9 +200,9 @@ async function run() {
       validate() { throw new Error('forced validation failure'); }
     };
     assert.throws(() => runMigrationEngine(failure.db, {
-      registry: [...MIGRATIONS, failing], minVersion: 1, maxVersion: 9, logger: () => {}
+      registry: [...MIGRATIONS, failing], minVersion: 1, maxVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1, logger: () => {}
     }), error => error.code === 'MIGRATION_FAILED');
-    assert.strictEqual(inspectMigrationStatus(failure.db).currentVersion, 8);
+    assert.strictEqual(inspectMigrationStatus(failure.db).currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
     assert.strictEqual(failure.db.prepare("SELECT 1 FROM sqlite_master WHERE name='should_rollback'").get(), undefined);
   } finally {
     failure.db.close();

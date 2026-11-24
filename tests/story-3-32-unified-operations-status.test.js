@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { MAX_SUPPORTED_SCHEMA_VERSION } = require('../db/migrations');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -103,7 +104,7 @@ function run() {
   assert.strictEqual(cli.status, 0, cli.stderr);
   const output = JSON.parse(cli.stdout);
   assert.strictEqual(output.status, 'healthy');
-  assert.strictEqual(output.migration.currentVersion, 8);
+  assert.strictEqual(output.migration.currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
   assert.strictEqual(output.storage.quickCheck, 'ok');
   assert.strictEqual(output.generation.mode, 'running');
   assert(!cli.stdout.includes(databasePath));

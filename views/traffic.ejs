@@ -1,0 +1,14 @@
+<div class="container dashboard">
+    <header class="dashboard-header"><h1>Site traffic</h1></header>
+    <section class="auth-card">
+        <h2>Since tracking began</h2>
+        <dl>
+            <dt>Unique browsers</dt><dd><strong><%= counts.visitors.toLocaleString('en-US') %></strong></dd>
+            <dt>Of those, opened an email invitation</dt><dd><strong><%= counts.invited.toLocaleString('en-US') %></strong></dd>
+        </dl>
+        <p>Each browser counts once, even on repeat visits. A person using two devices can count twice.</p>
+        <h2>Email invitation link</h2>
+        <p>Copy this link into invitations and follow-ups to measure visits from them.</p>
+        <input aria-label="Email invitation link" type="text" readonly value="<%= invitationUrl %>" onclick="this.select()">
+    </section>
+</div>

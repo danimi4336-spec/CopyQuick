@@ -99,6 +99,18 @@ Health endpoints:
 
 Production mutations—including migrations, billing reconciliation with `--apply`, recovery actions, provider execution, and deployment—require explicit authorization and the relevant runbook.
 
+### Site traffic
+
+Schema migration 9 adds first-party visitor counts. Set `TRAFFIC_OWNER_USER_ID` to your numeric CopyQuick account ID in the service environment. To look up your ID, run this read-only query in the Render shell with your own sign-in email:
+
+```sh
+sqlite3 -readonly "$DATABASE_PATH" "SELECT id FROM users WHERE email = 'your-login@example.com' COLLATE NOCASE;"
+```
+
+After the normal migration and release, sign in to that account and open **Site traffic** in the sidebar or visit `/admin/traffic`. Copy the invitation URL from the report. It uses `?ref=email-invite`. Previously sent untagged links cannot identify email traffic.
+
+The totals cover the period since tracking began. Each browser with JavaScript and local storage counts once per origin. Opening a tagged link adds the browser to the email subset even if it previously arrived directly. Reloading the page or reopening an invitation leaves the counts unchanged. Clearing browser data or using a different device can count someone again. The tracker skips hidden pages until viewed and respects Do Not Track and Global Privacy Control.
+
 ## Documentation
 
 - [Project Status](docs/PROJECT_STATUS.md)

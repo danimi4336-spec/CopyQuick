@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { MAX_SUPPORTED_SCHEMA_VERSION } = require('../db/migrations');
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
@@ -32,9 +33,9 @@ function closeFixture(value) {
   fs.rmSync(value.directory, { recursive: true, force: true });
 }
 
-function additiveV9() {
+function nextMigration() {
   return {
-    version: 9,
+    version: MAX_SUPPORTED_SCHEMA_VERSION + 1,
     name: 'add_gate_probe',
     kind: 'migration',
     policy: 'additive',
@@ -49,9 +50,9 @@ function initializeCurrent(db) {
 
 function initializeNewer(db) {
   return runMigrationEngine(db, {
-    registry: [...MIGRATIONS, additiveV9()],
+    registry: [...MIGRATIONS, nextMigration()],
     minVersion: 1,
-    maxVersion: 9,
+    maxVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1,
     logger: () => {}
   });
 }
@@ -88,13 +89,13 @@ async function run() {
       initializeCurrent(value.db);
       const logs = [];
       const status = gate(value.db, {}, entry => logs.push(entry));
-      assert.strictEqual(status.currentVersion, 8);
+      assert.strictEqual(status.currentVersion, MAX_SUPPORTED_SCHEMA_VERSION);
       assert.strictEqual(status.pendingCount, 0);
       assert.deepStrictEqual(logs, [{
         event: 'migration_compatibility_ok',
-        currentVersion: 8,
+        currentVersion: MAX_SUPPORTED_SCHEMA_VERSION,
         minSupportedVersion: 1,
-        maxSupportedVersion: 8,
+        maxSupportedVersion: MAX_SUPPORTED_SCHEMA_VERSION,
         pendingCount: 0
       }]);
     } finally { closeFixture(value); }
@@ -119,13 +120,13 @@ async function run() {
   // A schema below this build's minimum is incompatible; a pending additive migration is required, never implicit.
   {
     const value = fixture();
-    const registry = [...MIGRATIONS, additiveV9()];
+    const registry = [...MIGRATIONS, nextMigration()];
     try {
       initializeCurrent(value.db);
-      expectBlocked(() => gate(value.db, { registry, minVersion: 9, maxVersion: 9 }), 'MIGRATION_INCOMPATIBLE');
-      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: 9 }), 'MIGRATION_REQUIRED');
+      expectBlocked(() => gate(value.db, { registry, minVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1, maxVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1 }), 'MIGRATION_INCOMPATIBLE');
+      expectBlocked(() => gate(value.db, { registry, minVersion: 1, maxVersion: MAX_SUPPORTED_SCHEMA_VERSION + 1 }), 'MIGRATION_REQUIRED');
       assert.strictEqual(value.db.prepare("SELECT 1 FROM sqlite_master WHERE name='gate_probe'").get(), undefined);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 8);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, MAX_SUPPORTED_SCHEMA_VERSION);
     } finally { closeFixture(value); }
   }
 
@@ -263,7 +264,7 @@ async function run() {
       assert.match(result.stderr, /"condition":"MIGRATION_INCOMPATIBLE"/);
       assert.strictEqual(fileHash(unsafe.databasePath), beforeHash);
       unsafe.db = new Database(unsafe.databasePath);
-      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 9);
+      assert.strictEqual(unsafe.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, MAX_SUPPORTED_SCHEMA_VERSION + 1);
     } finally { closeFixture(unsafe); }
   }
 
@@ -291,7 +292,7 @@ async function run() {
       assert.doesNotMatch(result.stdout + result.stderr, new RegExp(value.directory.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
       assert.strictEqual(fs.existsSync(`${value.databasePath}.runtime-lock`), false);
       value.db = new Database(value.databasePath);
-      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, 9);
+      assert.strictEqual(value.db.prepare(`SELECT COUNT(*) count FROM ${LEDGER_TABLE}`).get().count, MAX_SUPPORTED_SCHEMA_VERSION + 1);
     } finally { closeFixture(value); }
   }
 
