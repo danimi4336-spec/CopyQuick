@@ -315,7 +315,7 @@ const MIGRATIONS = Object.freeze([
       `CREATE TABLE site_visitors (
         browser_hash TEXT PRIMARY KEY NOT NULL,
         email_invite INTEGER NOT NULL CHECK(email_invite IN (0, 1))
-      ) WITHOUT ROWID`
+      )`
     ])
   })
 ]);
